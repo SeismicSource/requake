@@ -1,0 +1,15 @@
+#Extensions
+*.pyc
+*.swp
+
+#Sphinx doc build
+doc/_build
+doc/generated
+
+#Temporary files
+*~
+
+#Build products
+*.egg-info/
+dist/
+build/
