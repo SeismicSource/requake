@@ -4,4 +4,4 @@ include LICENSE.txt
 include CONTRIBUTORS.txt
 include versioneer.py
 include requake/_version.py
-include requake/configspec.conf
+include requake/conf/configspec.conf
