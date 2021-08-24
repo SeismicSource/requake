@@ -128,8 +128,11 @@ def _setup_logging(config, basename=None, progname='requake'):
 
 
 def _init_connections(config):
-    """Coonect to FDSN services."""
-    config.client_dataselect = Client(config.fdsn_dataselect_url)
+    """Connect to FDSN services."""
+    config.client_fdsn_station = Client(config.fdsn_station_url)
+    logger.info('Connected to FDSN station server: {}'.format(
+        config.fdsn_station_url))
+    config.client_fdsn_dataselect = Client(config.fdsn_dataselect_url)
     logger.info('Connected to FDSN dataselect server: {}'.format(
         config.fdsn_dataselect_url))
     if config.catalog_fdsn_event_url is None:
