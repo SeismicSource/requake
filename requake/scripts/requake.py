@@ -11,10 +11,13 @@ Main script for Requake.
 """
 from ..rq_setup import configure, rq_exit
 from ..scan_catalog import scan_catalog
+from ..plot_pair import plot_pair
 
 
 def main():
     config = configure()
     if config.args.action == 'scan_catalog':
         scan_catalog(config)
+    if config.args.action == 'plot_pair':
+        plot_pair(config)
     rq_exit(0)

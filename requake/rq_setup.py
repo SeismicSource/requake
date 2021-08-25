@@ -78,6 +78,12 @@ def _parse_arguments(progname='requake'):
         'scan_template',
         help='scan a continous waveform stream using a template'
     )
+    plotpair = subparser.add_parser(
+        'plot_pair',
+        help='plot a pair of events'
+    )
+    plotpair.add_argument('evid1')
+    plotpair.add_argument('evid2')
     args = parser.parse_args()
     if args.action is None:
         parser.print_usage(sys.stderr)
@@ -193,6 +199,8 @@ def configure():
     # Create a config class
     config = Config(config_obj)
     config.args = args
+    # config.inventory needs to exist
+    config.inventory = None
     # Check library versions
     _check_library_versions()
     # Set up logging
