@@ -15,6 +15,6 @@ from ..catalog_scan import scan_catalog
 
 def main():
     config = configure()
-    if config.catalog_based_scan:
+    if config.args.action == 'scan_catalog':
         scan_catalog(config)
     rq_exit(0)

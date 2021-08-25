@@ -49,27 +49,43 @@ class Config(dict):
     __setattr__ = __setitem__
 
 
-def _parse_arguments():
+def _parse_arguments(progname='requake'):
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description='Run requake.')
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
-        '-c', '--configfile', type=str,
-        help='config file for data sources and processing params')
-    group.add_argument(
-        '-s', '--sampleconfig', default=False, action='store_true',
-        required=False,
-        help='write sample config file to current directory and exit')
+        description='{}: Repeating earthquakes '
+                    'search and analysis.'.format(progname))
+    subparser = parser.add_subparsers(dest='action')
     parser.add_argument(
-        '-o', '--outdir', dest='outdir',
-        action='store', default='requake_out',
-        help='save output to OUTDIR (default: requake_out)',
-        metavar='OUTDIR')
+        '-c', '--configfile', type=str, default='{}.conf'.format(progname),
+        help='config file (default: {}.conf)'.format(progname)
+    )
+    parser.add_argument(
+        '-o', '--outdir', type=str, default='{}_out'.format(progname),
+        help='save output to OUTDIR (default: {}_out)'.format(progname)
+    )
     parser.add_argument(
         '-v', '--version', action='version',
         version='%(prog)s {}'.format(get_versions()['version']))
+    subparser.add_parser(
+        'sample_config',
+        help='write sample config file to current directory and exit'
+    )
+    subparser.add_parser(
+        'scan_catalog',
+        help='scan an existing catalog for repeating earthquakes'
+    )
+    subparser.add_parser(
+        'scan_template',
+        help='scan a continous waveform stream using a template'
+    )
     args = parser.parse_args()
+    if args.action is None:
+        parser.print_usage(sys.stderr)
+        sys.stderr.write(
+            '{}: error: at least one positional argument '
+            'is required\n'.format(progname)
+        )
+        sys.exit(2)
     return args
 
 
@@ -165,7 +181,7 @@ def configure():
     """Read command line arguments. Read config file. Set up logging."""
     args = _parse_arguments()
     configspec = parse_configspec()
-    if args.sampleconfig:
+    if args.action == 'sample_config':
         write_sample_config(configspec, 'requake')
         sys.exit(0)
     config_obj = read_config(args.configfile, configspec)
