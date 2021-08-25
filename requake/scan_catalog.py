@@ -124,6 +124,8 @@ def _download_and_process_waveform(config, ev, trace_id):
     ev_lon = pref_origin.longitude
     ev_depth = pref_origin.depth / 1e3
     orig_time = pref_origin.time
+    mag = ev.preferred_magnitude().mag
+    mag_type = ev.preferred_magnitude().magnitude_type
     coords = config.inventory.get_coordinates(trace_id, orig_time)
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
@@ -150,6 +152,9 @@ def _download_and_process_waveform(config, ev, trace_id):
     st.merge(fill_value='interpolate')
     tr = st[0]
     tr.stats.evid = evid
+    tr.stats.orig_time = orig_time
+    tr.stats.mag = mag
+    tr.stats.mag_type = mag_type
     return tr
 
 

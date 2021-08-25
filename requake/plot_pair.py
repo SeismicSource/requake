@@ -51,18 +51,29 @@ def plot_pair(config):
     except Exception as m:
         logging.error(str(m))
         rq_exit(1)
-    fig, ax = plt.subplots(
-        2, 1, figsize=(12, 6), sharex=True, sharey=True)
     st.normalize()
     tr1, tr2 = st
     # apply lag to trace 2
     tr2.trim(
         tr2.stats.starttime-lag_sec, endtime=tr2.stats.endtime-lag_sec)
-    ax[0].plot(tr2.times(), tr2.data, color='gray')
-    ax[0].plot(tr1.times(), tr1.data)
-    ax[1].plot(tr1.times(), tr1.data, color='gray')
-    ax[1].plot(tr2.times(), tr2.data)
+    fig, ax = plt.subplots(
+        2, 1, figsize=(12, 6), sharex=True, sharey=True)
+    fig.suptitle('{} - CC: {:.2f}'.format(tr1.id, cc_max))
+    label1 = '{}, {} {:.1f}, {}'.format(
+        tr1.stats.evid, tr1.stats.mag_type, tr1.stats.mag,
+        tr1.stats.orig_time.strftime('%Y-%m-%dT%H:%M:%S'))
+    label2 = '{}, {} {:.1f}, {}'.format(
+        tr2.stats.evid, tr2.stats.mag_type, tr2.stats.mag,
+        tr2.stats.orig_time.strftime('%Y-%m-%dT%H:%M:%S'))
+    ax[0].plot(tr2.times(), tr2.data, color='gray', label=label2)
+    ax[0].plot(tr1.times(), tr1.data, color='blue', label=label1)
+    ax[1].plot(tr1.times(), tr1.data, color='gray', label=label1)
+    ax[1].plot(tr2.times(), tr2.data, color='blue', label=label2)
+    ax[1].set_xlabel('Time (s)')
     for _ax in ax:
-        _ax.set(ylim=[-1, 1])
+        _ax.set(ylim=[-1, 1], ylabel='Normalized amplitude')
+        _ax.minorticks_on()
+        _ax.yaxis.set_tick_params(which='minor', bottom=False)
         _ax.grid(True)
+        _ax.legend(loc='upper right')
     plt.show()
