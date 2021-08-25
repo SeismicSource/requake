@@ -10,7 +10,7 @@ Main script for Requake.
     (http://www.cecill.info/index.en.html)
 """
 from ..rq_setup import configure, rq_exit
-from ..catalog_scan import scan_catalog
+from ..scan_catalog import scan_catalog
 
 
 def main():
