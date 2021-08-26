@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__.split('.')[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
+import numpy as np
 import matplotlib.pyplot as plt
 from .rq_setup import rq_exit
 from .scan_catalog import get_waveform_pair, cc_waveform_pair
@@ -56,9 +57,20 @@ def plot_pair(config):
         rq_exit(1)
     st.normalize()
     tr1, tr2 = st
-    # apply lag to trace 2
-    tr2.trim(
-        tr2.stats.starttime-lag_sec, endtime=tr2.stats.endtime-lag_sec)
+    logger.info(
+        '{} {} -- lag: {} lag_sec: {:.1f} cc_max: {:.2f}'.format(
+            tr1.stats.evid, tr2.stats.evid, lag, lag_sec, cc_max
+        ))
+    data1 = tr1.data
+    # apply lag to trace #2
+    # if lag is positive, trace #2 is delayed
+    if lag > 0:
+        data2 = np.zeros_like(tr2.data)
+        data2[lag:] = tr2.data[:-lag]
+    # if lag is negative, trace #2 is advanced
+    elif lag < 0:
+        data2 = np.zeros_like(tr2.data)
+        data2[:lag] = tr2.data[-lag:]
     fig, ax = plt.subplots(
         2, 1, figsize=(12, 6), sharex=True, sharey=True)
     fig.suptitle('{} - CC: {:.2f}'.format(tr1.id, cc_max))
@@ -68,10 +80,10 @@ def plot_pair(config):
     label2 = '{}, {} {:.1f}, {}'.format(
         tr2.stats.evid, tr2.stats.mag_type, tr2.stats.mag,
         tr2.stats.orig_time.strftime('%Y-%m-%dT%H:%M:%S'))
-    ax[0].plot(tr2.times(), tr2.data, color='gray', label=label2)
-    ax[0].plot(tr1.times(), tr1.data, color='blue', label=label1)
-    ax[1].plot(tr1.times(), tr1.data, color='gray', label=label1)
-    ax[1].plot(tr2.times(), tr2.data, color='blue', label=label2)
+    ax[0].plot(tr2.times(), data2, color='gray', label=label2)
+    ax[0].plot(tr1.times(), data1, color='blue', label=label1)
+    ax[1].plot(tr1.times(), data1, color='gray', label=label1)
+    ax[1].plot(tr2.times(), data2, color='blue', label=label2)
     ax[1].set_xlabel('Time (s)')
     for _ax in ax:
         _ax.set(ylim=[-1, 1], ylabel='Normalized amplitude')
