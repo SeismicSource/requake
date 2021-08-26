@@ -19,6 +19,7 @@ from obspy.taup import TauPyModel
 model = TauPyModel(model='ak135')
 from obspy.signal.cross_correlation import correlate, xcorr_max
 from .rq_setup import rq_exit
+from .utils import update_progress
 
 
 def _get_metadata(config):
@@ -159,6 +160,9 @@ def _download_and_process_waveform(config, ev, trace_id):
     return tr
 
 
+skipped_evids = list()
+
+
 def get_waveform_pair(config, pair):
     """Download traces for a given pair."""
     if config.inventory is None:
@@ -173,17 +177,23 @@ def get_waveform_pair(config, pair):
     evids = [str(ev.resource_id).split('/')[-1] for ev in pair]
     trace_id = _get_trace_id(config, pair)
     st = Stream()
+    global skipped_evids
     for ev, evid in zip(pair, evids):
+        if evid in skipped_evids:
+            raise Exception
         try:
             st += _download_and_process_waveform(config, ev, trace_id)
         except Exception as m:
-            logger.warning(
-                '{} {} - Unable to download waveform data for '
-                'event {} and trace_id {}. '
-                'Skipping pair.'.format(*evids, evid, trace_id))
+            skipped_evids.append(evid)
             m = str(m).replace('\n', ' ')
-            logger.warning('{} {} - Error message: {}'.format(*evids, m))
-            raise Exception
+            msg = (
+                'Unable to download waveform data for '
+                'event {} and trace_id {}. '
+                'Skipping all pairs containig '
+                'this event.\n'
+                'Error message: {}'.format(evid, trace_id, m)
+            )
+            raise Exception(msg)
     return st
 
 
@@ -217,7 +227,9 @@ def scan_catalog(config):
     logger.info('{} events downloaded'.format(len(catalog)))
     logger.info('Building event pairs...')
     pairs = _get_pairs(config, catalog)
-    logger.info('{} event pairs built'.format(len(pairs)))
+    npairs = len(pairs)
+    logger.info('{} event pairs built'.format(npairs))
+    logger.info('Computing waveform cross-correlation...')
     outfile = os.path.join(
         config.args.outdir, 'requake.event_pairs.txt'
     )
@@ -227,7 +239,7 @@ def scan_catalog(config):
         'evid2          orig_time2                  mag2     '
         'lag_samples lag_seconds cc_max\n'
     )
-    for pair in pairs:
+    for n, pair in enumerate(pairs):
         try:
             st = get_waveform_pair(config, pair)
             lag, lag_sec, cc_max = cc_waveform_pair(config, st)
@@ -241,7 +253,13 @@ def scan_catalog(config):
                 )
             )
         except Exception as m:
-            logger.warning(str(m))
+            # Do not print empty messages
+            if str(m):
+                # Need a newline after the progressbar to print
+                # the warning message
+                update_progress(n/npairs, '\n')
+                logger.warning(str(m))
             continue
+        update_progress(n/npairs)
     fp_out.close()
     logger.info('Done! Output written to {}'.format(outfile))
