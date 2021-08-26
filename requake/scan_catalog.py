@@ -230,10 +230,7 @@ def scan_catalog(config):
     npairs = len(pairs)
     logger.info('{} event pairs built'.format(npairs))
     logger.info('Computing waveform cross-correlation...')
-    outfile = os.path.join(
-        config.args.outdir, 'requake.event_pairs.txt'
-    )
-    fp_out = open(outfile, 'w')
+    fp_out = open(config.scan_catalog_outfile, 'w')
     fp_out.write(
         '#evid1         orig_time1                  mag1     '
         'evid2          orig_time2                  mag2     '
@@ -262,4 +259,5 @@ def scan_catalog(config):
             continue
         update_progress(n/npairs)
     fp_out.close()
-    logger.info('Done! Output written to {}'.format(outfile))
+    logger.info(
+        'Done! Output written to {}'.format(config.scan_catalog_outfile))

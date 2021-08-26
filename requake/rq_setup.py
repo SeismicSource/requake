@@ -20,7 +20,8 @@ from obspy import UTCDateTime
 from obspy.clients.fdsn import Client
 from ._version import get_versions
 from .utils import (
-    parse_configspec, read_config, validate_config, write_sample_config
+    parse_configspec, read_config, validate_config, write_sample_config,
+    write_ok
 )
 
 
@@ -201,6 +202,15 @@ def configure():
     # Create a config class
     config = Config(config_obj)
     config.args = args
+    if args.action == 'scan_catalog':
+        outfile = os.path.join(
+            config.args.outdir, 'requake.event_pairs.txt'
+        )
+        if write_ok(outfile):
+            config.scan_catalog_outfile = outfile
+        else:
+            print('Exiting now.')
+            sys.exit(0)
     # config.inventory needs to exist
     config.inventory = None
     # Check library versions
