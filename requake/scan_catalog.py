@@ -9,6 +9,7 @@ Catalog-based repeater scan for Requake.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
+import os
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 from itertools import combinations
@@ -202,9 +203,6 @@ def cc_waveform_pair(config, st):
     cc = correlate(tr1, tr2, shift)
     lag, cc_max = xcorr_max(cc)
     lag_sec = lag*dt1
-    logger.info(
-        '{} {} - lag_samples: {} lag_sec: {:.2f} cc_max: {:.2f}'.format(
-            *evids, lag, lag_sec, cc_max))
     return lag, lag_sec, cc_max
 
 
@@ -220,10 +218,30 @@ def scan_catalog(config):
     logger.info('Building event pairs...')
     pairs = _get_pairs(config, catalog)
     logger.info('{} event pairs built'.format(len(pairs)))
+    outfile = os.path.join(
+        config.args.outdir, 'requake.event_pairs.txt'
+    )
+    fp_out = open(outfile, 'w')
+    fp_out.write(
+        '#evid1         orig_time1                  mag1     '
+        'evid2          orig_time2                  mag2     '
+        'lag_samples lag_seconds cc_max\n'
+    )
     for pair in pairs:
         try:
             st = get_waveform_pair(config, pair)
-            cc_waveform_pair(config, st)
+            lag, lag_sec, cc_max = cc_waveform_pair(config, st)
+            stats1, stats2 = [tr.stats for tr in st]
+            fp_out.write(
+                '{:14s} {} {:3s} {:3.1f}  {:14s} {} {:3s} {:3.1f}  '
+                '{:11d} {:11.2f} {:6.2f}\n'.format(
+                    stats1.evid, stats1.orig_time, stats1.mag_type, stats1.mag,
+                    stats2.evid, stats2.orig_time, stats2.mag_type, stats2.mag,
+                    lag, lag_sec, cc_max
+                )
+            )
         except Exception as m:
             logger.warning(str(m))
             continue
+    fp_out.close()
+    logger.info('Done! Output written to {}'.format(outfile))
