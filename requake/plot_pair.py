@@ -11,6 +11,9 @@ Download and plot a pair of events.
 """
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
+# Reduce logging level for Matplotlib to avoid DEBUG messages
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
 import matplotlib.pyplot as plt
 from .rq_setup import rq_exit
 from .scan_catalog import get_waveform_pair, cc_waveform_pair
