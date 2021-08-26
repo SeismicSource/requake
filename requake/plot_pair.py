@@ -41,7 +41,7 @@ def _get_pair(config):
         try:
             pair.append(_download_event(config, evid))
         except Exception as m:
-            logging.error(str(m))
+            logger.error(str(m))
             rq_exit(1)
     return pair
 
@@ -52,7 +52,7 @@ def plot_pair(config):
         st = get_waveform_pair(config, pair)
         lag, lag_sec, cc_max = cc_waveform_pair(config, st)
     except Exception as m:
-        logging.error(str(m))
+        logger.error(str(m))
         rq_exit(1)
     st.normalize()
     tr1, tr2 = st

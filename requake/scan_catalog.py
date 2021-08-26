@@ -37,7 +37,7 @@ def _get_metadata(config):
     channel_count = [channels.count(id) for id in unique_channels]
     for channel, count in zip(unique_channels, channel_count):
         if count > 1:
-            logging.warning(
+            logger.warning(
                 'Channel {} is present {} times in inventory'.format(
                     channel, count
                 )
@@ -176,12 +176,12 @@ def get_waveform_pair(config, pair):
         try:
             st += _download_and_process_waveform(config, ev, trace_id)
         except Exception as m:
-            logging.warning(
+            logger.warning(
                 '{} {} - Unable to download waveform data for '
                 'event {} and trace_id {}. '
                 'Skipping pair.'.format(*evids, evid, trace_id))
             m = str(m).replace('\n', ' ')
-            logging.warning('{} {} - Error message: {}'.format(*evids, m))
+            logger.warning('{} {} - Error message: {}'.format(*evids, m))
             raise Exception
     return st
 
@@ -194,7 +194,7 @@ def cc_waveform_pair(config, st):
     dt1 = tr1.stats.delta
     dt2 = tr2.stats.delta
     if dt1 != dt2:
-        logging.warning(
+        logger.warning(
             '{} {} - The two traces have a different sampling interval.'
             'Skipping pair.'.format(*evids))
         raise
@@ -202,7 +202,7 @@ def cc_waveform_pair(config, st):
     cc = correlate(tr1, tr2, shift)
     lag, cc_max = xcorr_max(cc)
     lag_sec = lag*dt1
-    logging.info(
+    logger.info(
         '{} {} - lag_samples: {} lag_sec: {:.2f} cc_max: {:.2f}'.format(
             *evids, lag, lag_sec, cc_max))
     return lag, lag_sec, cc_max
@@ -225,5 +225,5 @@ def scan_catalog(config):
             st = get_waveform_pair(config, pair)
             cc_waveform_pair(config, st)
         except Exception as m:
-            logging.warning(str(m))
+            logger.warning(str(m))
             continue
