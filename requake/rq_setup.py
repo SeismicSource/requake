@@ -109,14 +109,16 @@ def _check_library_versions():
     OBSPY_VERSION_STR = obspy.__version__
 
 
-def _setup_logging(config, basename=None, progname='requake'):
+def _setup_logging(config, progname, action_name):
     """Set up the logging infrastructure."""
     global logger
     # Create outdir
     if not os.path.exists(config.args.outdir):
         os.makedirs(config.args.outdir)
 
-    logfile = os.path.join(config.args.outdir, '{}.log'.format(progname))
+    logfile = os.path.join(
+        config.args.outdir,
+        '{}.{}.log'.format(progname, action_name))
 
     logger_root = logging.getLogger()
 
@@ -126,7 +128,7 @@ def _setup_logging(config, basename=None, progname='requake'):
     except Exception:
         pass
     logger_root.setLevel(logging.DEBUG)
-    filehand = logging.FileHandler(filename=logfile, mode='w')
+    filehand = logging.FileHandler(filename=logfile, mode='a')
     filehand.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s %(name)-20s '
                                   '%(levelname)-8s %(message)s')
@@ -204,7 +206,7 @@ def configure():
     # Check library versions
     _check_library_versions()
     # Set up logging
-    _setup_logging(config)
+    _setup_logging(config, 'requake', args.action)
     # save config to output dir
     shutil.copy(args.configfile, args.outdir)
     try:
@@ -219,9 +221,9 @@ def rq_exit(retval=0, abort=False, progname='requake'):
     """Exit as gracefully as possible."""
     if abort:
         print('\nAborting.')
-        logger.debug('{} ABORTED'.format(progname))
+        logger.debug('{} ABORTED\n\n'.format(progname))
     else:
-        logger.debug('{} END'.format(progname))
+        logger.debug('{} END\n\n'.format(progname))
     logging.shutdown()
     sys.exit(retval)
 
