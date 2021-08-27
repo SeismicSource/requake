@@ -9,9 +9,9 @@ Catalog-based repeater scan for Requake.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
-import os
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
+import csv
 from itertools import combinations
 from obspy import Catalog, Inventory, Stream
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
@@ -154,6 +154,9 @@ def _download_and_process_waveform(config, ev, trace_id):
     st.merge(fill_value='interpolate')
     tr = st[0]
     tr.stats.evid = evid
+    tr.stats.ev_lat = ev_lat
+    tr.stats.ev_lon = ev_lon
+    tr.stats.ev_depth = ev_depth
     tr.stats.orig_time = orig_time
     tr.stats.mag = mag
     tr.stats.mag_type = mag_type
@@ -231,24 +234,27 @@ def scan_catalog(config):
     logger.info('{} event pairs built'.format(npairs))
     logger.info('Computing waveform cross-correlation...')
     fp_out = open(config.scan_catalog_outfile, 'w')
-    fp_out.write(
-        '#evid1         orig_time1                  mag1     '
-        'evid2          orig_time2                  mag2     '
-        'lag_samples lag_seconds cc_max\n'
-    )
+    fieldnames = [
+        'evid1', 'evid2', 'trace_id',
+        'orig_time1', 'lon1', 'lat1', 'depth_km1', 'mag_type1', 'mag1',
+        'orig_time2', 'lon2', 'lat2', 'depth_km2', 'mag_type2', 'mag2',
+        'lag_samples', 'lag_sec', 'cc_max'
+    ]
+    writer = csv.writer(fp_out)
+    writer.writerows([fieldnames])
     for n, pair in enumerate(pairs):
         try:
             st = get_waveform_pair(config, pair)
             lag, lag_sec, cc_max = cc_waveform_pair(config, st)
             stats1, stats2 = [tr.stats for tr in st]
-            fp_out.write(
-                '{:14s} {} {:3s} {:3.1f}  {:14s} {} {:3s} {:3.1f}  '
-                '{:11d} {:11.2f} {:6.2f}\n'.format(
-                    stats1.evid, stats1.orig_time, stats1.mag_type, stats1.mag,
-                    stats2.evid, stats2.orig_time, stats2.mag_type, stats2.mag,
-                    lag, lag_sec, cc_max
-                )
-            )
+            writer.writerows([[
+                stats1.evid, stats2.evid, st[0].id,
+                stats1.orig_time, stats1.ev_lon, stats1.ev_lat,
+                stats1.ev_depth, stats1.mag_type, stats1.mag,
+                stats2.orig_time, stats2.ev_lon, stats2.ev_lat,
+                stats2.ev_depth, stats2.mag_type, stats2.mag,
+                lag, lag_sec, cc_max
+            ]])
         except Exception as m:
             # Do not print empty messages
             if str(m):

@@ -73,7 +73,7 @@ def _parse_arguments(progname='requake'):
     )
     subparser.add_parser(
         'scan_catalog',
-        help='scan an existing catalog for repeating earthquakes'
+        help='scan an existing catalog for earthquake pairs'
     )
     subparser.add_parser(
         'scan_template',
@@ -202,15 +202,13 @@ def configure():
     # Create a config class
     config = Config(config_obj)
     config.args = args
-    if args.action == 'scan_catalog':
-        outfile = os.path.join(
-            config.args.outdir, 'requake.event_pairs.txt'
-        )
-        if write_ok(outfile):
-            config.scan_catalog_outfile = outfile
-        else:
-            print('Exiting now.')
-            sys.exit(0)
+    config.scan_catalog_outfile = os.path.join(
+        config.args.outdir, 'requake.event_pairs.csv'
+    )
+    if (args.action == 'scan_catalog' and
+            not write_ok(config.scan_catalog_outfile)):
+        print('Exiting now.')
+        sys.exit(0)
     # config.inventory needs to exist
     config.inventory = None
     # Check library versions
@@ -219,11 +217,12 @@ def configure():
     _setup_logging(config, 'requake', args.action)
     # save config to output dir
     shutil.copy(args.configfile, args.outdir)
-    try:
-        _init_connections(config)
-    except Exception as m:
-        logger.error(m)
-        rq_exit(1)
+    if args.action in ['scan_catalog', 'plot_pair']:
+        try:
+            _init_connections(config)
+        except Exception as m:
+            logger.error(m)
+            rq_exit(1)
     return config
 
 
