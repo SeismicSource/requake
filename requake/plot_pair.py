@@ -73,16 +73,26 @@ def plot_pair(config):
         data2[:lag] = tr2.data[-lag:]
     fig, ax = plt.subplots(
         2, 1, figsize=(12, 6), sharex=True, sharey=True)
-    fig.suptitle('{} - CC: {:.2f}'.format(tr1.id, cc_max))
-    label1 = '{}, {} {:.1f}, {}'.format(
-        tr1.stats.evid, tr1.stats.mag_type, tr1.stats.mag,
-        tr1.stats.orig_time.strftime('%Y-%m-%dT%H:%M:%S'))
-    label2 = '{}, {} {:.1f}, {}'.format(
-        tr2.stats.evid, tr2.stats.mag_type, tr2.stats.mag,
-        tr2.stats.orig_time.strftime('%Y-%m-%dT%H:%M:%S'))
-    ax[0].plot(tr2.times(), data2, color='gray', label=label2)
+    ax[0].set_title('{} - CC: {:.2f}'.format(tr1.id, cc_max))
+    stats1 = tr1.stats
+    stats2 = tr2.stats
+    label1 = (
+        '{}, {} {:.1f}, {}\n'
+        '{:.4f}°N {:.4f}°E {:.3f} km'.format(
+            stats1.evid, stats1.mag_type, stats1.mag,
+            stats1.orig_time.strftime('%Y-%m-%dT%H:%M:%S'),
+            stats1.ev_lat, stats1.ev_lon, stats1.ev_depth)
+    )
+    label2 = (
+        '{}, {} {:.1f}, {}\n'
+        '{:.4f}°N {:.4f}°E {:.3f} km'.format(
+            stats2.evid, stats2.mag_type, stats2.mag,
+            stats2.orig_time.strftime('%Y-%m-%dT%H:%M:%S'),
+            stats2.ev_lat, stats2.ev_lon, stats2.ev_depth)
+    )
+    ax[0].plot(tr2.times(), data2, color='gray', label=stats2.evid)
     ax[0].plot(tr1.times(), data1, color='blue', label=label1)
-    ax[1].plot(tr1.times(), data1, color='gray', label=label1)
+    ax[1].plot(tr1.times(), data1, color='gray', label=stats1.evid)
     ax[1].plot(tr2.times(), data2, color='blue', label=label2)
     ax[1].set_xlabel('Time (s)')
     for _ax in ax:
