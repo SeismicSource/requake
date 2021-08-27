@@ -264,6 +264,8 @@ def scan_catalog(config):
                 logger.warning(str(m))
             continue
         update_progress(n/npairs)
+    # Final update to progressbar
+    update_progress(1.)
     fp_out.close()
     logger.info(
         'Done! Output written to {}'.format(config.scan_catalog_outfile))
