@@ -81,7 +81,7 @@ def _parse_arguments(progname='requake'):
     )
     plotpair = subparser.add_parser(
         'plot_pair',
-        help='plot a pair of events'
+        help='plot traces for a given event pair'
     )
     plotpair.add_argument('evid1')
     plotpair.add_argument('evid2')

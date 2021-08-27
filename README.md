@@ -27,7 +27,7 @@ version number is lost), then install the code from within the `requake` main
 directory by running:
 
     pip install .
-    
+
 ## Running
 
 Requake is based on a single executable, aptly named `requake` 😉.
@@ -45,9 +45,9 @@ Currently supported verbs are:
                                 pairs
     requake scan_template       scan a continuous waveform stream using
                                 a template
-    requake plot_pair           plot a pair of events
+    requake plot_pair           plot traces for a given event pair
     requake build_families      build families of repeating earthquakes
                                 from a catalog of pairs
-                        
+
 Certain running modes (e.g., `plot_pair`) require further arguments (use, e.g.,
 `requake plot_pair -h` to get help).

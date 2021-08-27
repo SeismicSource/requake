@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
-Download and plot a pair of events.
+Download and plot traces for an event pair.
 
 :copyright:
     2021 Claudio Satriano <satriano@ipgp.fr>
