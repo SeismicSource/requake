@@ -77,7 +77,7 @@ def _parse_arguments(progname='requake'):
     )
     subparser.add_parser(
         'scan_template',
-        help='scan a continous waveform stream using a template'
+        help='scan a continuous waveform stream using a template'
     )
     plotpair = subparser.add_parser(
         'plot_pair',
