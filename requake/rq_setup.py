@@ -85,6 +85,10 @@ def _parse_arguments(progname='requake'):
     )
     plotpair.add_argument('evid1')
     plotpair.add_argument('evid2')
+    subparser.add_parser(
+        'build_families',
+        help='build families of repeating earthquakes from a catalog of pairs'
+    )
     args = parser.parse_args()
     if args.action is None:
         parser.print_usage(sys.stderr)
@@ -204,6 +208,9 @@ def configure():
     config.args = args
     config.scan_catalog_outfile = os.path.join(
         config.args.outdir, 'requake.event_pairs.csv'
+    )
+    config.build_families_outfile = os.path.join(
+        config.args.outdir, 'requake.event_families.csv'
     )
     if (args.action == 'scan_catalog' and
             not write_ok(config.scan_catalog_outfile)):

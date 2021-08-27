@@ -12,6 +12,7 @@ Main script for Requake.
 from ..rq_setup import configure, rq_exit
 from ..scan_catalog import scan_catalog
 from ..plot_pair import plot_pair
+from ..build_families import build_families
 
 
 def main():
@@ -20,4 +21,6 @@ def main():
         scan_catalog(config)
     if config.args.action == 'plot_pair':
         plot_pair(config)
+    if config.args.action == 'build_families':
+        build_families(config)
     rq_exit(0)
