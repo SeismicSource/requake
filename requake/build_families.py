@@ -12,45 +12,8 @@ Build families of repeating earthquakes from a catalog of pairs.
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import csv
+from .data_types import RequakeEvent
 from .rq_setup import rq_exit
-
-
-class Event():
-    """An hashable event class."""
-
-    evid = None
-    orig_time = None
-    lon = None
-    lat = None
-    depth = None
-    mag_type = None
-    mag = None
-
-    def __eq__(self, other):
-        if self.evid == other.evid:
-            return True
-        else:
-            return False
-
-    def __gt__(self, other):
-        return self.orig_time > other.orig_time
-
-    def __ge__(self, other):
-        return self.orig_time >= other.orig_time
-
-    def __lt__(self, other):
-        return self.orig_time < other.orig_time
-
-    def __le__(self, other):
-        return self.orig_time <= other.orig_time
-
-    def __hash__(self):
-        return self.evid.__hash__()
-
-    def __str__(self):
-        s = '{} {} {} {}'.format(
-            self.evid, self.orig_time, self.mag_type, self.mag)
-        return s
 
 
 def _read_pairs(config):
@@ -61,7 +24,7 @@ def _read_pairs(config):
         cc_max = float(row['cc_max'])
         if abs(cc_max) < config.cc_min:
             continue
-        ev1 = Event()
+        ev1 = RequakeEvent()
         ev1.evid = row['evid1']
         ev1.orig_time = row['orig_time1']
         ev1.lon = row['lon1']
@@ -69,7 +32,7 @@ def _read_pairs(config):
         ev1.depth = row['depth_km1']
         ev1.mag_type = row['mag_type1']
         ev1.mag = row['mag1']
-        ev2 = Event()
+        ev2 = RequakeEvent()
         ev2.evid = row['evid2']
         ev2.orig_time = row['orig_time2']
         ev2.lon = row['lon2']

@@ -17,7 +17,7 @@ mpl_logger.setLevel(logging.WARNING)
 import numpy as np
 import matplotlib.pyplot as plt
 from .rq_setup import rq_exit
-from .scan_catalog import get_waveform_pair, cc_waveform_pair
+from .waveforms import get_waveform_pair, cc_waveform_pair
 
 
 def _download_event(config, evid):
