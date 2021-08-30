@@ -183,7 +183,7 @@ def _init_connections(config):
         config.clients_fdsn_event.append(Client(url))
         logger.info('Connected to FDSN event server: {}'.format(url))
         start_time = config['catalog_start_time_{:1d}'.format(n)]
-        end_time = config['catalog_start_time_{:1d}'.format(n)]
+        end_time = config['catalog_end_time_{:1d}'.format(n)]
         if start_time is None or end_time is None:
             continue
         config.catalog_start_times.append(UTCDateTime(start_time))
