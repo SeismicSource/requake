@@ -25,7 +25,7 @@ def get_metadata(config):
     """Download metadata for the trace_ids specified in config file."""
     logger.info('Downloading station metadata...')
     inv = Inventory()
-    cl = config.client_fdsn_station
+    cl = config.fdsn_station_client
     start_time = min(config.catalog_start_times)
     end_time = max(config.catalog_end_times)
     for trace_id in config.catalog_trace_id:
@@ -110,7 +110,7 @@ def download_and_process_waveform(config, ev, trace_id):
     pre_P = config.cc_pre_P
     trace_length = config.cc_trace_length
     t0 = orig_time + arrivals[0].time - pre_P
-    cl = config.client_fdsn_dataselect
+    cl = config.fdsn_dataselect_client
     net, sta, loc, chan = trace_id.split('.')
     st = cl.get_waveforms(
         network=net, station=sta, location=loc, channel=chan,

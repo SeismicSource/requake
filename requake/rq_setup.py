@@ -158,29 +158,33 @@ def _setup_logging(config, progname, action_name):
 
 def _init_connections(config):
     """Connect to FDSN services."""
-    config.client_fdsn_station = Client(config.fdsn_station_url)
+    config.fdsn_station_client = Client(config.fdsn_station_url)
     logger.info('Connected to FDSN station server: {}'.format(
         config.fdsn_station_url))
-    config.client_fdsn_dataselect = Client(config.fdsn_dataselect_url)
+    config.fdsn_dataselect_client = Client(config.fdsn_dataselect_url)
     logger.info('Connected to FDSN dataselect server: {}'.format(
         config.fdsn_dataselect_url))
     if config.catalog_fdsn_event_url is None:
         return
-    config.clients_fdsn_event = list()
+    config.catalog_fdsn_event_clients = list()
     config.catalog_start_times = list()
     config.catalog_end_times = list()
-    config.clients_fdsn_event.append(Client(config.catalog_fdsn_event_url))
+    config.catalog_fdsn_event_urls = list()
+    config.catalog_fdsn_event_urls.append(config.catalog_fdsn_event_url)
+    config.catalog_fdsn_event_clients.append(
+        Client(config.catalog_fdsn_event_url))
     logger.info('Connected to FDSN event server: {}'.format(
         config.catalog_fdsn_event_url))
     config.catalog_start_times.append(
-            UTCDateTime(config.catalog_start_time))
+        UTCDateTime(config.catalog_start_time))
     config.catalog_end_times.append(
-            UTCDateTime(config.catalog_end_time))
+        UTCDateTime(config.catalog_end_time))
     for n in 1, 2, 3:
         url = config['catalog_fdsn_event_url_{:1d}'.format(n)]
         if url is None:
             continue
-        config.clients_fdsn_event.append(Client(url))
+        config.catalog_fdsn_event_urls.append(url)
+        config.catalog_fdsn_event_clients.append(Client(url))
         logger.info('Connected to FDSN event server: {}'.format(url))
         start_time = config['catalog_start_time_{:1d}'.format(n)]
         end_time = config['catalog_end_time_{:1d}'.format(n)]

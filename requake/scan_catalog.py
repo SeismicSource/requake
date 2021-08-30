@@ -25,22 +25,32 @@ from .utils import update_progress
 def _get_catalog(config):
     """Download events based on user-defined criteria."""
     cat_info = zip(
-        config.clients_fdsn_event,
+        config.catalog_fdsn_event_urls,
+        config.catalog_fdsn_event_clients,
         config.catalog_start_times,
         config.catalog_end_times)
     catalog = Catalog()
-    for cl, start_time, end_time in cat_info:
-        catalog += cl.get_events(
-            starttime=start_time, endtime=end_time,
-            minlatitude=config.catalog_lat_min,
-            maxlatitude=config.catalog_lat_max,
-            minlongitude=config.catalog_lon_min,
-            maxlongitude=config.catalog_lon_max,
-            mindepth=config.catalog_depth_min,
-            maxdepth=config.catalog_depth_max,
-            minmagnitude=config.catalog_mag_min,
-            maxmagnitude=config.catalog_mag_max
-        )
+    for url, cl, start_time, end_time in cat_info:
+        try:
+            catalog += cl.get_events(
+                starttime=start_time, endtime=end_time,
+                minlatitude=config.catalog_lat_min,
+                maxlatitude=config.catalog_lat_max,
+                minlongitude=config.catalog_lon_min,
+                maxlongitude=config.catalog_lon_max,
+                mindepth=config.catalog_depth_min,
+                maxdepth=config.catalog_depth_max,
+                minmagnitude=config.catalog_mag_min,
+                maxmagnitude=config.catalog_mag_max
+            )
+        except Exception as m:
+            logger.warning(
+                'Unable to download events from {} for period {} - {}. '
+                '{}'.format(url, start_time, end_time, m)
+            )
+    if not catalog:
+        logger.error('No event downloaded')
+        rq_exit(1)
     # Remove events without preferred_origin
     cat = [ev for ev in catalog if ev.preferred_origin() is not None]
     # Sort catalog in increasing time order and return it
@@ -69,12 +79,9 @@ def _get_pairs(config, catalog):
 def scan_catalog(config):
     """Perform cross-correlation on catalog events."""
     logger.info('Downloading events...')
-    try:
-        catalog = _get_catalog(config)
-    except Exception as m:
-        logger.error('Unable to download events. ' + str(m))
-        rq_exit(1)
-    logger.info('{} events downloaded'.format(len(catalog)))
+    catalog = _get_catalog(config)
+    nevents = len(catalog)
+    logger.info('{} events downloaded'.format(nevents))
     logger.info('Building event pairs...')
     pairs = _get_pairs(config, catalog)
     npairs = len(pairs)
