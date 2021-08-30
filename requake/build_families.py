@@ -12,13 +12,13 @@ Build families of repeating earthquakes from a catalog of pairs.
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import csv
-from .data_types import RequakeEvent
+from .catalog import RequakeEvent
 from .rq_setup import rq_exit
 
 
 def _read_pairs(config):
     pairs = list()
-    fp = open(config.scan_catalog_outfile, 'r')
+    fp = open(config.scan_catalog_pairs_file, 'r')
     reader = csv.DictReader(fp)
     for row in reader:
         cc_max = float(row['cc_max'])
@@ -53,7 +53,7 @@ def build_families(config):
     except FileNotFoundError:
         logger.error(
             'Unable to find event pairs file: {}'.format(
-                config.scan_catalog_outfile
+                config.scan_catalog_pairs_file
             ))
         rq_exit(1)
     # Build families from pairs sharing an event

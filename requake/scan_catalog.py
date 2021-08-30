@@ -12,27 +12,39 @@ Catalog-based repeater scan for Requake.
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import csv
+from math import factorial
 from itertools import combinations
-from obspy import Catalog
 from obspy.geodetics import gps2dist_azimuth
 from obspy.taup import TauPyModel
 model = TauPyModel(model='ak135')
+from .catalog import RequakeCatalog, get_events, read_events
 from .waveforms import get_waveform_pair, cc_waveform_pair
 from .rq_setup import rq_exit
 from .utils import update_progress
 
 
 def _get_catalog(config):
-    """Download events based on user-defined criteria."""
+    """
+    Download events based on user-defined criteria.
+
+    Reads a cached catalog file, if available.
+    """
+    try:
+        cat = read_events(config.scan_catalog_file)
+        logger.info('{} events read from catalog file'.format(len(cat)))
+        return cat
+    except Exception:
+        pass
+    logger.info('Downloading events...')
     cat_info = zip(
         config.catalog_fdsn_event_urls,
-        config.catalog_fdsn_event_clients,
         config.catalog_start_times,
         config.catalog_end_times)
-    catalog = Catalog()
-    for url, cl, start_time, end_time in cat_info:
+    catalog = list()
+    for url, start_time, end_time in cat_info:
         try:
-            catalog += cl.get_events(
+            catalog += get_events(
+                url,
                 starttime=start_time, endtime=end_time,
                 minlatitude=config.catalog_lat_min,
                 maxlatitude=config.catalog_lat_max,
@@ -51,43 +63,39 @@ def _get_catalog(config):
     if not catalog:
         logger.error('No event downloaded')
         rq_exit(1)
-    # Remove events without preferred_origin
-    cat = [ev for ev in catalog if ev.preferred_origin() is not None]
-    # Sort catalog in increasing time order and return it
-    return Catalog(sorted(cat, key=lambda ev: ev.preferred_origin().time))
+    # Sort catalog in increasing time order
+    cat = RequakeCatalog(sorted(catalog, key=lambda ev: ev.orig_time))
+    cat.write(config.scan_catalog_file)
+    logger.info('{} events downloaded'.format(len(cat)))
+    return cat
 
 
 def _get_pairs(config, catalog):
     """Get event pairs to check for similarity."""
     pairs = list()
-    for ev1, ev2 in combinations(catalog, 2):
-        pref_origin1 = ev1.preferred_origin()
-        pref_origin2 = ev2.preferred_origin()
-        if pref_origin1 is None or pref_origin2 is None:
-            continue
-        lat1 = pref_origin1.latitude
-        lon1 = pref_origin1.longitude
-        lat2 = pref_origin2.latitude
-        lon2 = pref_origin2.longitude
-        distance, _, _ = gps2dist_azimuth(lat1, lon1, lat2, lon2)
+    nevents = len(catalog)
+    npairs = int(factorial(nevents)/(factorial(2)*factorial(nevents-2)))
+    for n, pair in enumerate(combinations(catalog, 2)):
+        ev1, ev2 = pair
+        distance, _, _ = gps2dist_azimuth(ev1.lat, ev1.lon, ev2.lat, ev2.lon)
         distance /= 1e3
         if distance <= config.catalog_search_range:
             pairs.append((ev1, ev2))
+        update_progress(n/npairs)
+    update_progress(1.)
     return pairs
 
 
 def scan_catalog(config):
     """Perform cross-correlation on catalog events."""
-    logger.info('Downloading events...')
     catalog = _get_catalog(config)
     nevents = len(catalog)
-    logger.info('{} events downloaded'.format(nevents))
     logger.info('Building event pairs...')
     pairs = _get_pairs(config, catalog)
     npairs = len(pairs)
     logger.info('{} event pairs built'.format(npairs))
     logger.info('Computing waveform cross-correlation...')
-    fp_out = open(config.scan_catalog_outfile, 'w')
+    fp_out = open(config.scan_catalog_pairs_file, 'w')
     fieldnames = [
         'evid1', 'evid2', 'trace_id',
         'orig_time1', 'lon1', 'lat1', 'depth_km1', 'mag_type1', 'mag1',
@@ -122,4 +130,4 @@ def scan_catalog(config):
     update_progress(1.)
     fp_out.close()
     logger.info(
-        'Done! Output written to {}'.format(config.scan_catalog_outfile))
+        'Done! Output written to {}'.format(config.scan_catalog_pairs_file))

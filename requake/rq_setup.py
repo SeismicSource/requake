@@ -210,14 +210,17 @@ def configure():
     # Create a config class
     config = Config(config_obj)
     config.args = args
-    config.scan_catalog_outfile = os.path.join(
+    config.scan_catalog_file = os.path.join(
+        config.args.outdir, 'requake.catalog.txt'
+    )
+    config.scan_catalog_pairs_file = os.path.join(
         config.args.outdir, 'requake.event_pairs.csv'
     )
     config.build_families_outfile = os.path.join(
         config.args.outdir, 'requake.event_families.csv'
     )
     if (args.action == 'scan_catalog' and
-            not write_ok(config.scan_catalog_outfile)):
+            not write_ok(config.scan_catalog_pairs_file)):
         print('Exiting now.')
         sys.exit(0)
     # config.inventory needs to exist

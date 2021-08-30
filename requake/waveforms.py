@@ -18,7 +18,7 @@ from obspy.taup import TauPyModel
 model = TauPyModel(model='ak135')
 from obspy.signal.cross_correlation import correlate, xcorr_max
 from .rq_setup import rq_exit
-from .data_types import RequakeEvent
+from .catalog import RequakeEvent
 
 
 def get_metadata(config):
@@ -58,15 +58,9 @@ def get_trace_id(config, ev):
     trace_ids = config.catalog_trace_id
     if len(trace_ids) == 1:
         return trace_ids[0]
-    if isinstance(ev, Event):
-        pref_origin = ev.preferred_origin()
-        ev_lat = pref_origin.latitude
-        ev_lon = pref_origin.longitude
-        orig_time = pref_origin.time
-    elif isinstance(ev, RequakeEvent):
-        ev_lat = ev.lat
-        ev_lon = ev.lon
-        orig_time = ev.orig_time
+    ev_lat = ev.lat
+    ev_lon = ev.lon
+    orig_time = ev.orig_time
     distances = []
     for trace_id in trace_ids:
         coords = config.inventory.get_coordinates(trace_id, orig_time)
@@ -81,23 +75,13 @@ def get_trace_id(config, ev):
 
 def download_and_process_waveform(config, ev, trace_id):
     """Download and process waveform for a given event at a given trace_id."""
-    if isinstance(ev, Event):
-        evid = str(ev.resource_id).split('/')[-1]
-        pref_origin = ev.preferred_origin()
-        ev_lat = pref_origin.latitude
-        ev_lon = pref_origin.longitude
-        ev_depth = pref_origin.depth / 1e3
-        orig_time = pref_origin.time
-        mag = ev.preferred_magnitude().mag
-        mag_type = ev.preferred_magnitude().magnitude_type
-    elif isinstance(ev, RequakeEvent):
-        evid = ev.evid
-        ev_lat = ev.lat
-        ev_lon = ev.lon
-        ev_depth = ev.depth
-        orig_time = ev.orig_time
-        mag = ev.mag
-        mag_type = ev.mag_type
+    evid = ev.evid
+    ev_lat = ev.lat
+    ev_lon = ev.lon
+    ev_depth = ev.depth
+    orig_time = ev.orig_time
+    mag = ev.mag
+    mag_type = ev.mag_type
     coords = config.inventory.get_coordinates(trace_id, orig_time)
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
@@ -140,24 +124,23 @@ def get_waveform_pair(config, pair):
     """Download traces for a given pair."""
     if config.inventory is None:
         get_metadata(config)
-    evids = [str(ev.resource_id).split('/')[-1] for ev in pair]
     trace_id = get_trace_id(config, pair[0])
     st = Stream()
     global skipped_evids
-    for ev, evid in zip(pair, evids):
-        if evid in skipped_evids:
+    for ev in pair:
+        if ev.evid in skipped_evids:
             raise Exception
         try:
             st += download_and_process_waveform(config, ev, trace_id)
         except Exception as m:
-            skipped_evids.append(evid)
+            skipped_evids.append(ev.evid)
             m = str(m).replace('\n', ' ')
             msg = (
                 'Unable to download waveform data for '
                 'event {} and trace_id {}. '
                 'Skipping all pairs containig '
                 'this event.\n'
-                'Error message: {}'.format(evid, trace_id, m)
+                'Error message: {}'.format(ev.evid, trace_id, m)
             )
             raise Exception(msg)
     return st
