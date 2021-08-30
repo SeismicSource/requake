@@ -70,20 +70,14 @@ def _get_catalog(config):
     return cat
 
 
-def _get_pairs(config, catalog):
-    """Get event pairs to check for similarity."""
-    pairs = list()
-    nevents = len(catalog)
-    npairs = int(factorial(nevents)/(factorial(2)*factorial(nevents-2)))
-    for n, pair in enumerate(combinations(catalog, 2)):
-        ev1, ev2 = pair
-        distance, _, _ = gps2dist_azimuth(ev1.lat, ev1.lon, ev2.lat, ev2.lon)
-        distance /= 1e3
-        if distance <= config.catalog_search_range:
-            pairs.append((ev1, ev2))
-        update_progress(n/npairs)
-    update_progress(1.)
-    return pairs
+def _pair_ok(config, pair):
+    """Check if events in pair are close enough."""
+    ev1, ev2 = pair
+    distance, _, _ = gps2dist_azimuth(ev1.lat, ev1.lon, ev2.lat, ev2.lon)
+    distance /= 1e3
+    if distance <= config.catalog_search_range:
+        return True
+    return False
 
 
 def scan_catalog(config):
@@ -91,9 +85,6 @@ def scan_catalog(config):
     catalog = _get_catalog(config)
     nevents = len(catalog)
     logger.info('Building event pairs...')
-    pairs = _get_pairs(config, catalog)
-    npairs = len(pairs)
-    logger.info('{} event pairs built'.format(npairs))
     logger.info('Computing waveform cross-correlation...')
     fp_out = open(config.scan_catalog_pairs_file, 'w')
     fieldnames = [
@@ -104,7 +95,11 @@ def scan_catalog(config):
     ]
     writer = csv.writer(fp_out)
     writer.writerows([fieldnames])
-    for n, pair in enumerate(pairs):
+    npairs = int(factorial(nevents)/(factorial(2)*factorial(nevents-2)))
+    for n, pair in enumerate(combinations(catalog, 2)):
+        if not _pair_ok(config, pair):
+            update_progress(n/npairs)
+            continue
         try:
             st = get_waveform_pair(config, pair)
             lag, lag_sec, cc_max = cc_waveform_pair(config, st)
