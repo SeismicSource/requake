@@ -10,6 +10,8 @@ Utility functions for Requake.
 """
 import os
 import sys
+import locale
+locale.setlocale(locale.LC_ALL, '')
 from .configobj import ConfigObj
 from .configobj.validate import Validator
 
@@ -83,7 +85,7 @@ def validate_config(config_obj):
         err_exit('No configuration value present!')
 
 
-def update_progress(progress, status=None):
+def update_progress(num, total, status=None):
     """
     Display or update a console progress bar.
 
@@ -91,9 +93,10 @@ def update_progress(progress, status=None):
     A value under 0 represents a 'halt'.
     A value at 1 or bigger represents 100%
 
-    Source: https://stackoverflow.com/a/15860757/2021880
+    Modified from: https://stackoverflow.com/a/15860757/2021880
     """
     barLength = 40  # Modify this to change the length of the progress bar
+    progress = num/total
     if status is None:
         status = ''
         if progress < 0:
@@ -103,7 +106,7 @@ def update_progress(progress, status=None):
             progress = 1
             status = 'Done.\r\n'
     block = int(round(barLength*progress))
-    text = '\rProgress: [{}] {:5.1f}% {}'.format(
-        '#'*block + '-'*(barLength-block), progress*100, status)
+    text = '\rProgress: [{}] {:n} of {:n} {}'.format(
+        '#'*block + '-'*(barLength-block), num, total, status)
     sys.stdout.write(text)
     sys.stdout.flush()

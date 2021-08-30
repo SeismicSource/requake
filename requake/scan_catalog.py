@@ -98,7 +98,7 @@ def scan_catalog(config):
     npairs = int(factorial(nevents)/(factorial(2)*factorial(nevents-2)))
     for n, pair in enumerate(combinations(catalog, 2)):
         if not _pair_ok(config, pair):
-            update_progress(n/npairs)
+            update_progress(n, npairs, 'pairs')
             continue
         try:
             st = get_waveform_pair(config, pair)
@@ -117,12 +117,12 @@ def scan_catalog(config):
             if str(m):
                 # Need a newline after the progressbar to print
                 # the warning message
-                update_progress(n/npairs, '\n')
+                update_progress(n, npairs, 'pairs\n')
                 logger.warning(str(m))
             continue
-        update_progress(n/npairs)
+        update_progress(n, npairs, 'pairs')
     # Final update to progressbar
-    update_progress(1.)
+    update_progress(npairs, npairs)
     fp_out.close()
     logger.info(
         'Done! Output written to {}'.format(config.scan_catalog_pairs_file))
