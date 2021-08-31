@@ -61,7 +61,14 @@ def get_trace_id(config, ev):
     orig_time = ev.orig_time
     distances = []
     for trace_id in trace_ids:
-        coords = config.inventory.get_coordinates(trace_id, orig_time)
+        try:
+            coords = config.inventory.get_coordinates(trace_id, orig_time)
+        except Exception:
+            logger.error(
+                'Unable to find coordinates for trace {} at time {}'.format(
+                    trace_id, orig_time
+                ))
+            rq_exit(1)
         trace_lat = coords['latitude']
         trace_lon = coords['longitude']
         distance, _, _ = gps2dist_azimuth(
