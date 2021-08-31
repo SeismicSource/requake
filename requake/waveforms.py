@@ -12,13 +12,11 @@ Functions for downloading and processing waveforms.
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 from obspy import Inventory, Stream
-from obspy.core.event import Event
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
 model = TauPyModel(model='ak135')
 from obspy.signal.cross_correlation import correlate, xcorr_max
 from .rq_setup import rq_exit
-from .catalog import RequakeEvent
 
 
 def get_metadata(config):
