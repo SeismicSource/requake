@@ -17,15 +17,22 @@ mpl_logger.setLevel(logging.WARNING)
 import numpy as np
 import matplotlib.pyplot as plt
 from .rq_setup import rq_exit
+from .catalog import get_events, read_events
 from .waveforms import get_waveform_pair, cc_waveform_pair
 
 
 def _download_event(config, evid):
     """Download an event based on its evid."""
     ev = None
-    for cl in config.clients_fdsn_event:
+    try:
+        cat = read_events(config.scan_catalog_file)
+        ev = [e for e in cat if e.evid == evid][0]
+        return ev
+    except Exception:
+        pass
+    for url in config.catalog_fdsn_event_urls:
         try:
-            ev = cl.get_events(eventid=evid)[0]
+            ev = get_events(url, eventid=evid)[0]
         except Exception:
             pass
     if ev is None:
