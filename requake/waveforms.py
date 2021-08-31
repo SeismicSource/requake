@@ -116,7 +116,8 @@ def download_and_process_waveform(config, ev, trace_id):
 
 
 skipped_evids = list()
-tr_cache = None
+tr_cache = dict()
+old_evid1 = None
 
 
 def get_waveform_pair(config, pair):
@@ -127,15 +128,28 @@ def get_waveform_pair(config, pair):
     st = Stream()
     global skipped_evids
     global tr_cache
+    global old_evid1
+    # remove trace from cache when ev1 changes
+    evid1 = pair[0].evid
+    if old_evid1 is not None and evid1 != old_evid1:
+        try:
+            del tr_cache[old_evid1]
+        except KeyError:
+            pass
+    old_evid1 = evid1
     for ev in pair:
         if ev.evid in skipped_evids:
             raise Exception
         # use cached trace, if possible
-        if tr_cache is not None and tr_cache.stats.evid == ev.evid:
-            st.append(tr_cache)
-            continue
         try:
-            st += download_and_process_waveform(config, ev, trace_id)
+            st.append(tr_cache[ev.evid])
+            continue
+        except KeyError:
+            pass
+        try:
+            tr = download_and_process_waveform(config, ev, trace_id)
+            tr_cache[ev.evid] = tr
+            st.append(tr)
         except Exception as m:
             skipped_evids.append(ev.evid)
             m = str(m).replace('\n', ' ')
@@ -147,7 +161,6 @@ def get_waveform_pair(config, pair):
                 'Error message: {}'.format(ev.evid, trace_id, m)
             )
             raise Exception(msg)
-    tr_cache = st[0]
     return st
 
 
