@@ -102,7 +102,7 @@ def scan_catalog(config):
             continue
         try:
             st = get_waveform_pair(config, pair)
-            lag, lag_sec, cc_max = cc_waveform_pair(config, st)
+            lag, lag_sec, cc_max = cc_waveform_pair(config, st[0], st[1])
             stats1, stats2 = [tr.stats for tr in st]
             writer.writerows([[
                 stats1.evid, stats2.evid, st[0].id,

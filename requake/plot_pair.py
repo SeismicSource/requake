@@ -58,7 +58,7 @@ def plot_pair(config):
     try:
         pair = _get_pair(config)
         st = get_waveform_pair(config, pair)
-        lag, lag_sec, cc_max = cc_waveform_pair(config, st)
+        lag, lag_sec, cc_max = cc_waveform_pair(config, st[0], st[1])
     except Exception as m:
         logger.error(str(m))
         rq_exit(1)

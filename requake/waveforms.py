@@ -171,17 +171,16 @@ def get_waveform_pair(config, pair):
     return st
 
 
-def cc_waveform_pair(config, st):
+def cc_waveform_pair(config, tr1, tr2):
     """Perform cross-correlation."""
-    evids = [tr.stats.evid for tr in st]
-    tr1 = st[0]
-    tr2 = st[1]
+    evid1 = tr1.stats.evid
+    evid2 = tr2.stats.evid
     dt1 = tr1.stats.delta
     dt2 = tr2.stats.delta
     if dt1 != dt2:
         logger.warning(
             '{} {} - The two traces have a different sampling interval.'
-            'Skipping pair.'.format(*evids))
+            'Skipping pair.'.format(evid1, evid2))
         raise
     shift = int(config.cc_max_shift/dt1)
     cc = correlate(tr1, tr2, shift)
