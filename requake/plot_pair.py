@@ -97,10 +97,11 @@ def plot_pair(config):
             stats2.orig_time.strftime('%Y-%m-%dT%H:%M:%S'),
             stats2.ev_lat, stats2.ev_lon, stats2.ev_depth)
     )
-    ax[0].plot(tr2.times(), data2, color='gray', label=stats2.evid)
-    ax[0].plot(tr1.times(), data1, color='blue', label=label1)
-    ax[1].plot(tr1.times(), data1, color='gray', label=stats1.evid)
-    ax[1].plot(tr2.times(), data2, color='blue', label=label2)
+    lw = 0.8  # linewidth
+    ax[0].plot(tr2.times(), data2, color='gray', lw=lw, label=stats2.evid)
+    ax[0].plot(tr1.times(), data1, color='blue', lw=lw, label=label1)
+    ax[1].plot(tr1.times(), data1, color='gray', lw=lw, label=stats1.evid)
+    ax[1].plot(tr2.times(), data2, color='blue', lw=lw, label=label2)
     ax[1].set_xlabel('Time (s)')
     for _ax in ax:
         _ax.set(ylim=[-1, 1], ylabel='Normalized amplitude')
