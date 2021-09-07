@@ -39,15 +39,16 @@ To get help, use:
 The different running modes are specified as "verbs" (positional arguments).
 Currently supported verbs are:
 
-    requake sample_config       write sample config file to current
-                                directory and exit
-    requake scan_catalog        scan an existing catalog for earthquake
-                                pairs
-    requake scan_template       scan a continuous waveform stream using
-                                a template
-    requake plot_pair           plot traces for a given event pair
-    requake build_families      build families of repeating earthquakes
-                                from a catalog of pairs
+    sample_config       write sample config file to current directory and exit
+    scan_catalog        scan an existing catalog for earthquake pairs
+    scan_template       scan a continuous waveform stream using a template
+    plot_pair           plot traces for a given event pair
+    build_families      build families of repeating earthquakes from a catalog
+                        of pairs
+    plot_families       plot traces for one ore more event families
+    flag_family         flag a family of repeating earthquakes as valid or not
+                        valid. Note that all families are valid by default
+                        when first created
 
 Certain running modes (e.g., `plot_pair`) require further arguments (use, e.g.,
 `requake plot_pair -h` to get help).
