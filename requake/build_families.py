@@ -80,13 +80,13 @@ def build_families(config):
         'mag_type', 'mag', 'family_number', 'valid'
     ]
     writer = csv.writer(fp_out)
-    writer.writerows([fieldnames])
+    writer.writerow(fieldnames)
     for number, family in enumerate(families):
         for ev in family:
-            writer.writerows([[
+            writer.writerow([
                 ev.evid, ev.trace_id, ev.orig_time, ev.lon, ev.lat, ev.depth,
                 ev.mag_type, ev.mag, number, True
-            ]])
+            ])
     fp_out.close()
     logger.info('Done! Output written to: {}'.format(
         config.build_families_outfile))

@@ -94,7 +94,7 @@ def scan_catalog(config):
         'lag_samples', 'lag_sec', 'cc_max'
     ]
     writer = csv.writer(fp_out)
-    writer.writerows([fieldnames])
+    writer.writerow(fieldnames)
     npairs = int(factorial(nevents)/(factorial(2)*factorial(nevents-2)))
     for n, pair in enumerate(combinations(catalog, 2)):
         if not _pair_ok(config, pair):
@@ -104,14 +104,14 @@ def scan_catalog(config):
             st = get_waveform_pair(config, pair)
             lag, lag_sec, cc_max = cc_waveform_pair(config, st[0], st[1])
             stats1, stats2 = [tr.stats for tr in st]
-            writer.writerows([[
+            writer.writerow([
                 stats1.evid, stats2.evid, st[0].id,
                 stats1.orig_time, stats1.ev_lon, stats1.ev_lat,
                 stats1.ev_depth, stats1.mag_type, stats1.mag,
                 stats2.orig_time, stats2.ev_lon, stats2.ev_lat,
                 stats2.ev_depth, stats2.mag_type, stats2.mag,
                 lag, lag_sec, cc_max
-            ]])
+            ])
         except Exception as m:
             # Do not print empty messages
             if str(m):
