@@ -11,6 +11,7 @@ Functions for downloading and processing waveforms.
 """
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
+import numpy as np
 from obspy import Inventory, Stream
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
@@ -187,3 +188,28 @@ def cc_waveform_pair(config, tr1, tr2):
     lag, cc_max = xcorr_max(cc)
     lag_sec = lag*dt1
     return lag, lag_sec, cc_max
+
+
+def align_pair(config, tr1, tr2):
+    """Align tr2 respect to tr1 using cross-correlation."""
+    lag, lag_sec, cc_max = cc_waveform_pair(config, tr1, tr2)
+    # apply lag to trace #2
+    # if lag is positive, trace #2 is delayed
+    if lag > 0:
+        data2 = np.zeros_like(tr2.data)
+        data2[lag:] = tr2.data[:-lag]
+    # if lag is negative, trace #2 is advanced
+    elif lag < 0:
+        data2 = np.zeros_like(tr2.data)
+        data2[:lag] = tr2.data[-lag:]
+    else:
+        data2 = tr2.data
+    tr2.data = data2
+    return lag, lag_sec, cc_max
+
+
+def align_traces(config, st):
+    """Align traces in stream using cross-correlation."""
+    tr1 = st[0]
+    for tr2 in st[1:]:
+        align_pair(config, tr1, tr2)

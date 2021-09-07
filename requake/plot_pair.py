@@ -14,11 +14,10 @@ logger = logging.getLogger(__name__.split('.')[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
-import numpy as np
 import matplotlib.pyplot as plt
 from .rq_setup import rq_exit
 from .catalog import get_events, read_events
-from .waveforms import get_waveform_pair, cc_waveform_pair
+from .waveforms import get_waveform_pair, align_pair
 
 
 def _download_event(config, evid):
@@ -58,7 +57,7 @@ def plot_pair(config):
     try:
         pair = _get_pair(config)
         st = get_waveform_pair(config, pair)
-        lag, lag_sec, cc_max = cc_waveform_pair(config, st[0], st[1])
+        lag, lag_sec, cc_max = align_pair(config, st[0], st[1])
     except Exception as m:
         logger.error(str(m))
         rq_exit(1)
@@ -68,16 +67,6 @@ def plot_pair(config):
         '{} {} -- lag: {} lag_sec: {:.1f} cc_max: {:.2f}'.format(
             tr1.stats.evid, tr2.stats.evid, lag, lag_sec, cc_max
         ))
-    data1 = tr1.data
-    # apply lag to trace #2
-    # if lag is positive, trace #2 is delayed
-    if lag > 0:
-        data2 = np.zeros_like(tr2.data)
-        data2[lag:] = tr2.data[:-lag]
-    # if lag is negative, trace #2 is advanced
-    elif lag < 0:
-        data2 = np.zeros_like(tr2.data)
-        data2[:lag] = tr2.data[-lag:]
     fig, ax = plt.subplots(
         2, 1, figsize=(12, 6), sharex=True, sharey=True)
     ax[0].set_title('{} - CC: {:.2f}'.format(tr1.id, cc_max))
@@ -98,6 +87,8 @@ def plot_pair(config):
             stats2.ev_lat, stats2.ev_lon, stats2.ev_depth)
     )
     lw = 0.8  # linewidth
+    data1 = tr1.data
+    data2 = tr2.data
     ax[0].plot(tr2.times(), data2, color='gray', lw=lw, label=stats2.evid)
     ax[0].plot(tr1.times(), data1, color='blue', lw=lw, label=label1)
     ax[1].plot(tr1.times(), data1, color='gray', lw=lw, label=stats1.evid)
