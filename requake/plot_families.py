@@ -56,7 +56,7 @@ def _plot_family(config, family_number):
         align_traces(config, st)
     except Exception as m:
         logger.error(str(m))
-        rq_exit(1)
+        return
 
     t0 = config.args.starttime
     t1 = config.args.endtime
@@ -105,25 +105,33 @@ def _plot_family(config, family_number):
     ax.set_title(title, loc='right')
 
 
-def _build_family_numbers_list(family_numbers):
+def _build_family_number_list(config):
+    family_numbers = config.args.family_numbers
+    if family_numbers == 'all':
+        with open(config.build_families_outfile, 'r') as fp:
+            reader = csv.DictReader(fp)
+            fn = sorted(
+                    set(row['family_number'] for row in reader),
+                    key=lambda n: int(n)
+                    )
+        return fn
     try:
         if ',' in family_numbers:
-            family_numbers = family_numbers.split(',')
+            fn = family_numbers.split(',')
         elif '-' in family_numbers:
             family0, family1 = map(int, family_numbers.split('-'))
-            family_numbers = map(str, range(family0, family1))
+            fn = map(str, range(family0, family1))
         else:
-            family_numbers = [family_numbers, ]
+            fn = [family_numbers, ]
     except Exception:
         msg = 'Unable to find family numbers: {}'.format(family_numbers)
         raise Exception(msg)
-    return family_numbers
+    return fn
 
 
 def plot_families(config):
     try:
-        family_numbers = _build_family_numbers_list(
-            config.args.family_numbers)
+        family_numbers = _build_family_number_list(config)
     except Exception as m:
         logger.error(str(m))
         rq_exit(1)

@@ -96,7 +96,8 @@ def _parse_arguments(progname='requake'):
     plotfamilies.add_argument(
         'family_numbers',
         help='family_numbers to plot. It can be a single number, '
-             'a comma-separated list or a hyphen-separated number range.')
+             'a comma-separated list or a hyphen-separated number range. '
+             'Use "all" to specify all the families.')
     plotfamilies.add_argument(
         '-s', '--starttime', type=float, default=None,
         help='Start time, in seconds relative to trace start, for the plot.'
