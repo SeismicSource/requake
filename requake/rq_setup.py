@@ -106,6 +106,17 @@ def _parse_arguments(progname='requake'):
         '-e', '--endtime', type=float, default=None,
         help='End time, in seconds relative to trace start, for the plot.'
     )
+    flagfamily = subparser.add_parser(
+        'flag_family',
+        help='flag a family of repeating earthquakes as valid or not valid. '
+             'Note that all families are valid by default when first created'
+    )
+    flagfamily.add_argument('family_number')
+    flagfamily.add_argument(
+        'is_valid',
+        help='"true" (or "t") to flag family as valid, '
+             '"false" (or "f") to flag family as not valid.'
+    )
     args = parser.parse_args()
     if args.action is None:
         parser.print_usage(sys.stderr)

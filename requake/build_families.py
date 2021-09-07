@@ -77,7 +77,7 @@ def build_families(config):
     fp_out = open(config.build_families_outfile, 'w')
     fieldnames = [
         'evid', 'trace_id', 'orig_time', 'lon', 'lat', 'depth_km',
-        'mag_type', 'mag', 'family_number'
+        'mag_type', 'mag', 'family_number', 'valid'
     ]
     writer = csv.writer(fp_out)
     writer.writerows([fieldnames])
@@ -85,7 +85,7 @@ def build_families(config):
         for ev in family:
             writer.writerows([[
                 ev.evid, ev.trace_id, ev.orig_time, ev.lon, ev.lat, ev.depth,
-                ev.mag_type, ev.mag, number
+                ev.mag_type, ev.mag, number, True
             ]])
     fp_out.close()
     logger.info('Done! Output written to: {}'.format(

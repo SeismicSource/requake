@@ -14,6 +14,7 @@ from ..scan_catalog import scan_catalog
 from ..plot_pair import plot_pair
 from ..build_families import build_families
 from ..plot_families import plot_families
+from ..flag_family import flag_family
 
 
 def main():
@@ -26,4 +27,6 @@ def main():
         build_families(config)
     if config.args.action == 'plot_families':
         plot_families(config)
+    if config.args.action == 'flag_family':
+        flag_family(config)
     rq_exit(0)

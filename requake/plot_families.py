@@ -33,6 +33,9 @@ def _get_waveform_family(config, family_number):
     for row in reader:
         if row['family_number'] != family_number:
             continue
+        if row['valid'] != 'True':
+            msg = 'Family "{}" is flagged as not valid'.format(family_number)
+            raise Exception(msg)
         ev = RequakeEvent()
         ev.evid = row['evid']
         ev.orig_time = UTCDateTime(row['orig_time'])
