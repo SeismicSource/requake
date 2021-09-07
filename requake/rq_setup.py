@@ -1,5 +1,6 @@
 
 #!/usr/bin/env python
+# PYTHON_ARGCOMPLETE_OK
 # -*- coding: utf8 -*-
 """
 Setup functions for Requake.
@@ -13,7 +14,6 @@ Setup functions for Requake.
 import sys
 import os
 import shutil
-import argparse
 import logging
 import signal
 from obspy import UTCDateTime
@@ -48,84 +48,6 @@ class Config(dict):
             raise AttributeError(err)
 
     __setattr__ = __setitem__
-
-
-def _parse_arguments(progname='requake'):
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description='{}: Repeating earthquakes '
-                    'search and analysis.'.format(progname))
-    subparser = parser.add_subparsers(dest='action')
-    parser.add_argument(
-        '-c', '--configfile', type=str, default='{}.conf'.format(progname),
-        help='config file (default: {}.conf)'.format(progname)
-    )
-    parser.add_argument(
-        '-o', '--outdir', type=str, default='{}_out'.format(progname),
-        help='save output to OUTDIR (default: {}_out)'.format(progname)
-    )
-    parser.add_argument(
-        '-v', '--version', action='version',
-        version='%(prog)s {}'.format(get_versions()['version']))
-    subparser.add_parser(
-        'sample_config',
-        help='write sample config file to current directory and exit'
-    )
-    subparser.add_parser(
-        'scan_catalog',
-        help='scan an existing catalog for earthquake pairs'
-    )
-    subparser.add_parser(
-        'scan_template',
-        help='scan a continuous waveform stream using a template'
-    )
-    plotpair = subparser.add_parser(
-        'plot_pair',
-        help='plot traces for a given event pair'
-    )
-    plotpair.add_argument('evid1')
-    plotpair.add_argument('evid2')
-    subparser.add_parser(
-        'build_families',
-        help='build families of repeating earthquakes from a catalog of pairs'
-    )
-    plotfamilies = subparser.add_parser(
-        'plot_families',
-        help='plot traces for one ore more event families'
-    )
-    plotfamilies.add_argument(
-        'family_numbers',
-        help='family_numbers to plot. It can be a single number, '
-             'a comma-separated list or a hyphen-separated number range. '
-             'Use "all" to specify all the families.')
-    plotfamilies.add_argument(
-        '-s', '--starttime', type=float, default=None,
-        help='Start time, in seconds relative to trace start, for the plot.'
-    )
-    plotfamilies.add_argument(
-        '-e', '--endtime', type=float, default=None,
-        help='End time, in seconds relative to trace start, for the plot.'
-    )
-    flagfamily = subparser.add_parser(
-        'flag_family',
-        help='flag a family of repeating earthquakes as valid or not valid. '
-             'Note that all families are valid by default when first created'
-    )
-    flagfamily.add_argument('family_number')
-    flagfamily.add_argument(
-        'is_valid',
-        help='"true" (or "t") to flag family as valid, '
-             '"false" (or "f") to flag family as not valid.'
-    )
-    args = parser.parse_args()
-    if args.action is None:
-        parser.print_usage(sys.stderr)
-        sys.stderr.write(
-            '{}: error: at least one positional argument '
-            'is required\n'.format(progname)
-        )
-        sys.exit(2)
-    return args
 
 
 def _check_library_versions():
@@ -222,9 +144,8 @@ def _init_connections(config):
         config.catalog_end_times.append(UTCDateTime(end_time))
 
 
-def configure():
+def configure(args):
     """Read command line arguments. Read config file. Set up logging."""
-    args = _parse_arguments()
     configspec = parse_configspec()
     if args.action == 'sample_config':
         write_sample_config(configspec, 'requake')

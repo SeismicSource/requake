@@ -52,3 +52,10 @@ Currently supported verbs are:
 
 Certain running modes (e.g., `plot_pair`) require further arguments (use, e.g.,
 `requake plot_pair -h` to get help).
+
+Requake supports command line tab completion for arguments, thanks to
+[argcomplete](https://kislyuk.github.io/argcomplete/).
+To enable command line tab completion, add the following line to your `.bashrc`
+or `.zshrc`:
+
+    eval "$(register-python-argcomplete requake)"

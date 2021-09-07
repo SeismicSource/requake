@@ -9,24 +9,26 @@ Main script for Requake.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
-from ..rq_setup import configure, rq_exit
-from ..scan_catalog import scan_catalog
-from ..plot_pair import plot_pair
-from ..build_families import build_families
-from ..plot_families import plot_families
-from ..flag_family import flag_family
 
 
 def main():
-    config = configure()
+    from ..parse_arguments import parse_arguments
+    args = parse_arguments()
+    from ..rq_setup import configure, rq_exit
+    config = configure(args)
     if config.args.action == 'scan_catalog':
+        from ..scan_catalog import scan_catalog
         scan_catalog(config)
     if config.args.action == 'plot_pair':
+        from ..plot_pair import plot_pair
         plot_pair(config)
     if config.args.action == 'build_families':
+        from ..build_families import build_families
         build_families(config)
     if config.args.action == 'plot_families':
+        from ..plot_families import plot_families
         plot_families(config)
     if config.args.action == 'flag_family':
+        from ..flag_family import flag_family
         flag_family(config)
     rq_exit(0)
