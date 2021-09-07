@@ -18,7 +18,8 @@ class RequakeEvent():
     """
     A hashable event class.
 
-    Contains the same fields as in the FDSN text file format.
+    Contains the same fields as in the FDSN text file format, plus a
+    trace_id field.
     """
 
     evid = None
@@ -34,9 +35,10 @@ class RequakeEvent():
     contributor_id = None
     mag_author = None
     location_name = None
+    trace_id = None
 
     def __eq__(self, other):
-        if self.evid == other.evid:
+        if (self.evid == other.evid) and (self.trace_id == other.trace_id):
             return True
         else:
             return False

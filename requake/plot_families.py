@@ -22,7 +22,7 @@ from obspy.signal.filter import envelope
 from obspy.signal.util import smooth
 from .catalog import RequakeEvent
 from .waveforms import (
-    download_and_process_waveform, get_trace_id, get_metadata, align_traces)
+    download_and_process_waveform, get_metadata, align_traces)
 from .rq_setup import rq_exit
 
 
@@ -41,8 +41,8 @@ def _get_waveform_family(config, family_number):
         ev.depth = float(row['depth_km'])
         ev.mag_type = row['mag_type']
         ev.mag = float(row['mag'])
-        trace_id = get_trace_id(config, ev)
-        st.append(download_and_process_waveform(config, ev, trace_id))
+        ev.trace_id = row['trace_id']
+        st.append(download_and_process_waveform(config, ev))
     fp.close()
     if not st:
         msg = 'No family found with number "{}"'.format(family_number)

@@ -32,6 +32,7 @@ def _read_pairs(config):
         ev1.depth = row['depth_km1']
         ev1.mag_type = row['mag_type1']
         ev1.mag = row['mag1']
+        ev1.trace_id = row['trace_id']
         ev2 = RequakeEvent()
         ev2.evid = row['evid2']
         ev2.orig_time = row['orig_time2']
@@ -40,6 +41,7 @@ def _read_pairs(config):
         ev2.depth = row['depth_km2']
         ev2.mag_type = row['mag_type2']
         ev2.mag = row['mag2']
+        ev2.trace_id = row['trace_id']
         # each pair has to be a list, to be exetendable later as a family
         pairs.append([ev1, ev2])
     fp.close()
@@ -74,15 +76,15 @@ def build_families(config):
     # Write families to output file
     fp_out = open(config.build_families_outfile, 'w')
     fieldnames = [
-        'evid', 'orig_time', 'lon', 'lat', 'depth_km', 'mag_type', 'mag',
-        'family_number'
+        'evid', 'trace_id', 'orig_time', 'lon', 'lat', 'depth_km',
+        'mag_type', 'mag', 'family_number'
     ]
     writer = csv.writer(fp_out)
     writer.writerows([fieldnames])
     for number, family in enumerate(families):
         for ev in family:
             writer.writerows([[
-                ev.evid, ev.orig_time, ev.lon, ev.lat, ev.depth,
+                ev.evid, ev.trace_id, ev.orig_time, ev.lon, ev.lat, ev.depth,
                 ev.mag_type, ev.mag, number
             ]])
     fp_out.close()

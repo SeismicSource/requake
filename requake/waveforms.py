@@ -52,7 +52,7 @@ def get_metadata(config):
         set(config.inventory.get_contents()['channels'])))
 
 
-def get_trace_id(config, ev):
+def _get_trace_id(config, ev):
     """Get trace id to use with ev."""
     trace_ids = config.catalog_trace_id
     if len(trace_ids) == 1:
@@ -79,7 +79,7 @@ def get_trace_id(config, ev):
     return closest_trace
 
 
-def download_and_process_waveform(config, ev, trace_id):
+def download_and_process_waveform(config, ev):
     """Download and process waveform for a given event at a given trace_id."""
     evid = ev.evid
     ev_lat = ev.lat
@@ -88,6 +88,7 @@ def download_and_process_waveform(config, ev, trace_id):
     orig_time = ev.orig_time
     mag = ev.mag
     mag_type = ev.mag_type
+    trace_id = ev.trace_id
     coords = config.inventory.get_coordinates(trace_id, orig_time)
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
@@ -96,7 +97,6 @@ def download_and_process_waveform(config, ev, trace_id):
         source_depth_in_km=ev_depth,
         distance_in_degree=dist_deg,
         phase_list=['p', 'P'])
-    # these two values are hardcoded, for the moment
     pre_P = config.cc_pre_P
     trace_length = config.cc_trace_length
     t0 = orig_time + arrivals[0].time - pre_P
@@ -125,38 +125,40 @@ def download_and_process_waveform(config, ev, trace_id):
 
 skipped_evids = list()
 tr_cache = dict()
-old_evid1 = None
+old_cache_key = None
 
 
 def get_waveform_pair(config, pair):
     """Download traces for a given pair."""
     if config.inventory is None:
         get_metadata(config)
-    trace_id = get_trace_id(config, pair[0])
+    ev1, ev2 = pair
+    ev1.trace_id = ev2.trace_id = _get_trace_id(config, ev1)
     st = Stream()
     global skipped_evids
     global tr_cache
-    global old_evid1
-    # remove trace from cache when ev1 changes
-    evid1 = pair[0].evid
-    if old_evid1 is not None and evid1 != old_evid1:
+    global old_cache_key
+    cache_key = '_'.join((ev1.evid, ev1.trace_id))
+    # remove trace from cache when evid and/or trace_id changes
+    if old_cache_key is not None and cache_key != old_cache_key:
         try:
-            del tr_cache[old_evid1]
+            del tr_cache[cache_key]
         except KeyError:
             pass
-    old_evid1 = evid1
+    old_cache_key = cache_key
     for ev in pair:
         if ev.evid in skipped_evids:
             raise Exception
         # use cached trace, if possible
+        cache_key = '_'.join((ev.evid, ev.trace_id))
         try:
-            st.append(tr_cache[ev.evid])
+            st.append(tr_cache[cache_key])
             continue
         except KeyError:
             pass
         try:
-            tr = download_and_process_waveform(config, ev, trace_id)
-            tr_cache[ev.evid] = tr
+            tr = download_and_process_waveform(config, ev)
+            tr_cache[cache_key] = tr
             st.append(tr)
         except Exception as m:
             skipped_evids.append(ev.evid)
@@ -166,7 +168,7 @@ def get_waveform_pair(config, pair):
                 'event {} and trace_id {}. '
                 'Skipping all pairs containig '
                 'this event.\n'
-                'Error message: {}'.format(ev.evid, trace_id, m)
+                'Error message: {}'.format(ev.evid, ev.trace_id, m)
             )
             raise Exception(msg)
     return st
