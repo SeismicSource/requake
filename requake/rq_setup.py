@@ -89,6 +89,22 @@ def _parse_arguments(progname='requake'):
         'build_families',
         help='build families of repeating earthquakes from a catalog of pairs'
     )
+    plotfamilies = subparser.add_parser(
+        'plot_families',
+        help='plot traces for one ore more event families'
+    )
+    plotfamilies.add_argument(
+        'family_numbers',
+        help='family_numbers to plot. It can be a single number, '
+             'a comma-separated list or a hyphen-separated number range.')
+    plotfamilies.add_argument(
+        '-s', '--starttime', type=float, default=None,
+        help='Start time, in seconds relative to trace start, for the plot.'
+    )
+    plotfamilies.add_argument(
+        '-e', '--endtime', type=float, default=None,
+        help='End time, in seconds relative to trace start, for the plot.'
+    )
     args = parser.parse_args()
     if args.action is None:
         parser.print_usage(sys.stderr)
@@ -231,7 +247,7 @@ def configure():
     _setup_logging(config, 'requake', args.action)
     # save config to output dir
     shutil.copy(args.configfile, args.outdir)
-    if args.action in ['scan_catalog', 'plot_pair']:
+    if args.action in ['scan_catalog', 'plot_pair', 'plot_families']:
         try:
             _init_connections(config)
         except Exception as m:
