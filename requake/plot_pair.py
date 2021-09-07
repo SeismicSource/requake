@@ -69,7 +69,13 @@ def plot_pair(config):
         ))
     fig, ax = plt.subplots(
         2, 1, figsize=(12, 6), sharex=True, sharey=True)
-    ax[0].set_title('{} - CC: {:.2f}'.format(tr1.id, cc_max))
+    title = '{}-{}'.format(tr1.stats.evid, tr2.stats.evid)
+    fig.canvas.manager.set_window_title(title)
+    title = '{}-{} CC: {:.2f}'.format(tr1.stats.evid, tr2.stats.evid, cc_max)
+    ax[0].set_title(title, loc='left')
+    title = '{} | {:.1f}-{:.1f} Hz'.format(
+        tr1.id, config.cc_freq_min, config.cc_freq_max)
+    ax[0].set_title(title, loc='right')
     stats1 = tr1.stats
     stats2 = tr2.stats
     label1 = (
