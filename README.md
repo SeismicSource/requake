@@ -12,6 +12,9 @@ It can either scan an existing earthquake catalog to search for similar events,
 or perform template matching on a continuous waveform stream (*this second mode
 is not yet implemented*).
 
+Catalogs and waveforms are downloaded using standard
+[FDSN web services](https://www.fdsn.org/webservices/).
+
 Requake is written in Python and uses [ObsPy](https://obspy.org) as backend.
 
 ## Installation
@@ -29,6 +32,8 @@ directory by running:
     pip install .
 
 ## Running
+
+### Command line arguments
 
 Requake is based on a single executable, aptly named `requake` 😉.
 
@@ -59,3 +64,30 @@ To enable command line tab completion, add the following line to your `.bashrc`
 or `.zshrc`:
 
     eval "$(register-python-argcomplete requake)"
+
+### Typical workflow
+
+The first thing you will want to do is to generate a sample config file:
+
+    requake sample_config
+
+Edit the config file according to your needs, then build the catalog of event
+pairs with:
+
+    requake scan_catalog
+
+Once done ([it will take time!](#performances)), you are ready to build
+repeating earthquake families:
+
+    requake build_families
+
+
+## Performances
+
+- `requake scan_catalog` took 53 minutes on my 2.7 GHz i7 MacBook Pro to
+process 14,100,705 earthquake pairs.
+Dowloaded traces are cached in memory to speed up execution. Processing is not
+yet parallel: some improvements might come in future versions, when
+parallelization will be implemented.
+
+- `requake build_families` is fast™.
