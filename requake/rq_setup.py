@@ -172,6 +172,10 @@ def configure(args):
             not write_ok(config.scan_catalog_pairs_file)):
         print('Exiting now.')
         sys.exit(0)
+    if (args.action == 'build_families' and
+            not write_ok(config.build_families_outfile)):
+        print('Exiting now.')
+        sys.exit(0)
     # config.inventory needs to exist
     config.inventory = None
     # Check library versions
