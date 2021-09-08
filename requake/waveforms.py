@@ -27,7 +27,11 @@ def get_metadata(config):
     cl = config.fdsn_station_client
     start_time = min(config.catalog_start_times)
     end_time = max(config.catalog_end_times)
-    for trace_id in config.catalog_trace_id:
+    if config.args.traceid is not None:
+        trace_ids = [config.args.traceid, ]
+    else:
+        trace_ids = config.catalog_trace_id
+    for trace_id in trace_ids:
         net, sta, loc, chan = trace_id.split('.')
         try:
             inv += cl.get_stations(
@@ -88,7 +92,10 @@ def download_and_process_waveform(config, ev):
     orig_time = ev.orig_time
     mag = ev.mag
     mag_type = ev.mag_type
-    trace_id = ev.trace_id
+    if config.args.traceid is not None:
+        trace_id = config.args.traceid
+    else:
+        trace_id = ev.trace_id
     coords = config.inventory.get_coordinates(trace_id, orig_time)
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']

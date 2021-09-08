@@ -77,6 +77,10 @@ def parse_arguments(progname='requake'):
         '-a', '--arrivals', action='store_true',
         help='plot theoretical P and S arrivals.'
     )
+    plotfamilies.add_argument(
+        '-t', '--traceid', type=str, default=None,
+        help='plot using this traceid.'
+    )
     flagfamily = subparser.add_parser(
         'flag_family',
         help='flag a family of repeating earthquakes as valid or not valid. '

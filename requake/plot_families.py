@@ -45,7 +45,10 @@ def _get_waveform_family(config, family_number):
         ev.mag_type = row['mag_type']
         ev.mag = float(row['mag'])
         ev.trace_id = row['trace_id']
-        st.append(download_and_process_waveform(config, ev))
+        try:
+            st.append(download_and_process_waveform(config, ev))
+        except Exception:
+            pass
     fp.close()
     if not st:
         msg = 'No family found with number "{}"'.format(family_number)
