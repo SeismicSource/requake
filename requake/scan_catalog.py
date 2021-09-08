@@ -15,8 +15,6 @@ import csv
 from math import factorial
 from itertools import combinations
 from obspy.geodetics import gps2dist_azimuth
-from obspy.taup import TauPyModel
-model = TauPyModel(model='ak135')
 from .catalog import RequakeCatalog, get_events, read_events
 from .waveforms import get_waveform_pair, cc_waveform_pair
 from .rq_setup import rq_exit
