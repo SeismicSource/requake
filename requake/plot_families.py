@@ -63,14 +63,19 @@ def _plot_family(config, family_number):
 
     t0 = config.args.starttime
     t1 = config.args.endtime
-    # Use smooth envelope amplitude  of first trace
+    # Use P_arrival and smooth envelope amplitude of first trace
     # to determine default time limits (if above values are None)
     tr0 = st[0]
     env = smooth(envelope(tr0.data), 200)
     env_max = env.max()
     times = tr0.times()
     if t0 is None:
-        t0 = times[env > 0.1*env_max][0]
+        # For t0, take the earliest time between 10% of envelope
+        # and theoretical P arrival
+        P_arrival = tr0.stats.P_arrival_time - tr0.stats.starttime
+        t0_P = P_arrival - 1
+        t0_env = times[env > 0.1*env_max][0]
+        t0 = min(t0_P, t0_env)
     if t1 is None:
         t1 = times[env > 0.3*env_max][-1]
 

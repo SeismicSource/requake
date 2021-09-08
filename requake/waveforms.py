@@ -93,18 +93,25 @@ def download_and_process_waveform(config, ev):
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
     dist_deg = locations2degrees(trace_lat, trace_lon, ev_lat, ev_lon)
-    arrivals = model.get_travel_times(
+    P_arrivals = model.get_travel_times(
         source_depth_in_km=ev_depth,
         distance_in_degree=dist_deg,
         phase_list=['p', 'P'])
+    P_arrival_time = orig_time + P_arrivals[0].time
+    S_arrivals = model.get_travel_times(
+        source_depth_in_km=ev_depth,
+        distance_in_degree=dist_deg,
+        phase_list=['s', 'S'])
+    S_arrival_time = orig_time + S_arrivals[0].time
     pre_P = config.cc_pre_P
     trace_length = config.cc_trace_length
-    t0 = orig_time + arrivals[0].time - pre_P
+    t0 = P_arrival_time - pre_P
+    t1 = t0 + trace_length
     cl = config.fdsn_dataselect_client
     net, sta, loc, chan = trace_id.split('.')
     st = cl.get_waveforms(
         network=net, station=sta, location=loc, channel=chan,
-        starttime=t0, endtime=t0+trace_length
+        starttime=t0, endtime=t1
     )
     st.taper(max_percentage=0.05)
     st.filter(
@@ -120,6 +127,8 @@ def download_and_process_waveform(config, ev):
     tr.stats.orig_time = orig_time
     tr.stats.mag = mag
     tr.stats.mag_type = mag_type
+    tr.stats.P_arrival_time = P_arrival_time
+    tr.stats.S_arrival_time = S_arrival_time
     return tr
 
 
