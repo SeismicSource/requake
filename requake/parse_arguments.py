@@ -67,11 +67,15 @@ def parse_arguments(progname='requake'):
              'Use "all" to specify all the families.')
     plotfamilies.add_argument(
         '-s', '--starttime', type=float, default=None,
-        help='Start time, in seconds relative to trace start, for the plot.'
+        help='start time, in seconds relative to trace start, for the plot.'
     )
     plotfamilies.add_argument(
         '-e', '--endtime', type=float, default=None,
-        help='End time, in seconds relative to trace start, for the plot.'
+        help='end time, in seconds relative to trace start, for the plot.'
+    )
+    plotfamilies.add_argument(
+        '-a', '--arrivals', action='store_true',
+        help='plot theoretical P and S arrivals.'
     )
     flagfamily = subparser.add_parser(
         'flag_family',

@@ -89,6 +89,12 @@ def _plot_family(config, family_number):
         tr.detrend('demean')
         tr.data *= 0.5
         ax.plot(tr.times(), tr.data+n, color='black', linewidth=0.5)
+        if config.args.arrivals:
+            P_arrival = tr.stats.P_arrival_time - tr.stats.starttime
+            S_arrival = tr.stats.S_arrival_time - tr.stats.starttime
+            hh = 0.15  # pick line half-height
+            P_bar, = ax.plot((P_arrival, P_arrival), (n-hh, n+hh), color='g')
+            S_bar, = ax.plot((S_arrival, S_arrival), (n-hh, n+hh), color='r')
         trans = ax.get_yaxis_transform()
         text = '{} {} {} {:.1f}\n'.format(
             tr.stats.evid, tr.stats.orig_time.strftime('%Y-%m-%dT%H:%M:%S'),
@@ -99,6 +105,8 @@ def _plot_family(config, family_number):
             0.01, n+0.2, text, transform=trans, fontsize=8, linespacing=1.5)
         txt.set_path_effects(
             [PathEffects.withStroke(linewidth=3, foreground='w')])
+    if config.args.arrivals:
+        ax.legend([P_bar, S_bar], ['P theo', 'S theo'], loc='lower right')
     ax.axes.yaxis.set_visible(False)
     ax.minorticks_on()
     ax.tick_params(which='both', top=True, labeltop=False)
