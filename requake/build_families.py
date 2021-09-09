@@ -12,8 +12,43 @@ Build families of repeating earthquakes from a catalog of pairs.
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import csv
+import numpy as np
+from obspy import UTCDateTime
+from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeEvent
 from .rq_setup import rq_exit
+
+
+class Family(list):
+    lon = None
+    lat = None
+    depth = None
+    starttime = None
+    endtime = None
+    number = None
+    valid = True
+
+    def __str__(self):
+        s = '{:.4f} {:.4f} {:.3f} {} {}'.format(
+            self.lon, self.lat, self.depth,
+            self.starttime, self.endtime
+        )
+        return s
+
+    def extend(self, item):
+        for ev in item:
+            if ev not in self:
+                self.append(ev)
+        self.sort()
+        self.lon = np.mean([ev.lon for ev in self])
+        self.lat = np.mean([ev.lat for ev in self])
+        self.depth = np.mean([ev.depth for ev in self])
+        self.starttime = np.min([ev.orig_time for ev in self])
+        self.endtime = np.max([ev.orig_time for ev in self])
+
+    def distance_from(self, lon, lat):
+        distance, _, _ = gps2dist_azimuth(self.lat, self.lon, lat, lon)
+        return distance
 
 
 def _read_pairs(config):
@@ -26,29 +61,39 @@ def _read_pairs(config):
             continue
         ev1 = RequakeEvent()
         ev1.evid = row['evid1']
-        ev1.orig_time = row['orig_time1']
-        ev1.lon = row['lon1']
-        ev1.lat = row['lat1']
-        ev1.depth = row['depth_km1']
+        ev1.orig_time = UTCDateTime(row['orig_time1'])
+        ev1.lon = float(row['lon1'])
+        ev1.lat = float(row['lat1'])
+        ev1.depth = float(row['depth_km1'])
         ev1.mag_type = row['mag_type1']
-        ev1.mag = row['mag1']
+        ev1.mag = float(row['mag1'])
         ev1.trace_id = row['trace_id']
         ev2 = RequakeEvent()
         ev2.evid = row['evid2']
-        ev2.orig_time = row['orig_time2']
-        ev2.lon = row['lon2']
-        ev2.lat = row['lat2']
-        ev2.depth = row['depth_km2']
+        ev2.orig_time = UTCDateTime(row['orig_time2'])
+        ev2.lon = float(row['lon2'])
+        ev2.lat = float(row['lat2'])
+        ev2.depth = float(row['depth_km2'])
         ev2.mag_type = row['mag_type2']
-        ev2.mag = row['mag2']
+        ev2.mag = float(row['mag2'])
         ev2.trace_id = row['trace_id']
-        # each pair has to be a list, to be exetendable later as a family
-        pairs.append([ev1, ev2])
+        pair = Family()
+        pair.extend([ev1, ev2])
+        pairs.append(pair)
     fp.close()
     return pairs
 
 
 def build_families(config):
+    # Check options
+    sort_by = config.sort_families_by
+    lon0, lat0 = config.distance_from_lon, config.distance_from_lat
+    if sort_by == 'distance_from' and (lon0 is None or lat0 is None):
+        logger.error(
+            '"sort_families_by" set to "distance_from", '
+            'but "distance_from_lon" and/or "distance_from_lat" '
+            'are not specified')
+        rq_exit(1)
     logger.info('Building event families...')
     try:
         pairs = _read_pairs(config)
@@ -67,12 +112,18 @@ def build_families(config):
             if ev1 in family or ev2 in family:
                 found_family = True
                 family.extend(pair)
-                # [:] is important because we want to replace the whole
-                # family with the new one
-                family[:] = sorted(set(family))
                 break
         if not found_family:
             families.append(pair)
+    # Sort families
+    sort_keys = {
+        'time': lambda f: f.starttime,
+        'longitude': lambda f: f.lon,
+        'latitude': lambda f: f.lat,
+        'depth': lambda f: f.depth,
+        'distance_from': lambda f: f.distance_from(lon0, lat0)
+    }
+    families = sorted(families, key=sort_keys[sort_by])
     # Write families to output file
     fp_out = open(config.build_families_outfile, 'w')
     fieldnames = [
