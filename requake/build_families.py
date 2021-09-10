@@ -12,43 +12,10 @@ Build families of repeating earthquakes from a catalog of pairs.
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import csv
-import numpy as np
 from obspy import UTCDateTime
-from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeEvent
+from .families import Family
 from .rq_setup import rq_exit
-
-
-class Family(list):
-    lon = None
-    lat = None
-    depth = None
-    starttime = None
-    endtime = None
-    number = None
-    valid = True
-
-    def __str__(self):
-        s = '{:.4f} {:.4f} {:.3f} {} {}'.format(
-            self.lon, self.lat, self.depth,
-            self.starttime, self.endtime
-        )
-        return s
-
-    def extend(self, item):
-        for ev in item:
-            if ev not in self:
-                self.append(ev)
-        self.sort()
-        self.lon = np.mean([ev.lon for ev in self])
-        self.lat = np.mean([ev.lat for ev in self])
-        self.depth = np.mean([ev.depth for ev in self])
-        self.starttime = np.min([ev.orig_time for ev in self])
-        self.endtime = np.max([ev.orig_time for ev in self])
-
-    def distance_from(self, lon, lat):
-        distance, _, _ = gps2dist_azimuth(self.lat, self.lon, lat, lon)
-        return distance
 
 
 def _read_pairs(config):

@@ -17,39 +17,28 @@ mpl_logger.setLevel(logging.WARNING)
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as PathEffects
 import csv
-from obspy import Stream, UTCDateTime
+from obspy import Stream
 from obspy.signal.filter import envelope
 from obspy.signal.util import smooth
-from .catalog import RequakeEvent
 from .waveforms import (
     download_and_process_waveform, get_metadata, align_traces)
+from .families import read_families
 from .rq_setup import rq_exit
 
 
-def _get_waveform_family(config, family_number):
-    fp = open(config.build_families_outfile, 'r')
-    reader = csv.DictReader(fp)
+def _get_waveform_family(config, families, family_number):
     st = Stream()
-    for row in reader:
-        if row['family_number'] != family_number:
+    for family in families:
+        if family.number != family_number:
             continue
-        if row['valid'] != 'True':
+        if not family.valid:
             msg = 'Family "{}" is flagged as not valid'.format(family_number)
             raise Exception(msg)
-        ev = RequakeEvent()
-        ev.evid = row['evid']
-        ev.orig_time = UTCDateTime(row['orig_time'])
-        ev.lon = float(row['lon'])
-        ev.lat = float(row['lat'])
-        ev.depth = float(row['depth_km'])
-        ev.mag_type = row['mag_type']
-        ev.mag = float(row['mag'])
-        ev.trace_id = row['trace_id']
-        try:
-            st.append(download_and_process_waveform(config, ev))
-        except Exception:
-            pass
-    fp.close()
+        for ev in family:
+            try:
+                st.append(download_and_process_waveform(config, ev))
+            except Exception:
+                pass
     if not st:
         msg = 'No family found with number "{}"'.format(family_number)
         raise Exception(msg)
@@ -58,7 +47,8 @@ def _get_waveform_family(config, family_number):
 
 def _plot_family(config, family_number):
     try:
-        st = _get_waveform_family(config, family_number)
+        families = read_families(config)
+        st = _get_waveform_family(config, families, family_number)
         align_traces(config, st)
     except Exception as m:
         logger.error(str(m))
@@ -129,19 +119,16 @@ def _build_family_number_list(config):
     if family_numbers == 'all':
         with open(config.build_families_outfile, 'r') as fp:
             reader = csv.DictReader(fp)
-            fn = sorted(
-                    set(row['family_number'] for row in reader),
-                    key=lambda n: int(n)
-                    )
+            fn = sorted(set(int(row['family_number']) for row in reader))
         return fn
     try:
         if ',' in family_numbers:
-            fn = family_numbers.split(',')
+            fn = map(int, family_numbers.split(','))
         elif '-' in family_numbers:
             family0, family1 = map(int, family_numbers.split('-'))
-            fn = map(str, range(family0, family1))
+            fn = range(family0, family1)
         else:
-            fn = [family_numbers, ]
+            fn = [int(family_numbers), ]
     except Exception:
         msg = 'Unable to find family numbers: {}'.format(family_numbers)
         raise Exception(msg)
