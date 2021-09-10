@@ -28,6 +28,9 @@ def main():
     if config.args.action == 'plot_families':
         from ..plot_families import plot_families
         plot_families(config)
+    if config.args.action == 'plot_timespans':
+        from ..plot_timespans import plot_timespans
+        plot_timespans(config)
     if config.args.action == 'flag_family':
         from ..flag_family import flag_family
         flag_family(config)

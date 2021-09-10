@@ -81,6 +81,17 @@ def parse_arguments(progname='requake'):
         '-t', '--traceid', type=str, default=None,
         help='plot using this traceid.'
     )
+    timespans = subparser.add_parser(
+        'plot_timespans',
+        help='plot family timespans'
+    )
+    timespans.add_argument(
+        '-s', '--sortby', type=str, default=None,
+        help='quantity to sort families by on y-axis. '
+             'Possible values are: time, latitude, longitude, depth, '
+             'distance_from. If not specified, the config value '
+             '"sort_families_by" will be used.'
+    )
     flagfamily = subparser.add_parser(
         'flag_family',
         help='flag a family of repeating earthquakes as valid or not valid. '

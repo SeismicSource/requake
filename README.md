@@ -51,6 +51,7 @@ Currently supported verbs are:
     build_families      build families of repeating earthquakes from a catalog
                         of pairs
     plot_families       plot traces for one ore more event families
+    plot_timespans      plot family timespans
     flag_family         flag a family of repeating earthquakes as valid or not
                         valid. Note that all families are valid by default
                         when first created
