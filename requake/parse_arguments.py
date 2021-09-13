@@ -81,16 +81,28 @@ def parse_arguments(progname='requake'):
         '-t', '--traceid', type=str, default=None,
         help='plot using this traceid.'
     )
+    plotfamilies.add_argument(
+        '-l', '--longerthan', type=str, default=0, metavar='DURATION',
+        help='only use families lasting longer than this value. '
+             'You can specify DURATION in days (e.g., 100d) '
+             'or in years (e.g., 2.5y).'
+    )
     timespans = subparser.add_parser(
         'plot_timespans',
         help='plot family timespans'
     )
     timespans.add_argument(
-        '-s', '--sortby', type=str, default=None,
+        '-s', '--sortby', type=str, default=None, metavar='QUANTITY',
         help='quantity to sort families by on y-axis. '
              'Possible values are: time, latitude, longitude, depth, '
              'distance_from. If not specified, the config value '
              '"sort_families_by" will be used.'
+    )
+    timespans.add_argument(
+        '-l', '--longerthan', type=str, default=0, metavar='DURATION',
+        help='only use families lasting longer than this value. '
+             'You can specify DURATION in days (e.g., 100d) '
+             'or in years (e.g., 2.5y).'
     )
     flagfamily = subparser.add_parser(
         'flag_family',
@@ -110,6 +122,28 @@ def parse_arguments(progname='requake'):
         sys.stderr.write(
             '{}: error: at least one positional argument '
             'is required\n'.format(progname)
+        )
+        sys.exit(2)
+    # Additional code for "longerthan" option
+    try:
+        # transform "longerthan" to seconds
+        lt = args.longerthan
+        if lt != 0:
+            suffix = lt[-1]
+            lt_float = float(lt[:-1])
+            if suffix == 'd':
+                lt_float *= 24*60*60
+            elif suffix == 'y':
+                lt_float *= 365*24*60*60
+            else:
+                raise ValueError
+            args.longerthan = lt_float
+    except AttributeError:
+        pass
+    except ValueError:
+        sys.stderr.write(
+            '{} {}: error: argument -l/--longerthan: '
+            "invalid value: '{}'\n".format(progname, args.action, lt)
         )
         sys.exit(2)
     return args

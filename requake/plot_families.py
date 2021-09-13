@@ -34,6 +34,9 @@ def _get_waveform_family(config, families, family_number):
         if not family.valid:
             msg = 'Family "{}" is flagged as not valid'.format(family_number)
             raise Exception(msg)
+        if (family.endtime - family.starttime) < config.args.longerthan:
+            msg = 'Family "{}" is too short'.format(family_number)
+            raise Exception(msg)
         for ev in family:
             try:
                 st.append(download_and_process_waveform(config, ev))

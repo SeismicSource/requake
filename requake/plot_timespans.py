@@ -68,6 +68,10 @@ def plot_timespans(config):
             msg = 'Family "{}" is flagged as not valid'.format(fn)
             logger.warning(msg)
             continue
+        if (family.endtime - family.starttime) < config.args.longerthan:
+            msg = 'Family "{}" is too short'.format(fn)
+            logger.warning(msg)
+            continue
         label = 'Family {}'.format(fn)
         times = [ev.orig_time.matplotlib_date for ev in family]
         if sort_by == 'time':
