@@ -118,7 +118,7 @@ def plot_timespans(config):
                     annot.xy = (event.xdata, event.ydata)
                     annot.set_text(line.get_label())
                     annot.get_bbox_patch().set_facecolor(color)
-                    annot.get_bbox_patch().set_alpha(0.4)
+                    annot.get_bbox_patch().set_alpha(0.8)
                     annot.set_visible(True)
                     fig.canvas.draw_idle()
                     break
@@ -127,6 +127,6 @@ def plot_timespans(config):
                     if vis:
                         annot.set_visible(False)
                         fig.canvas.draw_idle()
+    fig.canvas.mpl_connect('motion_notify_event', hover)
 
-    fig.canvas.mpl_connect("motion_notify_event", hover)
     plt.show()
