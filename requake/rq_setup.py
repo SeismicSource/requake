@@ -67,28 +67,33 @@ def _check_library_versions():
 def _setup_logging(config, progname, action_name):
     """Set up the logging infrastructure."""
     global logger
-    # Create outdir
-    if not os.path.exists(config.args.outdir):
-        os.makedirs(config.args.outdir)
-
-    logfile = os.path.join(
-        config.args.outdir,
-        '{}.{}.log'.format(progname, action_name))
 
     logger_root = logging.getLogger()
-
     # captureWarnings is not supported in old versions of python
     try:
         logging.captureWarnings(True)
     except Exception:
         pass
     logger_root.setLevel(logging.DEBUG)
-    filehand = logging.FileHandler(filename=logfile, mode='a')
-    filehand.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s %(name)-20s '
-                                  '%(levelname)-8s %(message)s')
-    filehand.setFormatter(formatter)
-    logger_root.addHandler(filehand)
+
+    # Actions that will produce a logfile
+    loggin_actions = [
+        'scan_catalog',
+        'scan_template',
+        'build_families'
+    ]
+    if action_name in loggin_actions:
+        if not os.path.exists(config.args.outdir):
+            os.makedirs(config.args.outdir)
+        logfile = os.path.join(
+            config.args.outdir,
+            '{}.{}.log'.format(progname, action_name))
+        filehand = logging.FileHandler(filename=logfile, mode='a')
+        filehand.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s %(name)-20s '
+                                      '%(levelname)-8s %(message)s')
+        filehand.setFormatter(formatter)
+        logger_root.addHandler(filehand)
 
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
