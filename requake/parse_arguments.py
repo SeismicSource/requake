@@ -104,6 +104,16 @@ def parse_arguments(progname='requake'):
              'You can specify DURATION in days (e.g., 100d) '
              'or in years (e.g., 2.5y).'
     )
+    mapfamilies = subparser.add_parser(
+        'map_families',
+        help='plot families on a map'
+    )
+    mapfamilies.add_argument(
+        '-l', '--longerthan', type=str, default=0, metavar='DURATION',
+        help='only use families lasting longer than this value. '
+             'You can specify DURATION in days (e.g., 100d) '
+             'or in years (e.g., 2.5y).'
+    )
     flagfamily = subparser.add_parser(
         'flag_family',
         help='flag a family of repeating earthquakes as valid or not valid. '

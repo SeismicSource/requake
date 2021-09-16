@@ -52,6 +52,7 @@ Currently supported verbs are:
                         of pairs
     plot_families       plot traces for one ore more event families
     plot_timespans      plot family timespans
+    map_families        plot families on a map
     flag_family         flag a family of repeating earthquakes as valid or not
                         valid. Note that all families are valid by default
                         when first created
