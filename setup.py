@@ -25,18 +25,18 @@ setup(
     license='CeCILL Free Software License Agreement, Version 2.1',
     platforms='OS Independent',
     classifiers=[
-            'Development Status :: Development Status :: 2 - Pre-Alpha',
-            'Environment :: Console',
-            'Intended Audience :: Science/Research',
-            'License :: OSI Approved :: CEA CNRS Inria Logiciel Libre '
-                'License, version 2.1 (CeCILL-2.1)',
-            'Operating System :: OS Independent',
-            'Programming Language :: Python',
-            'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.7',
-            'Programming Language :: Python :: 3.8',
-            'Topic :: Scientific/Engineering',
-            'Topic :: Scientific/Engineering :: Physics'],
+        'Development Status :: 4 - Beta',
+        'Environment :: Console',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: CEA CNRS Inria Logiciel Libre '
+            'License, version 2.1 (CeCILL-2.1)',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Scientific/Engineering :: Physics'],
     install_requires=['obspy>=1.2.0', 'argcomplete'],
     python_requires='>3.7'
     )
