@@ -72,7 +72,8 @@ def plot_timespans(config):
             msg = 'Family "{}" is too short'.format(fn)
             logger.warning(msg)
             continue
-        label = 'Family {}'.format(fn)
+        label = 'Family {}\n{:.1f}°E {:.1f}°N {:.1f} km'.format(
+            fn, family.lon, family.lat, family.depth)
         times = [ev.orig_time.matplotlib_date for ev in family]
         if sort_by == 'time':
             yvals = np.ones(len(times)) * family.starttime.matplotlib_date
@@ -103,7 +104,8 @@ def plot_timespans(config):
     annot = ax.annotate(
         '', xy=(0, 0), xytext=(5, 5),
         textcoords='offset points',
-        bbox=dict(boxstyle="round", fc="w"),
+        bbox=dict(boxstyle='round', fc='w'),
+        zorder=20
     )
     annot.set_visible(False)
 
