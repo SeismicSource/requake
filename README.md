@@ -19,6 +19,16 @@ Requake is written in Python and uses [ObsPy](https://obspy.org) as backend.
 
 ## Installation
 
+### Using pip and PyPI (preferred method)
+
+The latest release of Requake is available on the
+[Python Package Index](https://pypi.org/project/requake/).
+
+You can install it easily through `pip`:
+
+    pip install requake
+
+
 ### From the Requake GitHub repository
 
 Clone the project:
