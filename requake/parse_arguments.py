@@ -42,10 +42,10 @@ def parse_arguments(progname='requake'):
         'scan_catalog',
         help='scan an existing catalog for earthquake pairs'
     )
-    subparser.add_parser(
-        'scan_template',
-        help='scan a continuous waveform stream using a template'
-    )
+    # subparser.add_parser(
+    #     'scan_template',
+    #     help='scan a continuous waveform stream using a template'
+    # )
     plotpair = subparser.add_parser(
         'plot_pair',
         help='plot traces for a given event pair'

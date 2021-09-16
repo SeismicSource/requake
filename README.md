@@ -46,7 +46,6 @@ Currently supported verbs are:
 
     sample_config       write sample config file to current directory and exit
     scan_catalog        scan an existing catalog for earthquake pairs
-    scan_template       scan a continuous waveform stream using a template
     plot_pair           plot traces for a given event pair
     build_families      build families of repeating earthquakes from a catalog
                         of pairs
