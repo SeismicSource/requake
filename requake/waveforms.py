@@ -96,7 +96,12 @@ def download_and_process_waveform(config, ev):
         trace_id = config.args.traceid
     else:
         trace_id = ev.trace_id
-    coords = config.inventory.get_coordinates(trace_id, orig_time)
+    try:
+        coords = config.inventory.get_coordinates(trace_id, orig_time)
+    except Exception:
+        msg = 'Unable to find coordinates for trace {} at time {}'.format(
+                    trace_id, orig_time)
+        raise Exception(msg)
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
     dist_deg = locations2degrees(trace_lat, trace_lon, ev_lat, ev_lon)
