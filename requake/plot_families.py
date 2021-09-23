@@ -26,8 +26,7 @@ from .families import read_families
 from .rq_setup import rq_exit
 
 
-def _get_waveform_family(config, families, family_number):
-    st = Stream()
+def _get_family(config, families, family_number):
     for family in families:
         if family.number != family_number:
             continue
@@ -35,23 +34,30 @@ def _get_waveform_family(config, families, family_number):
             msg = 'Family "{}" is flagged as not valid'.format(family_number)
             raise Exception(msg)
         if (family.endtime - family.starttime) < config.args.longerthan:
-            msg = 'Family "{}" is too short'.format(family_number)
+            msg = 'Family "{}" is too short'.format(family.number)
             raise Exception(msg)
-        for ev in family:
-            try:
-                st.append(download_and_process_waveform(config, ev))
-            except Exception:
-                pass
+        return family
+    msg = 'No family found with number "{}"'.format(family_number)
+    raise Exception(msg)
+
+
+def _get_waveform_family(config, family):
+    st = Stream()
+    for ev in family:
+        try:
+            st += download_and_process_waveform(config, ev)
+        except Exception as m:
+            logger.error(str(m))
+            pass
     if not st:
-        msg = 'No family found with number "{}"'.format(family_number)
+        msg = 'No traces found for family {}'.format(family.number)
         raise Exception(msg)
     return st
 
 
-def _plot_family(config, family_number):
+def _plot_family(config, family):
     try:
-        families = read_families(config)
-        st = _get_waveform_family(config, families, family_number)
+        st = _get_waveform_family(config, family)
         align_traces(config, st)
     except Exception as m:
         logger.error(str(m))
@@ -109,7 +115,7 @@ def _plot_family(config, family_number):
     ax.tick_params(axis='x', which='both', direction='in')
     ax.set_xlim(t0, t1)
     ax.set_xlabel('Time (s)')
-    title = 'Family {}'.format(family_number)
+    title = 'Family {}'.format(family.number)
     ax.set_title(title, loc='left')
     fig.canvas.manager.set_window_title(title)
     title = '{} | {:.1f}-{:.1f} Hz'.format(
@@ -141,10 +147,16 @@ def _build_family_number_list(config):
 def plot_families(config):
     try:
         family_numbers = _build_family_number_list(config)
+        families = read_families(config)
+        get_metadata(config)
     except Exception as m:
         logger.error(str(m))
         rq_exit(1)
-    get_metadata(config)
     for family_number in family_numbers:
-        _plot_family(config, family_number)
+        try:
+            family = _get_family(config, families, family_number)
+            _plot_family(config, family)
+        except Exception as m:
+            logger.error(str(m))
+            continue
     plt.show()
