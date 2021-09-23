@@ -123,6 +123,9 @@ def download_and_process_waveform(config, ev):
         network=net, station=sta, location=loc, channel=chan,
         starttime=t0, endtime=t1
     )
+    # webservices sometimes return longer traces: trim to be sure
+    st.trim(starttime=t0, endtime=t1)
+    st.detrend(type='demean')
     st.taper(max_percentage=0.05)
     st.filter(
         type='bandpass',
