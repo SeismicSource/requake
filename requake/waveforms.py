@@ -100,6 +100,9 @@ def download_and_process_waveform(config, ev):
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
     dist_deg = locations2degrees(trace_lat, trace_lon, ev_lat, ev_lon)
+    distance, _, _ = gps2dist_azimuth(
+        trace_lat, trace_lon, ev_lat, ev_lon)
+    distance /= 1e3
     P_arrivals = model.get_travel_times(
         source_depth_in_km=ev_depth,
         distance_in_degree=dist_deg,
@@ -134,6 +137,8 @@ def download_and_process_waveform(config, ev):
     tr.stats.orig_time = orig_time
     tr.stats.mag = mag
     tr.stats.mag_type = mag_type
+    tr.stats.dist_deg = dist_deg
+    tr.stats.distance = distance
     tr.stats.P_arrival_time = P_arrival_time
     tr.stats.S_arrival_time = S_arrival_time
     return tr

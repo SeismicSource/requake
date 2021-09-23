@@ -115,11 +115,11 @@ def _plot_family(config, family):
     ax.tick_params(axis='x', which='both', direction='in')
     ax.set_xlim(t0, t1)
     ax.set_xlabel('Time (s)')
-    title = 'Family {}'.format(family.number)
+    title = 'Family {} | {} events'.format(family.number, len(st))
     ax.set_title(title, loc='left')
     fig.canvas.manager.set_window_title(title)
-    title = '{} | {:.1f}-{:.1f} Hz'.format(
-        tr0.id, config.cc_freq_min, config.cc_freq_max)
+    title = '{} | {:.1f} km | {:.1f}-{:.1f} Hz'.format(
+        tr0.id, tr0.stats.distance, config.cc_freq_min, config.cc_freq_max)
     ax.set_title(title, loc='right')
 
 
