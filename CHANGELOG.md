@@ -2,6 +2,7 @@
 (c) 2021 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
+- Bugfix: `scan_catalog` could not run properly due to missing variable
 - Detrend traces before filtering
 - `plot_families`: print number of events and station-event distance
 

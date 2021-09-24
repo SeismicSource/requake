@@ -156,4 +156,7 @@ def parse_arguments(progname='requake'):
             "invalid value: '{}'\n".format(progname, args.action, lt)
         )
         sys.exit(2)
+    # args.traceid need to exist
+    if not hasattr(args, 'traceid'):
+        args.traceid = None
     return args
