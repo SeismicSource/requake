@@ -3,6 +3,7 @@
 
 ## unreleased
   - New progressbar, using `tqdm`
+  - Bugfix: last family was not read from family file
 
 ## v0.2 - 2021-09-24
 Mostly a bugfix release with a slightly improved trace plotting.

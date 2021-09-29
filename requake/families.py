@@ -80,4 +80,6 @@ def read_families(config):
             old_family_number = family_number
         family.append(ev)
         family.valid = row['valid'] in ['True', 'true']
+    # append last family
+    families.append(family)
     return families
