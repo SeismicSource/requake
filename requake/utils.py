@@ -83,30 +83,3 @@ def validate_config(config_obj):
         sys.exit(1)
     if not test:
         err_exit('No configuration value present!')
-
-
-def update_progress(num, total, status=None):
-    """
-    Display or update a console progress bar.
-
-    Accepts a float between 0 and 1.
-    A value under 0 represents a 'halt'.
-    A value at 1 or bigger represents 100%
-
-    Modified from: https://stackoverflow.com/a/15860757/2021880
-    """
-    barLength = 40  # Modify this to change the length of the progress bar
-    progress = num/total
-    if status is None:
-        status = ''
-        if progress < 0:
-            progress = 0
-            status = 'Halt...\r\n'
-        if progress >= 1:
-            progress = 1
-            status = 'Done.\r\n'
-    block = int(round(barLength*progress))
-    text = '\rProgress: [{}] {:n} of {:n} {}'.format(
-        '#'*block + '-'*(barLength-block), num, total, status)
-    sys.stdout.write(text)
-    sys.stdout.flush()

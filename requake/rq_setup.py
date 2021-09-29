@@ -15,6 +15,7 @@ import sys
 import os
 import shutil
 import logging
+import tqdm
 import signal
 from obspy import UTCDateTime
 from obspy.clients.fdsn import Client
@@ -95,7 +96,19 @@ def _setup_logging(config, progname, action_name):
         filehand.setFormatter(formatter)
         logger_root.addHandler(filehand)
 
-    console = logging.StreamHandler()
+    # tqdm compatible console handler
+    class TqdmLoggingHandler(logging.Handler):
+        def __init__(self, level=logging.NOTSET):
+            super().__init__(level)
+
+        def emit(self, record):
+            try:
+                msg = self.format(record)
+                tqdm.tqdm.write(msg)
+                self.flush()
+            except Exception:
+                self.handleError(record)
+    console = TqdmLoggingHandler()
     console.setLevel(logging.INFO)
     logger_root.addHandler(console)
 

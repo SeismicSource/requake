@@ -12,13 +12,13 @@ Catalog-based repeater scan for Requake.
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import csv
+from tqdm import tqdm
 from math import factorial
 from itertools import combinations
 from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeCatalog, get_events, read_events
 from .waveforms import get_waveform_pair, cc_waveform_pair
 from .rq_setup import rq_exit
-from .utils import update_progress
 
 
 def _get_catalog(config):
@@ -94,33 +94,30 @@ def scan_catalog(config):
     writer = csv.writer(fp_out)
     writer.writerow(fieldnames)
     npairs = int(factorial(nevents)/(factorial(2)*factorial(nevents-2)))
-    for n, pair in enumerate(combinations(catalog, 2)):
-        if not _pair_ok(config, pair):
-            update_progress(n, npairs, 'pairs')
-            continue
-        try:
-            st = get_waveform_pair(config, pair)
-            lag, lag_sec, cc_max = cc_waveform_pair(config, st[0], st[1])
-            stats1, stats2 = [tr.stats for tr in st]
-            writer.writerow([
-                stats1.evid, stats2.evid, st[0].id,
-                stats1.orig_time, stats1.ev_lon, stats1.ev_lat,
-                stats1.ev_depth, stats1.mag_type, stats1.mag,
-                stats2.orig_time, stats2.ev_lon, stats2.ev_lat,
-                stats2.ev_depth, stats2.mag_type, stats2.mag,
-                lag, lag_sec, cc_max
-            ])
-        except Exception as m:
-            # Do not print empty messages
-            if str(m):
-                # Need a newline after the progressbar to print
-                # the warning message
-                update_progress(n, npairs, 'pairs\n')
-                logger.warning(str(m))
-            continue
-        update_progress(n, npairs, 'pairs')
-    # Final update to progressbar
-    update_progress(npairs, npairs)
+    logger.info('Processing {:n} event pairs'.format(npairs))
+    with tqdm(total=npairs, unit='pairs', unit_scale=True) as pbar:
+        for n, pair in enumerate(combinations(catalog, 2)):
+            pbar.update()
+            if not _pair_ok(config, pair):
+                continue
+            try:
+                st = get_waveform_pair(config, pair)
+                lag, lag_sec, cc_max = cc_waveform_pair(config, st[0], st[1])
+                stats1, stats2 = [tr.stats for tr in st]
+                writer.writerow([
+                    stats1.evid, stats2.evid, st[0].id,
+                    stats1.orig_time, stats1.ev_lon, stats1.ev_lat,
+                    stats1.ev_depth, stats1.mag_type, stats1.mag,
+                    stats2.orig_time, stats2.ev_lon, stats2.ev_lat,
+                    stats2.ev_depth, stats2.mag_type, stats2.mag,
+                    lag, lag_sec, cc_max
+                ])
+            except Exception as m:
+                # Do not print empty messages
+                if str(m):
+                    logger.warning(str(m))
+                continue
     fp_out.close()
+    logger.info('Processed {:n} event pairs'.format(npairs))
     logger.info(
         'Done! Output written to {}'.format(config.scan_catalog_pairs_file))

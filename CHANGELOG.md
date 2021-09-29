@@ -1,6 +1,9 @@
 # Requake - Repeating earthquakes search and analysis
 (c) 2021 Claudio Satriano <satriano@ipgp.fr>
 
+## unreleased
+  - New progressbar, using `tqdm`
+
 ## v0.2 - 2021-09-24
 Mostly a bugfix release with a slightly improved trace plotting.
 
@@ -9,4 +12,4 @@ Mostly a bugfix release with a slightly improved trace plotting.
   - `plot_families`: print number of events and station-event distance
 
 ## v0.1 - 2021-09-16
- - Initial release, not yet feature complete
+  - Initial release, not yet feature complete
