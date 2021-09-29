@@ -31,6 +31,10 @@ You can install it easily through `pip`:
 
 ### From the Requake GitHub repository
 
+If you need an unreleased feature, or if you want to play with the source
+code, you can pull the most recent code from the
+[Requake GitHub repository](https://github.com/SeismicSource/requake).
+
 Clone the project:
 
     git clone https://github.com/SeismicSource/requake.git
@@ -40,6 +44,12 @@ version number is lost), then install the code from within the `requake` main
 directory by running:
 
     pip install .
+
+If you want to simultaneously modify and use the code, you can install
+in "editable mode":
+
+    pip install -e .
+
 
 ## Running
 
