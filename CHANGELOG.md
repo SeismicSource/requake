@@ -3,6 +3,9 @@
 
 ## unreleased
   - New progressbar, using `tqdm`
+  - `plot_families`:
+    - show event origin time as y-label
+    - show trace mean CC
   - Bugfix: last family was not read from family file
 
 ## v0.2 - 2021-09-24

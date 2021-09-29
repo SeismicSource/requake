@@ -12,6 +12,7 @@ Functions for downloading and processing waveforms.
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import numpy as np
+from itertools import combinations
 from obspy import Inventory, Stream
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
@@ -241,6 +242,14 @@ def align_pair(config, tr1, tr2):
 
 def align_traces(config, st):
     """Align traces in stream using cross-correlation."""
-    tr1 = st[0]
-    for tr2 in st[1:]:
-        align_pair(config, tr1, tr2)
+    for tr in st:
+        tr.stats.cc_mean = 0
+        tr.stats.cc_npairs = 0
+    for tr1, tr2 in combinations(st, 2):
+        _, _, cc_max = align_pair(config, tr1, tr2)
+        tr1.stats.cc_mean += cc_max
+        tr1.stats.cc_npairs += 1
+        tr2.stats.cc_mean += cc_max
+        tr2.stats.cc_npairs += 1
+    for tr in st:
+        tr.stats.cc_mean /= tr.stats.cc_npairs

@@ -98,13 +98,23 @@ def _plot_family(config, family):
             P_bar, = ax.plot((P_arrival, P_arrival), (n-hh, n+hh), color='g')
             S_bar, = ax.plot((S_arrival, S_arrival), (n-hh, n+hh), color='r')
         trans = ax.get_yaxis_transform()
-        text = '{} {} {} {:.1f}\n'.format(
-            tr.stats.evid, tr.stats.orig_time.strftime('%Y-%m-%dT%H:%M:%S'),
-            tr.stats.mag_type, tr.stats.mag)
+        text = '{}\n{}'.format(
+            tr.stats.orig_time.strftime('%Y-%m-%d'),
+            tr.stats.orig_time.strftime('%H:%M:%S'))
+        txt = ax.text(
+            -0.01, n, text, transform=trans, ha='right', va='center',
+            fontsize=8, linespacing=1.5)
+        text = '{} {} {:.1f}\n'.format(
+            tr.stats.evid, tr.stats.mag_type, tr.stats.mag)
         text += '{:.4f}°E {:.4f}°N {:.3f} km'.format(
             tr.stats.ev_lon, tr.stats.ev_lat, tr.stats.ev_depth)
         txt = ax.text(
             0.01, n+0.2, text, transform=trans, fontsize=8, linespacing=1.5)
+        txt.set_path_effects(
+            [PathEffects.withStroke(linewidth=3, foreground='w')])
+        text = 'CC mean {:.2f}'.format(tr.stats.cc_mean)
+        txt = ax.text(
+            0.98, n+0.2, text, ha='right', transform=trans, fontsize=8)
         txt.set_path_effects(
             [PathEffects.withStroke(linewidth=3, foreground='w')])
     if config.args.arrivals:
