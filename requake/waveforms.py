@@ -237,6 +237,8 @@ def align_pair(config, tr1, tr2):
     else:
         data2 = tr2.data
     tr2.data = data2
+    tr2.stats.P_arrival_time += lag_sec
+    tr2.stats.S_arrival_time += lag_sec
     return lag, lag_sec, cc_max
 
 

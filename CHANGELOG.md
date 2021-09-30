@@ -6,6 +6,7 @@
   - `plot_families`:
     - show event origin time as y-label
     - show trace mean CC
+    - also shift theoretical arrivals when aligning traces
   - Bugfix: last family was not read from family file
 
 ## v0.2 - 2021-09-24
