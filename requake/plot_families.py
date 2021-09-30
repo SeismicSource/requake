@@ -26,7 +26,7 @@ from obspy import Stream
 from obspy.signal.filter import envelope
 from obspy.signal.util import smooth
 from .waveforms import (
-    download_and_process_waveform, get_metadata, align_traces)
+    download_and_process_waveform, get_metadata, align_traces, build_template)
 from .families import read_families
 from .rq_setup import rq_exit
 
@@ -64,6 +64,7 @@ def _plot_family(config, family):
     try:
         st = _get_waveform_family(config, family)
         align_traces(config, st)
+        build_template(config, st, family)
     except Exception as m:
         logger.error(str(m))
         return
@@ -90,7 +91,8 @@ def _plot_family(config, family):
     tracelines = list()
     P_bars = list()
     S_bars = list()
-    for n, tr in enumerate(st):
+    for n, tr in enumerate(st.sort()):
+        average_trace = 'average' in tr.stats.evid
         # Normalize trace between t0 and t1
         tt0 = tr.stats.starttime + t0
         tt1 = tr.stats.starttime + t1
@@ -99,7 +101,11 @@ def _plot_family(config, family):
         tr.detrend('demean')
         tr.data *= 0.5
         # substract t0, so that time axis starts at 0
-        l, = ax.plot(tr.times()-t0, tr.data+n, color='black', linewidth=0.5)
+        if average_trace:
+            color = '#cc8800'
+        else:
+            color = 'black'
+        l, = ax.plot(tr.times()-t0, tr.data+n, color=color, linewidth=0.5)
         tracelines.append(l)
         P_arrival = tr.stats.P_arrival_time - tr.stats.starttime - t0
         S_arrival = tr.stats.S_arrival_time - tr.stats.starttime - t0
@@ -109,25 +115,29 @@ def _plot_family(config, family):
         P_bars.append(P_bar)
         S_bars.append(S_bar)
         trans = ax.get_yaxis_transform()
-        text = '{}\n{}'.format(
-            tr.stats.orig_time.strftime('%Y-%m-%d'),
-            tr.stats.orig_time.strftime('%H:%M:%S'))
+        if average_trace:
+            text = 'average'
+        else:
+            text = tr.stats.orig_time.strftime('%Y-%m-%d\n%H:%M:%S')
         txt = ax.text(
             -0.01, n, text, transform=trans, ha='right', va='center',
-            fontsize=8, linespacing=1.5)
-        text = '{} {} {:.1f}\n'.format(
-            tr.stats.evid, tr.stats.mag_type, tr.stats.mag)
-        text += '{:.4f}°E {:.4f}°N {:.3f} km'.format(
-            tr.stats.ev_lon, tr.stats.ev_lat, tr.stats.ev_depth)
-        txt = ax.text(
-            0.01, n+0.2, text, transform=trans, fontsize=8, linespacing=1.5)
-        txt.set_path_effects(
-            [PathEffects.withStroke(linewidth=3, foreground='w')])
-        text = 'CC mean {:.2f}'.format(tr.stats.cc_mean)
-        txt = ax.text(
-            0.98, n+0.2, text, ha='right', transform=trans, fontsize=8)
-        txt.set_path_effects(
-            [PathEffects.withStroke(linewidth=3, foreground='w')])
+            color=color, fontsize=8, linespacing=1.5)
+        if not average_trace:
+            text = '{} {} {:.1f}\n'.format(
+                tr.stats.evid, tr.stats.mag_type, tr.stats.mag)
+            text += '{:.4f}°E {:.4f}°N {:.3f} km'.format(
+                tr.stats.ev_lon, tr.stats.ev_lat, tr.stats.ev_depth)
+            txt = ax.text(
+                0.01, n+0.2, text, transform=trans,
+                color=color, fontsize=8, linespacing=1.5)
+            txt.set_path_effects(
+                [PathEffects.withStroke(linewidth=3, foreground='w')])
+            text = 'CC mean {:.2f}'.format(tr.stats.cc_mean)
+            txt = ax.text(
+                0.98, n+0.2, text, ha='right',
+                color=color, transform=trans, fontsize=8)
+            txt.set_path_effects(
+                [PathEffects.withStroke(linewidth=3, foreground='w')])
     legend = ax.legend(
         [P_bar, S_bar], ['P theo', 'S theo'], loc='lower right')
     legend.set_visible(False)
@@ -139,7 +149,7 @@ def _plot_family(config, family):
     ax.tick_params(axis='x', which='both', direction='in')
     ax.set_xlim(0, t1-t0)
     ax.set_xlabel('Time (s)')
-    title = 'Family {} | {} events'.format(family.number, len(st))
+    title = 'Family {} | {} events'.format(family.number, len(st)-1)
     ax.set_title(title, loc='left')
     fig.canvas.manager.set_window_title(title)
     title = '{} | {:.1f} km | {:.1f}-{:.1f} Hz'.format(

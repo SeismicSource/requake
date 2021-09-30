@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import numpy as np
 from itertools import combinations
-from obspy import Inventory, Stream
+from obspy import Inventory, Stream, UTCDateTime
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
 model = TauPyModel(model='ak135')
@@ -146,6 +146,7 @@ def download_and_process_waveform(config, ev):
     tr.stats.orig_time = orig_time
     tr.stats.mag = mag
     tr.stats.mag_type = mag_type
+    tr.stats.coords = coords
     tr.stats.dist_deg = dist_deg
     tr.stats.distance = distance
     tr.stats.P_arrival_time = P_arrival_time
@@ -255,3 +256,48 @@ def align_traces(config, st):
         tr2.stats.cc_npairs += 1
     for tr in st:
         tr.stats.cc_mean /= tr.stats.cc_npairs
+
+
+def build_template(config, st, family):
+    """
+    Build template by averaging traces.
+
+    Assumes that the stream is realigned.
+    """
+    tr_template = st[0].copy()
+    if config.trace_average_from_normalized_traces:
+        tr_template.data /= abs(tr_template.max())
+    P_arrival = tr_template.stats.P_arrival_time - tr_template.stats.starttime
+    S_arrival = tr_template.stats.S_arrival_time - tr_template.stats.starttime
+    for tr in st[1:]:
+        data = tr.data
+        if config.trace_average_from_normalized_traces:
+            data /= abs(tr.max())
+        tr_template.data += data
+        P_arrival += tr.stats.P_arrival_time - tr.stats.starttime
+        S_arrival += tr.stats.S_arrival_time - tr.stats.starttime
+    tr_template.data /= len(st)
+    P_arrival /= len(st)
+    S_arrival /= len(st)
+    tr_template.stats.evid = 'average{:02d}'.format(family.number)
+    tr_template.stats.ev_lat = family.lat
+    tr_template.stats.ev_lon = family.lon
+    tr_template.stats.ev_depth = family.depth
+    tr_template.stats.orig_time = UTCDateTime('00010101')
+    tr_template.stats.mag = 0
+    tr_template.stats.mag_type = ''
+    trace_lat = tr_template.stats.coords['latitude']
+    trace_lon = tr_template.stats.coords['longitude']
+    dist_deg = locations2degrees(
+        trace_lat, trace_lon, family.lat, family.lon)
+    distance, _, _ = gps2dist_azimuth(
+        trace_lat, trace_lon, family.lat, family.lon)
+    distance /= 1e3
+    tr_template.stats.dist_deg = dist_deg
+    tr_template.stats.distance = distance
+    tr_template.stats.starttime = UTCDateTime('00010101')
+    tr_template.stats.P_arrival_time = tr_template.stats.starttime + P_arrival
+    tr_template.stats.S_arrival_time = tr_template.stats.starttime + S_arrival
+    tr_template.stats.cc_mean = 0
+    tr_template.stats.cc_npairs = 0
+    st.append(tr_template)
