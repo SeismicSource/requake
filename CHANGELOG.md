@@ -4,6 +4,8 @@
 ## unreleased
   - New progressbar, using `tqdm`
   - `plot_families`:
+    - pan/zoom traces using arrows
+    - show/hide theoretical arrivals using 'a' (command line option removed)
     - show event origin time as y-label
     - show trace mean CC
     - also shift theoretical arrivals when aligning traces

@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__.split('.')[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
+import matplotlib as mpl
+# unbind some keys, that we use it for interacting with the plot
+mpl.rcParams['keymap.back'].remove('left')
+mpl.rcParams['keymap.forward'].remove('right')
+mpl.rcParams['keymap.all_axes'].remove('a')
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as PathEffects
 import csv
@@ -82,6 +87,9 @@ def _plot_family(config, family):
         t1 = times[env > 0.3*env_max][-1]
 
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+    tracelines = list()
+    P_bars = list()
+    S_bars = list()
     for n, tr in enumerate(st):
         # Normalize trace between t0 and t1
         tt0 = tr.stats.starttime + t0
@@ -91,13 +99,15 @@ def _plot_family(config, family):
         tr.detrend('demean')
         tr.data *= 0.5
         # substract t0, so that time axis starts at 0
-        ax.plot(tr.times()-t0, tr.data+n, color='black', linewidth=0.5)
-        if config.args.arrivals:
-            P_arrival = tr.stats.P_arrival_time - tr.stats.starttime - t0
-            S_arrival = tr.stats.S_arrival_time - tr.stats.starttime - t0
-            hh = 0.15  # pick line half-height
-            P_bar, = ax.plot((P_arrival, P_arrival), (n-hh, n+hh), color='g')
-            S_bar, = ax.plot((S_arrival, S_arrival), (n-hh, n+hh), color='r')
+        l, = ax.plot(tr.times()-t0, tr.data+n, color='black', linewidth=0.5)
+        tracelines.append(l)
+        P_arrival = tr.stats.P_arrival_time - tr.stats.starttime - t0
+        S_arrival = tr.stats.S_arrival_time - tr.stats.starttime - t0
+        hh = 0.15  # pick line half-height
+        P_bar, = ax.plot((P_arrival, P_arrival), (n-hh, n+hh), color='g')
+        S_bar, = ax.plot((S_arrival, S_arrival), (n-hh, n+hh), color='r')
+        P_bars.append(P_bar)
+        S_bars.append(S_bar)
         trans = ax.get_yaxis_transform()
         text = '{}\n{}'.format(
             tr.stats.orig_time.strftime('%Y-%m-%d'),
@@ -118,8 +128,11 @@ def _plot_family(config, family):
             0.98, n+0.2, text, ha='right', transform=trans, fontsize=8)
         txt.set_path_effects(
             [PathEffects.withStroke(linewidth=3, foreground='w')])
-    if config.args.arrivals:
-        ax.legend([P_bar, S_bar], ['P theo', 'S theo'], loc='lower right')
+    legend = ax.legend(
+        [P_bar, S_bar], ['P theo', 'S theo'], loc='lower right')
+    legend.set_visible(False)
+    for bar in P_bars + S_bars:
+        bar.set_visible(False)
     ax.axes.yaxis.set_visible(False)
     ax.minorticks_on()
     ax.tick_params(which='both', top=True, labeltop=False)
@@ -132,6 +145,52 @@ def _plot_family(config, family):
     title = '{} | {:.1f} km | {:.1f}-{:.1f} Hz'.format(
         tr0.id, tr0.stats.distance, config.cc_freq_min, config.cc_freq_max)
     ax.set_title(title, loc='right')
+
+    def _zoom_lines(zoom_level):
+        for line in tracelines:
+            ydata = line.get_ydata()
+            ymean = ydata.mean()
+            ydata = (ydata-ymean)*zoom_level + ymean
+            line.set_ydata(ydata)
+        fig.canvas.draw_idle()
+
+    def _pan_plot(ax, amount):
+        xlim = ax.get_xlim()
+        ax.set_xlim(xlim[0]+amount, xlim[1]+amount)
+        fig.canvas.draw_idle()
+
+    def _toggle_arrivals():
+        _toggle_arrivals.visible = not _toggle_arrivals.visible
+        for bar in P_bars + S_bars:
+            bar.set_visible(_toggle_arrivals.visible)
+        legend.set_visible(_toggle_arrivals.visible)
+        fig.canvas.draw_idle()
+    _toggle_arrivals.visible = False
+
+    def _keypress(event):
+        ax = event.canvas.figure.axes[0]
+        if event.key == 'up':
+            _keypress.zoom_level *= 2
+            _zoom_lines(2)
+        if event.key == 'down':
+            _keypress.zoom_level /= 2
+            _zoom_lines(0.5)
+        elif event.key == 'right':
+            _keypress.pan_amount += 1
+            _pan_plot(ax, 1)
+        elif event.key == 'left':
+            _keypress.pan_amount -= 1
+            _pan_plot(ax, -1)
+        elif event.key == '0':
+            _zoom_lines(1./_keypress.zoom_level)
+            _pan_plot(ax, -_keypress.pan_amount)
+            _keypress.zoom_level = 1
+            _keypress.pan_amount = 0
+        elif event.key == 'a':
+            _toggle_arrivals()
+    _keypress.zoom_level = 1
+    _keypress.pan_amount = 0
+    fig.canvas.mpl_connect('key_press_event', _keypress)
 
 
 def _build_family_number_list(config):
@@ -170,4 +229,10 @@ def plot_families(config):
         except Exception as m:
             logger.error(str(m))
             continue
+    print('''
+    Use arrow keys to pan/zoom traces.
+    Press '0' to reset the view.
+    Press 'a' to show/hide theoretical arrivals.
+    Press 'q' to close a plot.
+    ''')
     plt.show()

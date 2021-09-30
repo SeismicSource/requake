@@ -74,10 +74,6 @@ def parse_arguments(progname='requake'):
         help='end time, in seconds relative to trace start, for the plot.'
     )
     plotfamilies.add_argument(
-        '-a', '--arrivals', action='store_true',
-        help='plot theoretical P and S arrivals.'
-    )
-    plotfamilies.add_argument(
         '-t', '--traceid', type=str, default=None,
         help='plot using this traceid.'
     )
