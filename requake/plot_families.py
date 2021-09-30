@@ -154,6 +154,16 @@ def _plot_family(config, family):
             line.set_ydata(ydata)
         fig.canvas.draw_idle()
 
+    def _time_zoom(ax, zoom_level):
+        xmin, xmax = ax.get_xlim()
+        xmean = 0.5*(xmin+xmax)
+        xspan = xmax-xmin
+        xspan *= zoom_level
+        xmin = xmean - 0.5*xspan
+        xmax = xmean + 0.5*xspan
+        ax.set_xlim(xmin, xmax)
+        fig.canvas.draw_idle()
+
     def _pan_plot(ax, amount):
         xlim = ax.get_xlim()
         ax.set_xlim(xlim[0]+amount, xlim[1]+amount)
@@ -181,14 +191,23 @@ def _plot_family(config, family):
         elif event.key == 'left':
             _keypress.pan_amount -= 1
             _pan_plot(ax, -1)
+        elif event.key == 'shift+right':
+            _keypress.time_zoom_level /= 2
+            _time_zoom(ax, 0.5)
+        elif event.key == 'shift+left':
+            _keypress.time_zoom_level *= 2
+            _time_zoom(ax, 2)
         elif event.key == '0':
             _zoom_lines(1./_keypress.zoom_level)
+            _time_zoom(ax, 1./_keypress.time_zoom_level)
             _pan_plot(ax, -_keypress.pan_amount)
             _keypress.zoom_level = 1
+            _keypress.time_zoom_level = 1
             _keypress.pan_amount = 0
         elif event.key == 'a':
             _toggle_arrivals()
     _keypress.zoom_level = 1
+    _keypress.time_zoom_level = 1
     _keypress.pan_amount = 0
     fig.canvas.mpl_connect('key_press_event', _keypress)
 
@@ -230,7 +249,9 @@ def plot_families(config):
             logger.error(str(m))
             continue
     print('''
-    Use arrow keys to pan/zoom traces.
+    Use left/right arrow keys to scroll backwards/forward in time.
+    Use shift+left/shift+right to increase/decrease the time window.
+    Use up/down arrow keys to increase/decrease trace amplitude.
     Press '0' to reset the view.
     Press 'a' to show/hide theoretical arrivals.
     Press 'q' to close a plot.
