@@ -90,10 +90,11 @@ def _plot_family(config, family):
         tr.data /= abs(tr2.max())
         tr.detrend('demean')
         tr.data *= 0.5
-        ax.plot(tr.times(), tr.data+n, color='black', linewidth=0.5)
+        # substract t0, so that time axis starts at 0
+        ax.plot(tr.times()-t0, tr.data+n, color='black', linewidth=0.5)
         if config.args.arrivals:
-            P_arrival = tr.stats.P_arrival_time - tr.stats.starttime
-            S_arrival = tr.stats.S_arrival_time - tr.stats.starttime
+            P_arrival = tr.stats.P_arrival_time - tr.stats.starttime - t0
+            S_arrival = tr.stats.S_arrival_time - tr.stats.starttime - t0
             hh = 0.15  # pick line half-height
             P_bar, = ax.plot((P_arrival, P_arrival), (n-hh, n+hh), color='g')
             S_bar, = ax.plot((S_arrival, S_arrival), (n-hh, n+hh), color='r')
@@ -123,7 +124,7 @@ def _plot_family(config, family):
     ax.minorticks_on()
     ax.tick_params(which='both', top=True, labeltop=False)
     ax.tick_params(axis='x', which='both', direction='in')
-    ax.set_xlim(t0, t1)
+    ax.set_xlim(0, t1-t0)
     ax.set_xlabel('Time (s)')
     title = 'Family {} | {} events'.format(family.number, len(st))
     ax.set_title(title, loc='left')
