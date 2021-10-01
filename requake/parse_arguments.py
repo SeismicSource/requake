@@ -34,30 +34,51 @@ def parse_arguments(progname='requake'):
     parser.add_argument(
         '-v', '--version', action='version',
         version='%(prog)s {}'.format(get_versions()['version']))
+    # --- sample_config
     subparser.add_parser(
         'sample_config',
         help='write sample config file to current directory and exit'
     )
+    # ---
+    # --- scan_catalog
     subparser.add_parser(
         'scan_catalog',
         help='scan an existing catalog for earthquake pairs'
     )
+    # ---
     # subparser.add_parser(
     #     'scan_template',
     #     help='scan a continuous waveform stream using a template'
     # )
+    # --- plot_pair
     plotpair = subparser.add_parser(
         'plot_pair',
         help='plot traces for a given event pair'
     )
     plotpair.add_argument('evid1')
     plotpair.add_argument('evid2')
+    # ---
+    # --- build_families
     subparser.add_parser(
         'build_families',
         help='build families of repeating earthquakes from a catalog of pairs'
     )
+    # ---
+    # --- longerthan
+    #     a parent parser for the "longerthan" option,
+    #     used by several subparsers
+    longerthan = argparse.ArgumentParser(add_help=False)
+    longerthan.add_argument(
+        '-l', '--longerthan', type=str, default=0, metavar='DURATION',
+        help='only use families lasting longer than this value. '
+             'You can specify DURATION in days (e.g., 100d) '
+             'or in years (e.g., 2.5y).'
+    )
+    # ---
+    # --- plot_families
     plotfamilies = subparser.add_parser(
         'plot_families',
+        parents=[longerthan],
         help='plot traces for one ore more event families'
     )
     plotfamilies.add_argument(
@@ -77,14 +98,11 @@ def parse_arguments(progname='requake'):
         '-t', '--traceid', type=str, default=None,
         help='plot using this traceid.'
     )
-    plotfamilies.add_argument(
-        '-l', '--longerthan', type=str, default=0, metavar='DURATION',
-        help='only use families lasting longer than this value. '
-             'You can specify DURATION in days (e.g., 100d) '
-             'or in years (e.g., 2.5y).'
-    )
+    # ---
+    # --- plot_timespans
     timespans = subparser.add_parser(
         'plot_timespans',
+        parents=[longerthan],
         help='plot family timespans'
     )
     timespans.add_argument(
@@ -94,22 +112,15 @@ def parse_arguments(progname='requake'):
              'distance_from. If not specified, the config value '
              '"sort_families_by" will be used.'
     )
-    timespans.add_argument(
-        '-l', '--longerthan', type=str, default=0, metavar='DURATION',
-        help='only use families lasting longer than this value. '
-             'You can specify DURATION in days (e.g., 100d) '
-             'or in years (e.g., 2.5y).'
-    )
-    mapfamilies = subparser.add_parser(
+    # ---
+    # --- map_families
+    subparser.add_parser(
         'map_families',
+        parents=[longerthan],
         help='plot families on a map'
     )
-    mapfamilies.add_argument(
-        '-l', '--longerthan', type=str, default=0, metavar='DURATION',
-        help='only use families lasting longer than this value. '
-             'You can specify DURATION in days (e.g., 100d) '
-             'or in years (e.g., 2.5y).'
-    )
+    # ---
+    # --- flag_family
     flagfamily = subparser.add_parser(
         'flag_family',
         help='flag a family of repeating earthquakes as valid or not valid. '
@@ -121,6 +132,7 @@ def parse_arguments(progname='requake'):
         help='"true" (or "t") to flag family as valid, '
              '"false" (or "f") to flag family as not valid.'
     )
+    # ---
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
     if args.action is None:
