@@ -2,6 +2,7 @@
 (c) 2021 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
+  - New verb: `build_templates`
   - New progressbar, using `tqdm`
   - `plot_families`:
     - show average trace

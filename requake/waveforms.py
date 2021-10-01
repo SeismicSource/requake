@@ -21,7 +21,7 @@ from obspy.signal.cross_correlation import correlate, xcorr_max
 from .rq_setup import rq_exit
 
 
-def get_metadata(config):
+def _get_metadata(config):
     """Download metadata for the trace_ids specified in config file."""
     logger.info('Downloading station metadata...')
     inv = Inventory()
@@ -59,6 +59,8 @@ def get_metadata(config):
 
 def _get_trace_id(config, ev):
     """Get trace id to use with ev."""
+    if config.inventory is None:
+        _get_metadata(config)
     trace_ids = config.catalog_trace_id
     if len(trace_ids) == 1:
         return trace_ids[0]
@@ -86,6 +88,8 @@ def _get_trace_id(config, ev):
 
 def download_and_process_waveform(config, ev):
     """Download and process waveform for a given event at a given trace_id."""
+    if config.inventory is None:
+        _get_metadata(config)
     evid = ev.evid
     ev_lat = ev.lat
     ev_lon = ev.lon
@@ -162,7 +166,7 @@ old_cache_key = None
 def get_waveform_pair(config, pair):
     """Download traces for a given pair."""
     if config.inventory is None:
-        get_metadata(config)
+        _get_metadata(config)
     ev1, ev2 = pair
     ev1.trace_id = ev2.trace_id = _get_trace_id(config, ev1)
     st = Stream()
@@ -283,7 +287,7 @@ def build_template(config, st, family):
     tr_template.stats.ev_lat = family.lat
     tr_template.stats.ev_lon = family.lon
     tr_template.stats.ev_depth = family.depth
-    tr_template.stats.orig_time = UTCDateTime('00010101')
+    tr_template.stats.orig_time = UTCDateTime('1900/01/01T00:00:00')
     tr_template.stats.mag = 0
     tr_template.stats.mag_type = ''
     trace_lat = tr_template.stats.coords['latitude']
@@ -295,7 +299,7 @@ def build_template(config, st, family):
     distance /= 1e3
     tr_template.stats.dist_deg = dist_deg
     tr_template.stats.distance = distance
-    tr_template.stats.starttime = UTCDateTime('00010101')
+    tr_template.stats.starttime = UTCDateTime('1900/01/01T00:00:00')
     tr_template.stats.P_arrival_time = tr_template.stats.starttime + P_arrival
     tr_template.stats.S_arrival_time = tr_template.stats.starttime + S_arrival
     tr_template.stats.cc_mean = 0

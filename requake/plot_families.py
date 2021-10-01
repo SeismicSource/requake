@@ -21,50 +21,17 @@ mpl.rcParams['keymap.forward'].remove('right')
 mpl.rcParams['keymap.all_axes'].remove('a')
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as PathEffects
-import csv
-from obspy import Stream
 from obspy.signal.filter import envelope
 from obspy.signal.util import smooth
-from .waveforms import (
-    download_and_process_waveform, get_metadata, align_traces, build_template)
-from .families import read_families
+from .families import (
+    build_family_number_list, read_families, get_family,
+    get_family_aligned_waveforms_and_template)
 from .rq_setup import rq_exit
-
-
-def _get_family(config, families, family_number):
-    for family in families:
-        if family.number != family_number:
-            continue
-        if not family.valid:
-            msg = 'Family "{}" is flagged as not valid'.format(family_number)
-            raise Exception(msg)
-        if (family.endtime - family.starttime) < config.args.longerthan:
-            msg = 'Family "{}" is too short'.format(family.number)
-            raise Exception(msg)
-        return family
-    msg = 'No family found with number "{}"'.format(family_number)
-    raise Exception(msg)
-
-
-def _get_waveform_family(config, family):
-    st = Stream()
-    for ev in family:
-        try:
-            st += download_and_process_waveform(config, ev)
-        except Exception as m:
-            logger.error(str(m))
-            pass
-    if not st:
-        msg = 'No traces found for family {}'.format(family.number)
-        raise Exception(msg)
-    return st
 
 
 def _plot_family(config, family):
     try:
-        st = _get_waveform_family(config, family)
-        align_traces(config, st)
-        build_template(config, st, family)
+        st = get_family_aligned_waveforms_and_template(config, family)
     except Exception as m:
         logger.error(str(m))
         return
@@ -222,38 +189,16 @@ def _plot_family(config, family):
     fig.canvas.mpl_connect('key_press_event', _keypress)
 
 
-def _build_family_number_list(config):
-    family_numbers = config.args.family_numbers
-    if family_numbers == 'all':
-        with open(config.build_families_outfile, 'r') as fp:
-            reader = csv.DictReader(fp)
-            fn = sorted(set(int(row['family_number']) for row in reader))
-        return fn
-    try:
-        if ',' in family_numbers:
-            fn = map(int, family_numbers.split(','))
-        elif '-' in family_numbers:
-            family0, family1 = map(int, family_numbers.split('-'))
-            fn = range(family0, family1)
-        else:
-            fn = [int(family_numbers), ]
-    except Exception:
-        msg = 'Unable to find family numbers: {}'.format(family_numbers)
-        raise Exception(msg)
-    return fn
-
-
 def plot_families(config):
     try:
-        family_numbers = _build_family_number_list(config)
+        family_numbers = build_family_number_list(config)
         families = read_families(config)
-        get_metadata(config)
     except Exception as m:
         logger.error(str(m))
         rq_exit(1)
     for family_number in family_numbers:
         try:
-            family = _get_family(config, families, family_number)
+            family = get_family(config, families, family_number)
             _plot_family(config, family)
         except Exception as m:
             logger.error(str(m))

@@ -75,6 +75,8 @@ Currently supported verbs are:
     flag_family         flag a family of repeating earthquakes as valid or not
                         valid. Note that all families are valid by default
                         when first created
+    build_templates     build waveform templates for one or more event
+                        families
 
 Certain running modes (e.g., `plot_pair`) require further arguments (use, e.g.,
 `requake plot_pair -h` to get help).

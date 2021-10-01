@@ -75,17 +75,31 @@ def parse_arguments(progname='requake'):
              'or in years (e.g., 2.5y).'
     )
     # ---
+    # --- familynumbers
+    #     a parent parser for the "family_numbers" option,
+    #     used by several subparsers
+    familynumbers = argparse.ArgumentParser(add_help=False)
+    familynumbers.add_argument(
+        'family_numbers',
+        help='family numbers to use. It can be a single number, '
+             'a comma-separated list or a hyphen-separated number range. '
+             'Use "all" to specify all the families.')
+    # ---
+    # --- traceid
+    #     a parent parser for the "traceid" option,
+    #     used by several subparsers
+    traceid = argparse.ArgumentParser(add_help=False)
+    traceid.add_argument(
+        '-t', '--traceid', type=str, default=None,
+        help='use this traceid instead of the default one for the family.'
+    )
+    # ---
     # --- plot_families
     plotfamilies = subparser.add_parser(
         'plot_families',
-        parents=[longerthan],
+        parents=[longerthan, familynumbers, traceid],
         help='plot traces for one ore more event families'
     )
-    plotfamilies.add_argument(
-        'family_numbers',
-        help='family_numbers to plot. It can be a single number, '
-             'a comma-separated list or a hyphen-separated number range. '
-             'Use "all" to specify all the families.')
     plotfamilies.add_argument(
         '-s', '--starttime', type=float, default=None,
         help='start time, in seconds relative to trace start, for the plot.'
@@ -93,10 +107,6 @@ def parse_arguments(progname='requake'):
     plotfamilies.add_argument(
         '-e', '--endtime', type=float, default=None,
         help='end time, in seconds relative to trace start, for the plot.'
-    )
-    plotfamilies.add_argument(
-        '-t', '--traceid', type=str, default=None,
-        help='plot using this traceid.'
     )
     # ---
     # --- plot_timespans
@@ -131,6 +141,13 @@ def parse_arguments(progname='requake'):
         'is_valid',
         help='"true" (or "t") to flag family as valid, '
              '"false" (or "f") to flag family as not valid.'
+    )
+    # ---
+    # --- build_templates
+    subparser.add_parser(
+        'build_templates',
+        parents=[longerthan, familynumbers, traceid],
+        help='build waveform templates for one or more event families'
     )
     # ---
     argcomplete.autocomplete(parser)

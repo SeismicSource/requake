@@ -37,4 +37,7 @@ def main():
     if config.args.action == 'flag_family':
         from ..flag_family import flag_family
         flag_family(config)
+    if config.args.action == 'build_templates':
+        from ..build_templates import build_templates
+        build_templates(config)
     rq_exit(0)

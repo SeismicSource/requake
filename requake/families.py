@@ -13,9 +13,11 @@ import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import csv
 import numpy as np
-from obspy import UTCDateTime
+from obspy import UTCDateTime, Stream
 from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeEvent
+from .waveforms import (
+    download_and_process_waveform, align_traces, build_template)
 
 
 class Family(list):
@@ -83,3 +85,64 @@ def read_families(config):
     # append last family
     families.append(family)
     return families
+
+
+def get_family(config, families, family_number):
+    """Get a given family from a list of families."""
+    for family in families:
+        if family.number != family_number:
+            continue
+        if not family.valid:
+            msg = 'Family "{}" is flagged as not valid'.format(family_number)
+            raise Exception(msg)
+        if (family.endtime - family.starttime) < config.args.longerthan:
+            msg = 'Family "{}" is too short'.format(family.number)
+            raise Exception(msg)
+        return family
+    msg = 'No family found with number "{}"'.format(family_number)
+    raise Exception(msg)
+
+
+def get_family_waveforms(config, family):
+    """Get waveforms for a given family."""
+    st = Stream()
+    for ev in family:
+        try:
+            st += download_and_process_waveform(config, ev)
+        except Exception as m:
+            logger.error(str(m))
+            pass
+    if not st:
+        msg = 'No traces found for family {}'.format(family.number)
+        raise Exception(msg)
+    return st
+
+
+def get_family_aligned_waveforms_and_template(config, family):
+    """Get aligned waveforms and template for a given family."""
+    st = get_family_waveforms(config, family)
+    align_traces(config, st)
+    build_template(config, st, family)
+    return st
+
+
+def build_family_number_list(config):
+    """Build a list of family numbers from config option."""
+    family_numbers = config.args.family_numbers
+    if family_numbers == 'all':
+        with open(config.build_families_outfile, 'r') as fp:
+            reader = csv.DictReader(fp)
+            fn = sorted(set(int(row['family_number']) for row in reader))
+        return fn
+    try:
+        if ',' in family_numbers:
+            fn = map(int, family_numbers.split(','))
+        elif '-' in family_numbers:
+            family0, family1 = map(int, family_numbers.split('-'))
+            fn = range(family0, family1)
+        else:
+            fn = [int(family_numbers), ]
+    except Exception:
+        msg = 'Unable to find family numbers: {}'.format(family_numbers)
+        raise Exception(msg)
+    return fn

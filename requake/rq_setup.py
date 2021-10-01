@@ -186,6 +186,9 @@ def configure(args):
     config.build_families_outfile = os.path.join(
         config.args.outdir, 'requake.event_families.csv'
     )
+    config.template_dir = os.path.join(
+        config.args.outdir, 'templates'
+    )
     if (args.action == 'scan_catalog' and
             not write_ok(config.scan_catalog_pairs_file)):
         print('Exiting now.')
@@ -202,7 +205,10 @@ def configure(args):
     _setup_logging(config, 'requake', args.action)
     # save config to output dir
     shutil.copy(args.configfile, args.outdir)
-    if args.action in ['scan_catalog', 'plot_pair', 'plot_families']:
+    actions_needing_connection = (
+        'scan_catalog', 'plot_pair', 'plot_families', 'build_templates'
+    )
+    if args.action in actions_needing_connection:
         try:
             _init_connections(config)
         except Exception as m:
