@@ -83,22 +83,24 @@ def _plot_family(config, family):
         S_bars.append(S_bar)
         trans = ax.get_yaxis_transform()
         if average_trace:
-            text = 'average'
-        else:
-            text = tr.stats.orig_time.strftime('%Y-%m-%d\n%H:%M:%S')
-        txt = ax.text(
-            -0.01, n, text, transform=trans, ha='right', va='center',
-            color=color, fontsize=8, linespacing=1.5)
-        if not average_trace:
-            text = '{} {} {:.1f}\n'.format(
-                tr.stats.evid, tr.stats.mag_type, tr.stats.mag)
-            text += '{:.4f}°E {:.4f}°N {:.3f} km'.format(
+            y_label = 'average'
+            info_text = '{:.4f}°E {:.4f}°N {:.3f} km'.format(
                 tr.stats.ev_lon, tr.stats.ev_lat, tr.stats.ev_depth)
-            txt = ax.text(
-                0.01, n+0.2, text, transform=trans,
-                color=color, fontsize=8, linespacing=1.5)
-            txt.set_path_effects(
-                [PathEffects.withStroke(linewidth=3, foreground='w')])
+        else:
+            y_label = tr.stats.orig_time.strftime('%Y-%m-%d\n%H:%M:%S')
+            info_text = '{} {} {:.1f}\n'.format(
+                tr.stats.evid, tr.stats.mag_type, tr.stats.mag)
+            info_text += '{:.4f}°E {:.4f}°N {:.3f} km'.format(
+                tr.stats.ev_lon, tr.stats.ev_lat, tr.stats.ev_depth)
+        ax.text(
+            -0.01, n, y_label, transform=trans, ha='right', va='center',
+            color=color, fontsize=8, linespacing=1.5)
+        txt = ax.text(
+            0.01, n+0.2, info_text, transform=trans,
+            color=color, fontsize=8, linespacing=1.5)
+        txt.set_path_effects(
+            [PathEffects.withStroke(linewidth=3, foreground='w')])
+        if not average_trace:
             text = 'CC mean {:.2f}'.format(tr.stats.cc_mean)
             txt = ax.text(
                 0.98, n+0.2, text, ha='right',
