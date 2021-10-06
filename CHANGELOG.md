@@ -3,6 +3,7 @@
 
 ## unreleased
   - New verb: `build_templates`
+  - New option: `cc_allow_negative` to search for anticorrelated events
   - New progressbar, using `tqdm`
   - `plot_families`:
     - show average trace

@@ -231,7 +231,8 @@ def cc_waveform_pair(config, tr1, tr2):
     tr2 = process_waveforms(config, tr2)
     shift = int(config.cc_max_shift/dt1)
     cc = correlate(tr1, tr2, shift)
-    lag, cc_max = xcorr_max(cc)
+    abs_max = bool(config.cc_allow_negative)
+    lag, cc_max = xcorr_max(cc, abs_max)
     lag_sec = lag*dt1
     return lag, lag_sec, cc_max
 
