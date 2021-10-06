@@ -26,12 +26,14 @@ from obspy.signal.util import smooth
 from .families import (
     build_family_number_list, read_families, get_family,
     get_family_aligned_waveforms_and_template)
+from .waveforms import process_waveforms
 from .rq_setup import rq_exit
 
 
 def _plot_family(config, family):
     try:
         st = get_family_aligned_waveforms_and_template(config, family)
+        st = process_waveforms(config, st)
     except Exception as m:
         logger.error(str(m))
         return

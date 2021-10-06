@@ -86,8 +86,8 @@ def _get_trace_id(config, ev):
     return closest_trace
 
 
-def download_and_process_waveform(config, ev):
-    """Download and process waveform for a given event at a given trace_id."""
+def get_waveform(config, ev):
+    """Download waveform for a given event at a given trace_id."""
     if config.inventory is None:
         _get_metadata(config)
     evid = ev.evid
@@ -135,14 +135,9 @@ def download_and_process_waveform(config, ev):
     )
     # webservices sometimes return longer traces: trim to be sure
     st.trim(starttime=t0, endtime=t1)
-    st.detrend(type='demean')
-    st.taper(max_percentage=0.05)
-    st.filter(
-        type='bandpass',
-        freqmin=config.cc_freq_min,
-        freqmax=config.cc_freq_max)
     st.merge(fill_value='interpolate')
     tr = st[0]
+    tr.detrend(type='demean')
     tr.stats.evid = evid
     tr.stats.ev_lat = ev_lat
     tr.stats.ev_lon = ev_lon
@@ -156,6 +151,18 @@ def download_and_process_waveform(config, ev):
     tr.stats.P_arrival_time = P_arrival_time
     tr.stats.S_arrival_time = S_arrival_time
     return tr
+
+
+def process_waveforms(config, st):
+    """Demean and filter a waveform trace or stream."""
+    st = st.copy()
+    st.detrend(type='demean')
+    st.taper(max_percentage=0.05)
+    st.filter(
+        type='bandpass',
+        freqmin=config.cc_freq_min,
+        freqmax=config.cc_freq_max)
+    return st
 
 
 skipped_evids = list()
@@ -192,7 +199,7 @@ def get_waveform_pair(config, pair):
         except KeyError:
             pass
         try:
-            tr = download_and_process_waveform(config, ev)
+            tr = get_waveform(config, ev)
             tr_cache[cache_key] = tr
             st.append(tr)
         except Exception as m:
@@ -220,6 +227,8 @@ def cc_waveform_pair(config, tr1, tr2):
             '{} {} - The two traces have a different sampling interval.'
             'Skipping pair.'.format(evid1, evid2))
         raise
+    tr1 = process_waveforms(config, tr1)
+    tr2 = process_waveforms(config, tr2)
     shift = int(config.cc_max_shift/dt1)
     cc = correlate(tr1, tr2, shift)
     lag, cc_max = xcorr_max(cc)

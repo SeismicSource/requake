@@ -17,7 +17,7 @@ mpl_logger.setLevel(logging.WARNING)
 import matplotlib.pyplot as plt
 from .rq_setup import rq_exit
 from .catalog import get_events, read_events
-from .waveforms import get_waveform_pair, align_pair
+from .waveforms import get_waveform_pair, process_waveforms, align_pair
 
 
 def _download_event(config, evid):
@@ -58,6 +58,7 @@ def plot_pair(config):
         pair = _get_pair(config)
         st = get_waveform_pair(config, pair)
         lag, lag_sec, cc_max = align_pair(config, st[0], st[1])
+        st = process_waveforms(config, st)
     except Exception as m:
         logger.error(str(m))
         rq_exit(1)
