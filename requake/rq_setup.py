@@ -124,25 +124,22 @@ def _setup_logging(config, progname, action_name):
     logger.debug(' '.join(sys.argv))
 
 
-def _init_connections(config):
-    """Connect to FDSN services."""
+def _connect_fdsn_station_dataselect(config):
+    """Connect to FDSN station and dataselect services."""
     config.fdsn_station_client = Client(config.fdsn_station_url)
     logger.info('Connected to FDSN station server: {}'.format(
         config.fdsn_station_url))
     config.fdsn_dataselect_client = Client(config.fdsn_dataselect_url)
     logger.info('Connected to FDSN dataselect server: {}'.format(
         config.fdsn_dataselect_url))
-    if config.catalog_fdsn_event_url is None:
-        return
-    config.catalog_fdsn_event_clients = list()
+
+
+def _parse_catalog_options(config):
+    """Parse catalog options into lists."""
+    config.catalog_fdsn_event_urls = list()
     config.catalog_start_times = list()
     config.catalog_end_times = list()
-    config.catalog_fdsn_event_urls = list()
     config.catalog_fdsn_event_urls.append(config.catalog_fdsn_event_url)
-    config.catalog_fdsn_event_clients.append(
-        Client(config.catalog_fdsn_event_url))
-    logger.info('Connected to FDSN event server: {}'.format(
-        config.catalog_fdsn_event_url))
     config.catalog_start_times.append(
         UTCDateTime(config.catalog_start_time))
     config.catalog_end_times.append(
@@ -152,14 +149,20 @@ def _init_connections(config):
         if url is None:
             continue
         config.catalog_fdsn_event_urls.append(url)
-        config.catalog_fdsn_event_clients.append(Client(url))
-        logger.info('Connected to FDSN event server: {}'.format(url))
         start_time = config['catalog_start_time_{:1d}'.format(n)]
         end_time = config['catalog_end_time_{:1d}'.format(n)]
         if start_time is None or end_time is None:
             continue
         config.catalog_start_times.append(UTCDateTime(start_time))
         config.catalog_end_times.append(UTCDateTime(end_time))
+
+
+def _connect_fdsn_catalog(config):
+    """Connect to FDSN catalog services."""
+    config.catalog_fdsn_event_clients = list()
+    for url in config.catalog_fdsn_event_urls:
+        config.catalog_fdsn_event_clients.append(Client(url))
+        logger.info('Connected to FDSN event server: {}'.format(url))
 
 
 def configure(args):
@@ -205,15 +208,21 @@ def configure(args):
     _setup_logging(config, 'requake', args.action)
     # save config to output dir
     shutil.copy(args.configfile, args.outdir)
-    actions_needing_connection = (
-        'scan_catalog', 'plot_pair', 'plot_families', 'build_templates'
+    _parse_catalog_options(config)
+    actions_needing_fdsn_station_dataselect = (
+        'scan_catalog', 'plot_pair', 'plot_families', 'build_templates',
     )
-    if args.action in actions_needing_connection:
-        try:
-            _init_connections(config)
-        except Exception as m:
-            logger.error(m)
-            rq_exit(1)
+    actions_needing_fdsn_catalog = (
+        'scan_catalog',
+    )
+    try:
+        if args.action in actions_needing_fdsn_station_dataselect:
+            _connect_fdsn_station_dataselect(config)
+        if args.action in actions_needing_fdsn_catalog:
+            _connect_fdsn_catalog(config)
+    except Exception as m:
+        logger.error(m)
+        rq_exit(1)
     return config
 
 
