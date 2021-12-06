@@ -17,7 +17,7 @@ from obspy import UTCDateTime, Stream
 from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeEvent
 from .waveforms import (
-    get_waveform, align_traces, build_template)
+    get_event_waveform, align_traces, build_template)
 
 
 class Family(list):
@@ -108,7 +108,7 @@ def get_family_waveforms(config, family):
     st = Stream()
     for ev in family:
         try:
-            st += get_waveform(config, ev)
+            st += get_event_waveform(config, ev)
         except Exception as m:
             logger.error(str(m))
             pass

@@ -86,7 +86,23 @@ def _get_trace_id(config, ev):
     return closest_trace
 
 
-def get_waveform(config, ev):
+def get_waveform(config, traceid, starttime, endtime):
+    """Download waveform for a given traceid, start and end time."""
+    cl = config.fdsn_dataselect_client
+    net, sta, loc, chan = traceid.split('.')
+    st = cl.get_waveforms(
+        network=net, station=sta, location=loc, channel=chan,
+        starttime=starttime, endtime=endtime
+    )
+    # webservices sometimes return longer traces: trim to be sure
+    st.trim(starttime=starttime, endtime=endtime)
+    st.merge(fill_value='interpolate')
+    tr = st[0]
+    tr.detrend(type='demean')
+    return tr
+
+
+def get_event_waveform(config, ev):
     """Download waveform for a given event at a given trace_id."""
     if config.inventory is None:
         _get_metadata(config)
@@ -98,14 +114,14 @@ def get_waveform(config, ev):
     mag = ev.mag
     mag_type = ev.mag_type
     if config.args.traceid is not None:
-        trace_id = config.args.traceid
+        traceid = config.args.traceid
     else:
-        trace_id = ev.trace_id
+        traceid = ev.trace_id
     try:
-        coords = config.inventory.get_coordinates(trace_id, orig_time)
+        coords = config.inventory.get_coordinates(traceid, orig_time)
     except Exception:
         msg = 'Unable to find coordinates for trace {} at time {}'.format(
-                    trace_id, orig_time)
+                    traceid, orig_time)
         raise Exception(msg)
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
@@ -127,17 +143,7 @@ def get_waveform(config, ev):
     trace_length = config.cc_trace_length
     t0 = P_arrival_time - pre_P
     t1 = t0 + trace_length
-    cl = config.fdsn_dataselect_client
-    net, sta, loc, chan = trace_id.split('.')
-    st = cl.get_waveforms(
-        network=net, station=sta, location=loc, channel=chan,
-        starttime=t0, endtime=t1
-    )
-    # webservices sometimes return longer traces: trim to be sure
-    st.trim(starttime=t0, endtime=t1)
-    st.merge(fill_value='interpolate')
-    tr = st[0]
-    tr.detrend(type='demean')
+    tr = get_waveform(config, traceid, t0, t1)
     tr.stats.evid = evid
     tr.stats.ev_lat = ev_lat
     tr.stats.ev_lon = ev_lon
@@ -199,7 +205,7 @@ def get_waveform_pair(config, pair):
         except KeyError:
             pass
         try:
-            tr = get_waveform(config, ev)
+            tr = get_event_waveform(config, ev)
             tr_cache[cache_key] = tr
             st.append(tr)
         except Exception as m:
