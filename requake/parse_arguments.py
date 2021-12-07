@@ -80,10 +80,12 @@ def parse_arguments(progname='requake'):
     #     used by several subparsers
     familynumbers = argparse.ArgumentParser(add_help=False)
     familynumbers.add_argument(
-        'family_numbers',
+        'family_numbers', default='all', nargs='?',
         help='family numbers to use. It can be a single number, '
-             'a comma-separated list or a hyphen-separated number range. '
-             'Use "all" to specify all the families.')
+             'a comma-separated list (ex.: 1,4,8), '
+             'a hyphen-separated number range (ex.: 2-12), or "all" '
+             '(default: "all"). '
+    )
     # ---
     # --- traceid
     #     a parent parser for the "traceid" option,
