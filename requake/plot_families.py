@@ -24,7 +24,7 @@ import matplotlib.patheffects as PathEffects
 from obspy.signal.filter import envelope
 from obspy.signal.util import smooth
 from .families import (
-    build_family_number_list, read_families, get_family,
+    read_selected_families,
     get_family_aligned_waveforms_and_template)
 from .waveforms import process_waveforms
 from .rq_setup import rq_exit
@@ -195,14 +195,12 @@ def _plot_family(config, family):
 
 def plot_families(config):
     try:
-        family_numbers = build_family_number_list(config)
-        families = read_families(config)
+        families = read_selected_families(config)
     except Exception as m:
         logger.error(str(m))
         rq_exit(1)
-    for family_number in family_numbers:
+    for family in families:
         try:
-            family = get_family(config, families, family_number)
             _plot_family(config, family)
         except Exception as m:
             logger.error(str(m))

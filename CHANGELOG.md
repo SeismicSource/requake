@@ -2,6 +2,11 @@
 (c) 2021 Claudio Satriano <satriano@ipgp.fr>
 
 
+## unreleased
+
+- `map_families` and `plot_timespans`: mandatory `family_numbers` argument
+
+
 ## v0.3 - 2021-11-08
 
 - New verb: `build_templates`

@@ -19,12 +19,12 @@ import matplotlib.dates as mdates
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 import numpy as np
-from .families import read_families
+from .families import read_selected_families
 from .rq_setup import rq_exit
 
 
 def plot_timespans(config):
-    families = read_families(config)
+    families = read_selected_families(config)
     fig, ax = plt.subplots(figsize=(8, 8))
     years = mdates.YearLocator()   # every year
     months = mdates.MonthLocator()  # every month
@@ -64,14 +64,6 @@ def plot_timespans(config):
         ax.yaxis.set_minor_locator(months)
     for family in families:
         fn = family.number
-        if not family.valid:
-            msg = 'Family "{}" is flagged as not valid'.format(fn)
-            logger.warning(msg)
-            continue
-        if (family.endtime - family.starttime) < config.args.longerthan:
-            msg = 'Family "{}" is too short'.format(fn)
-            logger.warning(msg)
-            continue
         label = 'Family {}\n{:.1f}°E {:.1f}°N {:.1f} km'.format(
             fn, family.lon, family.lat, family.depth)
         times = [ev.orig_time.matplotlib_date for ev in family]

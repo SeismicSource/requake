@@ -22,7 +22,7 @@ import cartopy.io.img_tiles as cimgt
 import cartopy.feature as cfeature
 from obspy.geodetics import gps2dist_azimuth
 from .cached_tiler import CachedTiler
-from .families import read_families
+from .families import read_selected_families
 
 
 def _make_basemap(config):
@@ -56,7 +56,7 @@ def _make_basemap(config):
 
 
 def map_families(config):
-    families = read_families(config)
+    families = read_selected_families(config)
     fig, ax = _make_basemap(config)
     trans = ccrs.PlateCarree()
     cmap = cm.tab10
@@ -64,14 +64,6 @@ def map_families(config):
     markers = list()
     for family in families:
         fn = family.number
-        if not family.valid:
-            msg = 'Family "{}" is flagged as not valid'.format(fn)
-            logger.warning(msg)
-            continue
-        if (family.endtime - family.starttime) < config.args.longerthan:
-            msg = 'Family "{}" is too short'.format(fn)
-            logger.warning(msg)
-            continue
         nevents = len(family)
         duration = (family.endtime - family.starttime)/(365*24*60*60)
         label = 'Family {}\n{} evts\n{:.1f} yrs\nZ {:.1f} km'.format(

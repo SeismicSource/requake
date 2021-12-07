@@ -87,6 +87,29 @@ def read_families(config):
     return families
 
 
+def read_selected_families(config):
+    """Read and select families based on family number, validity and length."""
+    family_numbers = _build_family_number_list(config)
+    families = read_families(config)
+    families_selected = list()
+    for family in families:
+        if family.number not in family_numbers:
+            continue
+        if not family.valid:
+            msg = 'Family "{}" is flagged as not valid'.format(family.number)
+            logger.warning(msg)
+            continue
+        if (family.endtime - family.starttime) < config.args.longerthan:
+            msg = 'Family "{}" is too short'.format(family.number)
+            logger.warning(msg)
+            continue
+        families_selected.append(family)
+    if not families_selected:
+        msg = 'No family found with numbers "{}"'.format(family_numbers)
+        raise Exception(msg)
+    return families_selected
+
+
 def get_family(config, families, family_number):
     """Get a given family from a list of families."""
     for family in families:
@@ -126,7 +149,7 @@ def get_family_aligned_waveforms_and_template(config, family):
     return st
 
 
-def build_family_number_list(config):
+def _build_family_number_list(config):
     """Build a list of family numbers from config option."""
     family_numbers = config.args.family_numbers
     if family_numbers == 'all':
@@ -136,10 +159,10 @@ def build_family_number_list(config):
         return fn
     try:
         if ',' in family_numbers:
-            fn = map(int, family_numbers.split(','))
+            fn = list(map(int, family_numbers.split(',')))
         elif '-' in family_numbers:
             family0, family1 = map(int, family_numbers.split('-'))
-            fn = range(family0, family1)
+            fn = list(range(family0, family1))
         else:
             fn = [int(family_numbers), ]
     except Exception:

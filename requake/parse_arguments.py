@@ -112,7 +112,7 @@ def parse_arguments(progname='requake'):
     # --- plot_timespans
     timespans = subparser.add_parser(
         'plot_timespans',
-        parents=[longerthan],
+        parents=[longerthan, familynumbers],
         help='plot family timespans'
     )
     timespans.add_argument(
@@ -126,7 +126,7 @@ def parse_arguments(progname='requake'):
     # --- map_families
     subparser.add_parser(
         'map_families',
-        parents=[longerthan],
+        parents=[longerthan, familynumbers],
         help='plot families on a map'
     )
     # ---

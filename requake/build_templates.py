@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import os
 from .families import (
-    build_family_number_list, read_families, get_family,
+    read_selected_families,
     get_family_aligned_waveforms_and_template)
 from .rq_setup import rq_exit
 
@@ -51,14 +51,12 @@ def _build_template(config, family):
 
 def build_templates(config):
     try:
-        family_numbers = build_family_number_list(config)
-        families = read_families(config)
+        families = read_selected_families(config)
     except Exception as m:
         logger.error(str(m))
         rq_exit(1)
-    for family_number in family_numbers:
+    for family in families:
         try:
-            family = get_family(config, families, family_number)
             _build_template(config, family)
         except Exception as m:
             logger.error(str(m))
