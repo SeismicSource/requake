@@ -23,6 +23,7 @@ import cartopy.feature as cfeature
 from obspy.geodetics import gps2dist_azimuth
 from .cached_tiler import CachedTiler
 from .families import read_selected_families
+from .rq_setup import rq_exit
 
 
 def _make_basemap(config):
@@ -56,7 +57,11 @@ def _make_basemap(config):
 
 
 def map_families(config):
-    families = read_selected_families(config)
+    try:
+        families = read_selected_families(config)
+    except Exception as msg:
+        logger.error(msg)
+        rq_exit(1)
     fig, ax = _make_basemap(config)
     trans = ccrs.PlateCarree()
     cmap = cm.tab10

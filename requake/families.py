@@ -163,9 +163,11 @@ def _build_family_number_list(config):
         elif '-' in family_numbers:
             family0, family1 = map(int, family_numbers.split('-'))
             fn = list(range(family0, family1))
-        else:
+        elif family_numbers.isnumeric():
             fn = [int(family_numbers), ]
+        else:
+            raise Exception
     except Exception:
-        msg = 'Unable to find family numbers: {}'.format(family_numbers)
+        msg = 'Invalid family numbers: {}'.format(family_numbers)
         raise Exception(msg)
     return fn

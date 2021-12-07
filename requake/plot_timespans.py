@@ -24,7 +24,11 @@ from .rq_setup import rq_exit
 
 
 def plot_timespans(config):
-    families = read_selected_families(config)
+    try:
+        families = read_selected_families(config)
+    except Exception as msg:
+        logger.error(msg)
+        rq_exit(1)
     fig, ax = plt.subplots(figsize=(8, 8))
     years = mdates.YearLocator()   # every year
     months = mdates.MonthLocator()  # every month
