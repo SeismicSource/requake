@@ -63,6 +63,9 @@ def plot_timespans(config):
             'are not specified')
         rq_exit(1)
     if sort_by == 'time':
+        years = mdates.YearLocator()   # every year
+        months = mdates.MonthLocator()  # every month
+        yearsFmt = mdates.DateFormatter('%Y')
         ax.yaxis.set_major_locator(years)
         ax.yaxis.set_major_formatter(yearsFmt)
         ax.yaxis.set_minor_locator(months)

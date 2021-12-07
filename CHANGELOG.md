@@ -5,6 +5,7 @@
 ## unreleased
 
 - `map_families` and `plot_timespans`: mandatory `family_numbers` argument
+- Bugfix: `plot_timespans`: correctly plot x time axis when sort by `time`
 
 
 ## v0.3 - 2021-11-08
