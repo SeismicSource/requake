@@ -80,21 +80,21 @@ class RequakeEvent():
         self.location_name = word[12]
 
     def fdsn_text(self):
-        line = '|'.join((
+        line = '|'.join(map(str, (
             self.evid,
-            str(self.orig_time),
-            str(self.lat),
-            str(self.lon),
-            str(self.depth),
+            self.orig_time,
+            self.lat,
+            self.lon,
+            self.depth,
             self.author,
             self.catalog,
             self.contributor,
             self.contributor_id,
             self.mag_type,
-            str(self.mag),
+            self.mag,
             self.mag_author,
             self.location_name
-        ))
+        )))
         return(line)
 
 
