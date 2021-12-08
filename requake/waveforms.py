@@ -18,6 +18,7 @@ from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
 model = TauPyModel(model='ak135')
 from obspy.signal.cross_correlation import correlate, xcorr_max
+from .arrivals import get_arrivals
 from .rq_setup import rq_exit
 
 
@@ -125,20 +126,10 @@ def get_event_waveform(config, ev):
         raise Exception(msg)
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
-    dist_deg = locations2degrees(trace_lat, trace_lon, ev_lat, ev_lon)
-    distance, _, _ = gps2dist_azimuth(
-        trace_lat, trace_lon, ev_lat, ev_lon)
-    distance /= 1e3
-    P_arrivals = model.get_travel_times(
-        source_depth_in_km=ev_depth,
-        distance_in_degree=dist_deg,
-        phase_list=['p', 'P'])
-    P_arrival_time = orig_time + P_arrivals[0].time
-    S_arrivals = model.get_travel_times(
-        source_depth_in_km=ev_depth,
-        distance_in_degree=dist_deg,
-        phase_list=['s', 'S'])
-    S_arrival_time = orig_time + S_arrivals[0].time
+    P_arrival, S_arrival, distance, dist_deg = get_arrivals(
+        trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
+    P_arrival_time = orig_time + P_arrival.time
+    S_arrival_time = orig_time + S_arrival.time
     pre_P = config.cc_pre_P
     trace_length = config.cc_trace_length
     t0 = P_arrival_time - pre_P
