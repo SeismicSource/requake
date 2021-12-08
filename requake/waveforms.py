@@ -276,11 +276,10 @@ def build_template(config, st, family):
     Assumes that the stream is realigned.
     """
     tr_template = st[0].copy()
-    if config.trace_average_from_normalized_traces:
-        tr_template.data /= abs(tr_template.max())
-    P_arrival = tr_template.stats.P_arrival_time - tr_template.stats.starttime
-    S_arrival = tr_template.stats.S_arrival_time - tr_template.stats.starttime
-    for tr in st[1:]:
+    tr_template.data *= 0.
+    P_arrival = 0.
+    S_arrival = 0.
+    for tr in st:
         data = tr.data
         if config.trace_average_from_normalized_traces:
             data /= abs(tr.max())
