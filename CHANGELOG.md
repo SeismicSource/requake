@@ -6,6 +6,8 @@
 
 - `family_numbers` argument is no more mandatory (default: `all`)
   - argument added to `map_families` and `plot_timespans`
+- Config parameter `trace_average_from_normalized_traces` renamed to
+  `normalize_traces_before_averaging`
 - Bugfix: `plot_timespans`: correctly plot x time axis when sort by `time`
 
 

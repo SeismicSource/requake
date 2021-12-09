@@ -281,7 +281,7 @@ def build_template(config, st, family):
     S_arrival = 0.
     for tr in st:
         data = tr.data
-        if config.trace_average_from_normalized_traces:
+        if config.normalize_traces_before_averaging:
             data /= abs(tr.max())
         tr_template.data += data
         P_arrival += tr.stats.P_arrival_time - tr.stats.starttime
