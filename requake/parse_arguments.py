@@ -46,10 +46,6 @@ def parse_arguments(progname='requake'):
         help='scan an existing catalog for earthquake pairs'
     )
     # ---
-    # subparser.add_parser(
-    #     'scan_template',
-    #     help='scan a continuous waveform stream using a template'
-    # )
     # --- plot_pair
     plotpair = subparser.add_parser(
         'plot_pair',
@@ -150,6 +146,13 @@ def parse_arguments(progname='requake'):
         'build_templates',
         parents=[longerthan, familynumbers, traceid],
         help='build waveform templates for one or more event families'
+    )
+    # ---
+    # --- build_templates
+    subparser.add_parser(
+        'scan_templates',
+        parents=[longerthan, familynumbers, traceid],
+        help='scan a continuous waveform stream using one or more templates'
     )
     # ---
     argcomplete.autocomplete(parser)

@@ -9,8 +9,7 @@ Repeating earthquakes search and analysis.
 Requake is a command line tool to search and analyse repeating earthquakes.
 
 It can either scan an existing earthquake catalog to search for similar events,
-or perform template matching on a continuous waveform stream (*this second mode
-is not yet implemented*).
+or perform template matching on a continuous waveform stream.
 
 Catalogs and waveforms are downloaded using standard
 [FDSN web services](https://www.fdsn.org/webservices/).
@@ -77,6 +76,8 @@ Currently supported verbs are:
                         when first created
     build_templates     build waveform templates for one or more event
                         families
+    scan_templates      scan a continuous waveform stream using one or more
+                        templates
 
 Certain running modes (e.g., `plot_pair`) require further arguments (use, e.g.,
 `requake plot_pair -h` to get help).

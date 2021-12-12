@@ -4,6 +4,8 @@
 
 ## unreleased
 
+- New verb: `scan_templates`: scan a continuous waveform stream using one
+  or more templates
 - `family_numbers` argument is no more mandatory (default: `all`)
   - argument added to `map_families` and `plot_timespans`
 - Config parameter `trace_average_from_normalized_traces` renamed to

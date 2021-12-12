@@ -18,6 +18,7 @@ from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
 model = TauPyModel(model='ak135')
 from obspy.signal.cross_correlation import correlate, xcorr_max
+from scipy.stats import median_abs_deviation
 from .arrivals import get_arrivals
 from .rq_setup import rq_exit
 
@@ -213,16 +214,20 @@ def get_waveform_pair(config, pair):
     return st
 
 
-def cc_waveform_pair(config, tr1, tr2):
+def cc_waveform_pair(config, tr1, tr2, mode='events'):
     """Perform cross-correlation."""
-    evid1 = tr1.stats.evid
-    evid2 = tr2.stats.evid
     dt1 = tr1.stats.delta
     dt2 = tr2.stats.delta
     if dt1 != dt2:
-        logger.warning(
-            '{} {} - The two traces have a different sampling interval.'
-            'Skipping pair.'.format(evid1, evid2))
+        if mode == 'events':
+            evid1 = tr1.stats.evid
+            evid2 = tr2.stats.evid
+            logger.warning(
+                '{} {} - The two traces have a different sampling interval.'
+                'Skipping pair.'.format(evid1, evid2))
+        elif mode == 'scan':
+            logger.error(
+                'The two traces have a different sampling interval.')
         raise
     tr1 = process_waveforms(config, tr1)
     tr2 = process_waveforms(config, tr2)
@@ -231,7 +236,12 @@ def cc_waveform_pair(config, tr1, tr2):
     abs_max = bool(config.cc_allow_negative)
     lag, cc_max = xcorr_max(cc, abs_max)
     lag_sec = lag*dt1
-    return lag, lag_sec, cc_max
+    if mode == 'scan':
+        # compute median absolute deviation for the non-zero portion of cc
+        cc_mad = median_abs_deviation(cc[np.abs(cc) > 1e-5])
+        return lag, lag_sec, cc_max, cc_mad
+    else:
+        return lag, lag_sec, cc_max
 
 
 def align_pair(config, tr1, tr2):

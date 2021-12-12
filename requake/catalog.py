@@ -170,3 +170,36 @@ def read_events(filename):
         ev.from_fdsn_text(line)
         cat.append(ev)
     return cat
+
+
+def _base26(val):
+    """Represent value using 6 characters from latin alphabet (26 chars)."""
+    chars = [
+      'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
+      'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+      'u', 'v', 'w', 'x', 'y', 'z'
+    ]
+    base = len(chars)
+    ret = ''
+    while True:
+        ret = chars[val % base] + ret
+        val = val // base
+        if val == 0:
+            break
+    # pad to 6 characters
+    ret = ret.rjust(6, 'a')
+    return ret
+
+
+def generate_evid(orig_time):
+    """Generate an event id from origin time."""
+    prefix = 'reqk'
+    year = orig_time.year
+    orig_year = UTCDateTime(year=year, month=1, day=1)
+    val = int(orig_time - orig_year)
+    # normalize val between 0 (aaaaaa) and 26**6-1 (zzzzzz)
+    maxval = 366*24*3600  # max number of seconds in leap year
+    normval = int(val/maxval * (26**6-1))
+    ret = _base26(normval)
+    evid = '{}{}{}'.format(prefix, year, ret)
+    return evid

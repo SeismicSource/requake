@@ -80,7 +80,7 @@ def _setup_logging(config, progname, action_name):
     # Actions that will produce a logfile
     loggin_actions = [
         'scan_catalog',
-        'scan_template',
+        'scan_templates',
         'build_families'
     ]
     if action_name in loggin_actions:
@@ -211,6 +211,7 @@ def configure(args):
     _parse_catalog_options(config)
     actions_needing_fdsn_station_dataselect = (
         'scan_catalog', 'plot_pair', 'plot_families', 'build_templates',
+        'scan_templates'
     )
     actions_needing_fdsn_catalog = (
         'scan_catalog',
@@ -223,6 +224,9 @@ def configure(args):
     except Exception as m:
         logger.error(m)
         rq_exit(1)
+    # Template times must be UTCDateTime objects
+    config.template_start_time = UTCDateTime(config.template_start_time)
+    config.template_end_time = UTCDateTime(config.template_end_time)
     return config
 
 
