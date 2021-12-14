@@ -23,7 +23,7 @@ def print_families(config):
         rq_exit(1)
 
     header = '#n nev     lon      lat   depth '
-    header += '                 start_time                    end_time'
+    header += '                 start_time                    end_time  yrs'
     print(header)
     for family in families:
         print(family)

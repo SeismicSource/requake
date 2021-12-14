@@ -23,16 +23,17 @@ from .waveforms import (
 class Family(list):
     lon = None
     lat = None
-    depth = None
+    depth = None  # km
     starttime = None
     endtime = None
+    duration = None  # years
     number = None
     valid = True
 
     def __str__(self):
-        s = '{:2d} {:2d} {:8.4f} {:8.4f} {:7.3f} {} {}'.format(
+        s = '{:2d} {:2d} {:8.4f} {:8.4f} {:7.3f} {} {} {:4.1f}'.format(
             self.number, len(self), self.lon, self.lat, self.depth,
-            self.starttime, self.endtime
+            self.starttime, self.endtime, self.duration
         )
         return s
 
@@ -46,6 +47,8 @@ class Family(list):
         self.depth = np.mean([e.depth for e in self])
         self.starttime = np.min([e.orig_time for e in self])
         self.endtime = np.max([e.orig_time for e in self])
+        year = 365*24*60*60
+        self.duration = (self.endtime - self.starttime)/year
 
     def extend(self, item):
         for ev in item:
