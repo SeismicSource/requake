@@ -11,8 +11,10 @@ Print families to screen.
 """
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
+import numpy as np
 from .families import read_selected_families
 from .rq_setup import rq_exit
+from .slip import mag_to_slip_in_cm
 
 
 def print_families(config):
@@ -24,6 +26,13 @@ def print_families(config):
 
     header = '#n nev     lon      lat   depth '
     header += '                 start_time                    end_time  yrs'
+    header += ' cm/y'
     print(header)
     for family in families:
-        print(family)
+        family_str = str(family)
+        slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
+        cum_slip = np.cumsum(slip)
+        d_slip = cum_slip[-1] - cum_slip[0]
+        slip_rate = d_slip/family.duration
+        family_str += ' {:4.1f}'.format(slip_rate)
+        print(family_str)
