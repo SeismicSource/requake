@@ -68,6 +68,7 @@ Currently supported verbs are:
     plot_pair           plot traces for a given event pair
     build_families      build families of repeating earthquakes from a catalog
                         of pairs
+    print_families      print families to screen
     plot_families       plot traces for one ore more event families
     plot_timespans      plot family timespans
     map_families        plot families on a map

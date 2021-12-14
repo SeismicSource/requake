@@ -28,6 +28,9 @@ def main():
     if config.args.action == 'build_families':
         from ..build_families import build_families
         build_families(config)
+    if config.args.action == 'print_families':
+        from ..print_families import print_families
+        print_families(config)
     if config.args.action == 'plot_families':
         from ..plot_families import plot_families
         plot_families(config)

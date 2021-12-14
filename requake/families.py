@@ -30,8 +30,8 @@ class Family(list):
     valid = True
 
     def __str__(self):
-        s = '{:.4f} {:.4f} {:.3f} {} {}'.format(
-            self.lon, self.lat, self.depth,
+        s = '{:2d} {:2d} {:8.4f} {:8.4f} {:7.3f} {} {}'.format(
+            self.number, len(self), self.lon, self.lat, self.depth,
             self.starttime, self.endtime
         )
         return s

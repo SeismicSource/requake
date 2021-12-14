@@ -92,6 +92,13 @@ def parse_arguments(progname='requake'):
         help='use this traceid instead of the default one for the family.'
     )
     # ---
+    # --- print_families
+    subparser.add_parser(
+        'print_families',
+        parents=[longerthan, familynumbers],
+        help='print families to screen'
+    )
+    # ---
     # --- plot_families
     plotfamilies = subparser.add_parser(
         'plot_families',
