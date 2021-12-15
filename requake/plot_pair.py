@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__.split('.')[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
+import matplotlib as mpl
+# Make text editable in Illustrator
+mpl.rcParams['pdf.fonttype'] = 42
 import matplotlib.pyplot as plt
 from .rq_setup import rq_exit
 from .catalog import get_events, read_events

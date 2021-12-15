@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__.split('.')[-1])
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 import matplotlib as mpl
+# Make text editable in Illustrator
+mpl.rcParams['pdf.fonttype'] = 42
 # unbind some keys, that we use it for interacting with the plot
 mpl.rcParams['keymap.back'].remove('left')
 mpl.rcParams['keymap.forward'].remove('right')
