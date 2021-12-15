@@ -18,7 +18,11 @@ import matplotlib as mpl
 # unbind some keys, that we use it for interacting with the plot
 mpl.rcParams['keymap.back'].remove('left')
 mpl.rcParams['keymap.forward'].remove('right')
-mpl.rcParams['keymap.all_axes'].remove('a')
+# the follwing keymap is not defined in mpl 3.5
+try:
+    mpl.rcParams['keymap.all_axes'].remove('a')
+except KeyError:
+    pass
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as PathEffects
 from obspy.signal.filter import envelope
