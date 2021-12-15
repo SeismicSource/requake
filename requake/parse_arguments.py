@@ -93,10 +93,15 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- print_families
-    subparser.add_parser(
+    printfamilies = subparser.add_parser(
         'print_families',
         parents=[longerthan, familynumbers],
         help='print families to screen'
+    )
+    printfamilies.add_argument(
+        '-f', '--format', type=str, default='simple',
+        help='format for the output table.'
+             'Choose between "simple", "markdown" and "csv"'
     )
     # ---
     # --- plot_families

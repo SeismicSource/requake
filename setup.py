@@ -37,6 +37,6 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Physics'],
-    install_requires=['obspy>=1.2.0', 'argcomplete', 'tqdm'],
+    install_requires=['obspy>=1.2.0', 'argcomplete', 'tqdm', 'tabulate'],
     python_requires='>3.7'
     )

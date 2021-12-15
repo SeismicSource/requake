@@ -12,6 +12,9 @@ Print families to screen.
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 import numpy as np
+import sys
+import csv
+from tabulate import tabulate
 from .families import read_selected_families
 from .rq_setup import rq_exit
 from .slip import mag_to_slip_in_cm
@@ -24,15 +27,58 @@ def print_families(config):
         logger.error(msg)
         rq_exit(1)
 
-    header = '#n nev     lon      lat   depth '
-    header += '                 start_time                    end_time  yrs'
-    header += ' cm/y'
-    print(header)
+    format_dict = {
+        'simple': 'simple',
+        'markdown': 'github'
+    }
+    headers = [
+        'family',
+        'nevents',
+        'longitude',
+        'latitude',
+        'depth (km)',
+        'start time',
+        'end time',
+        'duration (y)',
+        'slip rate (cm/y)'
+    ]
+    floatfmt = [
+        None,
+        None,
+        '.4f',
+        '.4f',
+        '.3f',
+        None,
+        None,
+        '.2f',
+        '.1f'
+    ]
+    table = list()
+    format = config.args.format
+    if format == 'csv':
+        writer = csv.writer(sys.stdout)
+        writer.writerow(headers)
     for family in families:
-        family_str = str(family)
+        row = [
+            family.number,
+            len(family),
+            family.lon,
+            family.lat,
+            family.depth,
+            family.starttime,
+            family.endtime,
+            family.duration
+        ]
         slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
         cum_slip = np.cumsum(slip)
         d_slip = cum_slip[-1] - cum_slip[0]
         slip_rate = d_slip/family.duration
-        family_str += ' {:4.1f}'.format(slip_rate)
-        print(family_str)
+        row.append(slip_rate)
+        table.append(row)
+    if format == 'csv':
+        writer.writerows(table)
+    else:
+        format = format_dict[config.args.format]
+        tab = tabulate(
+            table, headers=headers, floatfmt=floatfmt, tablefmt=format)
+        print(tab)
