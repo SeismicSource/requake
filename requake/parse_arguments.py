@@ -134,7 +134,7 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- plot_slip
-    timespans = subparser.add_parser(
+    subparser.add_parser(
         'plot_slip',
         parents=[longerthan, familynumbers],
         help='plot cumulative slip for one or more families'
