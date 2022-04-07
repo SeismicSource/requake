@@ -37,6 +37,9 @@ def main():
     if config.args.action == 'plot_timespans':
         from ..plot_timespans import plot_timespans
         plot_timespans(config)
+    if config.args.action == 'plot_slip':
+        from ..plot_slip import plot_slip
+        plot_slip(config)
     if config.args.action == 'map_families':
         from ..map_families import map_families
         map_families(config)

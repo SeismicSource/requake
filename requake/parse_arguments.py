@@ -133,6 +133,13 @@ def parse_arguments(progname='requake'):
              '"sort_families_by" will be used.'
     )
     # ---
+    # --- plot_slip
+    timespans = subparser.add_parser(
+        'plot_slip',
+        parents=[longerthan, familynumbers],
+        help='plot cumulative slip for one or more families'
+    )
+    # ---
     # --- map_families
     subparser.add_parser(
         'map_families',
