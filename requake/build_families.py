@@ -4,7 +4,7 @@
 Build families of repeating earthquakes from a catalog of pairs.
 
 :copyright:
-    2021 Claudio Satriano <satriano@ipgp.fr>
+    2021-2022 Claudio Satriano <satriano@ipgp.fr>
 :license:
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
