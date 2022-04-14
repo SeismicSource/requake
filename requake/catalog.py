@@ -13,6 +13,14 @@ from obspy.clients.fdsn.header import URL_MAPPINGS
 from obspy import UTCDateTime
 
 
+def _float_or_none(string):
+    try:
+        val = float(string)
+    except (TypeError, ValueError):
+        val = None
+    return val
+
+
 class RequakeEvent():
     """
     A hashable event class.
@@ -66,15 +74,15 @@ class RequakeEvent():
         word = line.split('|')
         self.evid = word[0]
         self.orig_time = UTCDateTime(word[1])
-        self.lat = float(word[2])
-        self.lon = float(word[3])
-        self.depth = float(word[4])
+        self.lat = _float_or_none(word[2])
+        self.lon = _float_or_none(word[3])
+        self.depth = _float_or_none(word[4])
         self.author = word[5]
         self.catalog = word[6]
         self.contributor = word[7]
         self.contributor_id = word[8]
         self.mag_type = word[9]
-        self.mag = float(word[10])
+        self.mag = _float_or_none(word[10])
         self.mag_author = word[11]
         self.location_name = word[12]
 
