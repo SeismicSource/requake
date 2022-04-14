@@ -100,6 +100,10 @@ class RequakeEvent():
 class RequakeCatalog(list):
     """A catalog class."""
 
+    def __str__(self):
+        s = '\n'.join(str(ev) for ev in self)
+        return s
+
     def write(self, filename):
         with open(filename, 'w') as fp:
             for ev in self:
