@@ -11,9 +11,10 @@ Utility functions for Requake.
 import os
 import sys
 import locale
-locale.setlocale(locale.LC_ALL, '')
 from .configobj import ConfigObj
 from .configobj.validate import Validator
+
+locale.setlocale(locale.LC_ALL, '')
 
 
 def err_exit(msg):

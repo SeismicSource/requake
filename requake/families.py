@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Family classes and functions.
@@ -10,7 +9,6 @@ Family classes and functions.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-logger = logging.getLogger(__name__.split('.')[-1])
 import csv
 import numpy as np
 from obspy import UTCDateTime, Stream
@@ -18,6 +16,8 @@ from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeEvent
 from .waveforms import (
     get_event_waveform, align_traces, build_template)
+
+logger = logging.getLogger(__name__.split('.')[-1])
 
 
 class Family(list):

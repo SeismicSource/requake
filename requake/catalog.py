@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Classes and functions for downloading, reading and writing catalogs.

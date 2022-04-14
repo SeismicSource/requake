@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Functions to compute slip for repeaters.
@@ -10,6 +9,7 @@ Functions to compute slip for repeaters.
     (http://www.cecill.info/index.en.html)
 """
 import logging
+
 logger = logging.getLogger(__name__.split('.')[-1])
 
 

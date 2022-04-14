@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Plot families on a map.
@@ -10,13 +9,7 @@ Plot families on a map.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-logger = logging.getLogger(__name__.split('.')[-1])
-# Reduce logging level for Matplotlib to avoid DEBUG messages
-mpl_logger = logging.getLogger('matplotlib')
-mpl_logger.setLevel(logging.WARNING)
 import matplotlib as mpl
-# Make text editable in Illustrator
-mpl.rcParams['pdf.fonttype'] = 42
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as colors
@@ -27,6 +20,13 @@ from obspy.geodetics import gps2dist_azimuth
 from .cached_tiler import CachedTiler
 from .families import read_selected_families
 from .rq_setup import rq_exit
+
+logger = logging.getLogger(__name__.split('.')[-1])
+# Reduce logging level for Matplotlib to avoid DEBUG messages
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
+# Make text editable in Illustrator
+mpl.rcParams['pdf.fonttype'] = 42
 
 
 def _make_basemap(config):

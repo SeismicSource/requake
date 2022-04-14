@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Build waveform templates for one or more event families.
@@ -10,12 +9,13 @@ Build waveform templates for one or more event families.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-logger = logging.getLogger(__name__.split('.')[-1])
 import os
 from .families import (
     read_selected_families,
     get_family_aligned_waveforms_and_template)
 from .rq_setup import rq_exit
+
+logger = logging.getLogger(__name__.split('.')[-1])
 
 
 def _build_template(config, family):

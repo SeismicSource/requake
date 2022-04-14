@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Catalog-based repeater scan for Requake.
@@ -10,7 +9,6 @@ Catalog-based repeater scan for Requake.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-logger = logging.getLogger(__name__.split('.')[-1])
 import csv
 from tqdm import tqdm
 from math import factorial
@@ -19,6 +17,8 @@ from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeCatalog, get_events, read_events
 from .waveforms import get_waveform_pair, cc_waveform_pair
 from .rq_setup import rq_exit
+
+logger = logging.getLogger(__name__.split('.')[-1])
 
 
 def _get_catalog(config):

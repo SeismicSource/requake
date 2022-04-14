@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Functions for downloading and processing waveforms.
@@ -10,17 +9,18 @@ Functions for downloading and processing waveforms.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-logger = logging.getLogger(__name__.split('.')[-1])
 import numpy as np
 from itertools import combinations
 from obspy import Inventory, Stream, UTCDateTime
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
-model = TauPyModel(model='ak135')
 from obspy.signal.cross_correlation import correlate, xcorr_max
 from scipy.stats import median_abs_deviation
 from .arrivals import get_arrivals
 from .rq_setup import rq_exit
+
+logger = logging.getLogger(__name__.split('.')[-1])
+model = TauPyModel(model='ak135')
 
 
 def _get_metadata(config):

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Flag a family of repeating earthquakes as valid or not valid.
@@ -10,10 +9,11 @@ Flag a family of repeating earthquakes as valid or not valid.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-logger = logging.getLogger(__name__.split('.')[-1])
 import csv
 import shutil
 from tempfile import NamedTemporaryFile
+
+logger = logging.getLogger(__name__.split('.')[-1])
 
 
 def flag_family(config):

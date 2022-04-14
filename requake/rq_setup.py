@@ -1,6 +1,3 @@
-
-#!/usr/bin/env python
-# PYTHON_ARGCOMPLETE_OK
 # -*- coding: utf8 -*-
 """
 Setup functions for Requake.

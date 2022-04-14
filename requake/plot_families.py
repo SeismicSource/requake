@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Download and plot traces for one or more event families.
@@ -10,11 +9,21 @@ Download and plot traces for one or more event families.
     (http://www.cecill.info/index.en.html)
 """
 import logging
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.patheffects as PathEffects
+from obspy.signal.filter import envelope
+from obspy.signal.util import smooth
+from .families import (
+    read_selected_families,
+    get_family_aligned_waveforms_and_template)
+from .waveforms import process_waveforms
+from .rq_setup import rq_exit
+
 logger = logging.getLogger(__name__.split('.')[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
-import matplotlib as mpl
 # Make text editable in Illustrator
 mpl.rcParams['pdf.fonttype'] = 42
 # unbind some keys, that we use it for interacting with the plot
@@ -25,15 +34,6 @@ try:
     mpl.rcParams['keymap.all_axes'].remove('a')
 except KeyError:
     pass
-import matplotlib.pyplot as plt
-import matplotlib.patheffects as PathEffects
-from obspy.signal.filter import envelope
-from obspy.signal.util import smooth
-from .families import (
-    read_selected_families,
-    get_family_aligned_waveforms_and_template)
-from .waveforms import process_waveforms
-from .rq_setup import rq_exit
 
 
 def _plot_family(config, family):

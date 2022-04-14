@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Scan a continuous waveform stream using one or more templates.
@@ -10,7 +9,6 @@ Scan a continuous waveform stream using one or more templates.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-logger = logging.getLogger(__name__.split('.')[-1])
 import os
 import sys
 from obspy import read
@@ -21,7 +19,7 @@ from .catalog import RequakeEvent, generate_evid
 from ._version import get_versions
 from .rq_setup import rq_exit
 
-
+logger = logging.getLogger(__name__.split('.')[-1])
 trace_cache = dict()
 
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Functions for computing P and S arrivals.
@@ -10,9 +9,10 @@ Functions for computing P and S arrivals.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-logger = logging.getLogger(__name__.split('.')[-1])
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
+
+logger = logging.getLogger(__name__.split('.')[-1])
 model = TauPyModel(model='ak135')
 
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Build families of repeating earthquakes from a catalog of pairs.
@@ -10,12 +9,13 @@ Build families of repeating earthquakes from a catalog of pairs.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-logger = logging.getLogger(__name__.split('.')[-1])
 import csv
 from obspy import UTCDateTime
 from .catalog import RequakeEvent
 from .families import Family
 from .rq_setup import rq_exit
+
+logger = logging.getLogger(__name__.split('.')[-1])
 
 
 def _read_pairs(config):

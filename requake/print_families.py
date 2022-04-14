@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf8 -*-
 """
 Print families to screen.
@@ -10,7 +9,6 @@ Print families to screen.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-logger = logging.getLogger(__name__.split('.')[-1])
 import numpy as np
 import sys
 import csv
@@ -18,6 +16,8 @@ from tabulate import tabulate
 from .families import read_selected_families
 from .rq_setup import rq_exit
 from .slip import mag_to_slip_in_cm
+
+logger = logging.getLogger(__name__.split('.')[-1])
 
 
 def print_families(config):
