@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__.split('.')[-1])
 import os
 import sys
 from obspy import read
-from .families import read_selected_families
+from .families import read_families, read_selected_families
 from .waveforms import get_waveform, cc_waveform_pair
 from .arrivals import get_arrivals
 from .catalog import RequakeEvent, generate_evid
@@ -27,14 +27,18 @@ trace_cache = dict()
 
 def _build_event(tr, template, p_arrival_absolute_time):
     """Build metadata for matched event, using metadata from template."""
-    trace_lat = template.stats.sac.stla
-    trace_lon = template.stats.sac.stlo
-    ev_lat = template.stats.sac.evla
-    ev_lon = template.stats.sac.evlo
-    ev_depth = template.stats.sac.evdp
-    P_arrival, S_arrival, distance, dist_deg = get_arrivals(
-        trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
-    orig_time = p_arrival_absolute_time - P_arrival.time
+    try:
+        trace_lat = template.stats.sac.stla
+        trace_lon = template.stats.sac.stlo
+        ev_lat = template.stats.sac.evla
+        ev_lon = template.stats.sac.evlo
+        ev_depth = template.stats.sac.evdp
+        P_arrival, S_arrival, distance, dist_deg = get_arrivals(
+            trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
+        orig_time = p_arrival_absolute_time - P_arrival.time
+    except Exception:
+        orig_time = p_arrival_absolute_time
+        ev_lon = ev_lat = ev_depth = None
     ev = RequakeEvent()
     ev.orig_time = orig_time
     ev.lon = ev_lon
@@ -89,7 +93,25 @@ def _scan_family_template(config, template, catalog_file, t0, t1):
         catalog_file.flush()
 
 
+def _read_template_from_file(config):
+    try:
+        families = read_families(config)
+        family_number = sorted(f.number for f in families)[-1] + 1
+    except Exception:
+        family_number = 0
+    templates = list()
+    try:
+        tr = read(config.args.template_file)[0]
+        tr.stats.family_number = family_number
+        templates.append(tr)
+    except Exception as msg:
+        logger.warning(msg)
+    return templates
+
+
 def _read_templates(config):
+    if config.args.template_file is not None:
+        return _read_template_from_file(config)
     families = read_selected_families(config)
     templates = list()
     for family in families:

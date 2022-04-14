@@ -168,10 +168,16 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- build_templates
-    subparser.add_parser(
+    scantemplates = subparser.add_parser(
         'scan_templates',
         parents=[longerthan, familynumbers, traceid],
         help='scan a continuous waveform stream using one or more templates'
+    )
+    scantemplates.add_argument(
+        '-T', '--template_file', type=str, default=None, metavar='FILE',
+        help='use the provided file as template. '
+             'File must be in SAC format, with a P pick in the '
+             '"A" header field'
     )
     # ---
     argcomplete.autocomplete(parser)

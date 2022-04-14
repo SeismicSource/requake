@@ -5,6 +5,7 @@
 ## unreleased
 
 - New verb: `scan_templates`: scan a continuous waveform stream using one
+  or more templates. Templates can be from families or from file
 - New verb: `print_families`: print families to screen
 - New verb: `plot_slip`: plot cumulative slip for one or more families
 - `family_numbers` argument is no more mandatory (default: `all`)
