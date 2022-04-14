@@ -165,7 +165,7 @@ def parse_arguments(progname='requake'):
         help='build waveform templates for one or more event families'
     )
     # ---
-    # --- build_templates
+    # --- scan_templates
     scantemplates = subparser.add_parser(
         'scan_templates',
         parents=[longerthan, familynumbers, traceid],
