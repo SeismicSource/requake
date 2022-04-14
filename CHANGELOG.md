@@ -1,6 +1,6 @@
 # Requake - Repeating earthquakes search and analysis
-(c) 2021-2022 Claudio Satriano <satriano@ipgp.fr>
 
+(c) 2021-2022 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 
@@ -13,7 +13,6 @@
 - Config parameter `trace_average_from_normalized_traces` renamed to
   `normalize_traces_before_averaging`
 - Bugfix: `plot_timespans`: correctly plot x time axis when sort by `time`
-
 
 ## v0.3 - 2021-11-08
 
@@ -29,7 +28,6 @@
   - also shift theoretical arrivals when aligning traces
 - Bugfix: last family was not read from family file
 
-
 ## v0.2 - 2021-09-24
 
 Mostly a bugfix release with a slightly improved trace plotting.
@@ -37,7 +35,6 @@ Mostly a bugfix release with a slightly improved trace plotting.
 - Bugfix: `scan_catalog` could not run properly due to missing variable
 - Bugfix: detrend traces before filtering
 - `plot_families`: print number of events and station-event distance
-
 
 ## v0.1 - 2021-09-16
 
