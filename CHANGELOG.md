@@ -1,6 +1,6 @@
 # Requake - Repeating earthquakes search and analysis
 
-(c) 2021-2022 Claudio Satriano <satriano@ipgp.fr>
+(c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 
