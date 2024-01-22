@@ -138,6 +138,8 @@ def get_events(
             continue
         if val is None:
             continue
+        if isinstance(val, UTCDateTime):
+            val = val.strftime('%Y-%m-%dT%H:%M:%S')
         query += '{}={}&'.format(key, val)
     # remove last "&" symbol
     query = query[:-1]
