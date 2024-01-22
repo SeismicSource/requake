@@ -127,7 +127,7 @@ def _read_templates(config):
 
 
 def _template_catalog_files(config, templates):
-    catalog_files = dict()
+    catalog_files = {}
     for template in templates:
         template_catalog_dir = os.path.join(
             config.args.outdir, 'template_catalogs'

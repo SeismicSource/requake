@@ -84,8 +84,8 @@ def _get_trace_id(config, ev):
         distance, _, _ = gps2dist_azimuth(
             trace_lat, trace_lon, ev_lat, ev_lon)
         distances.append(distance)
-    closest_trace = min(zip(trace_ids, distances), key=lambda x: x[1])[0]
-    return closest_trace
+    # return the trace_id for the closest trace
+    return min(zip(trace_ids, distances), key=lambda x: x[1])[0]
 
 
 def get_waveform(config, traceid, starttime, endtime):

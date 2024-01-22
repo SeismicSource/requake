@@ -75,13 +75,9 @@ def _pair_ok(config, pair):
     return distance <= config.catalog_search_range
 
 
-def scan_catalog(config):
-    """Perform cross-correlation on catalog events."""
-    catalog = _get_catalog(config)
-    nevents = len(catalog)
-    logger.info('Building event pairs...')
-    logger.info('Computing waveform cross-correlation...')
-    fp_out = open(config.scan_catalog_pairs_file, 'w')
+# TODO Rename this here and in `scan_catalog`
+def _process_pairs(fp_out, nevents, catalog, config):
+    """Process event pairs."""
     fieldnames = [
         'evid1', 'evid2', 'trace_id',
         'orig_time1', 'lon1', 'lat1', 'depth_km1', 'mag_type1', 'mag1',
@@ -91,9 +87,9 @@ def scan_catalog(config):
     writer = csv.writer(fp_out)
     writer.writerow(fieldnames)
     npairs = int(factorial(nevents)/(factorial(2)*factorial(nevents-2)))
-    logger.info('Processing {:n} event pairs'.format(npairs))
+    logger.info(f'Processing {npairs:n} event pairs')
     with tqdm(total=npairs, unit='pairs', unit_scale=True) as pbar:
-        for n, pair in enumerate(combinations(catalog, 2)):
+        for pair in combinations(catalog, 2):
             pbar.update()
             if not _pair_ok(config, pair):
                 continue
@@ -113,8 +109,16 @@ def scan_catalog(config):
                 # Do not print empty messages
                 if str(m):
                     logger.warning(str(m))
-                continue
-    fp_out.close()
-    logger.info('Processed {:n} event pairs'.format(npairs))
-    logger.info(
-        'Done! Output written to {}'.format(config.scan_catalog_pairs_file))
+    return npairs
+
+
+def scan_catalog(config):
+    """Perform cross-correlation on catalog events."""
+    catalog = _get_catalog(config)
+    nevents = len(catalog)
+    logger.info('Building event pairs...')
+    logger.info('Computing waveform cross-correlation...')
+    with open(config.scan_catalog_pairs_file, 'w') as fp_out:
+        npairs = _process_pairs(fp_out, nevents, catalog, config)
+    logger.info(f'Processed {npairs:n} event pairs')
+    logger.info(f'Done! Output written to {config.scan_catalog_pairs_file}')
