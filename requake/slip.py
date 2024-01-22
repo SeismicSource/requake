@@ -19,7 +19,7 @@ def _mag_to_moment(magnitude, unit='N.m'):
     elif unit == 'dyne.cm':
         Mo = 10**(3/2*(magnitude+10.7))
     else:
-        raise ValueError('Wrong unit for seismic moment: {}'.format(unit))
+        raise ValueError(f'Wrong unit for seismic moment: {unit}')
     return Mo
 
 
@@ -27,5 +27,4 @@ def mag_to_slip_in_cm(config, magnitude):
     Mo = _mag_to_moment(magnitude, unit='dyne.cm')
     # TODO: add other laws via config parameter
     # Nadeau and Johnson (1998)
-    slip_in_cm = (10**(-2.36))*(Mo**(0.17))
-    return slip_in_cm
+    return (10**(-2.36))*(Mo**(0.17))

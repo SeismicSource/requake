@@ -31,11 +31,11 @@ class Family(list):
     valid = True
 
     def __str__(self):
-        s = '{:2d} {:2d} {:8.4f} {:8.4f} {:7.3f} {} {} {:4.1f}'.format(
-            self.number, len(self), self.lon, self.lat, self.depth,
-            self.starttime, self.endtime, self.duration
+        return (
+            f'{self.number:2d} {len(self):2d} '
+            f'{self.lon:8.4f} {self.lat:8.4f} {self.depth:7.3f} '
+            f'{self.starttime} {self.endtime} {self.duration:4.1f}'
         )
-        return s
 
     def append(self, ev):
         if ev in self:
@@ -64,7 +64,7 @@ def read_families(config):
     fp = open(config.build_families_outfile, 'r')
     reader = csv.DictReader(fp)
     old_family_number = -1
-    families = list()
+    families = []
     family = None
     for row in reader:
         ev = RequakeEvent()
@@ -94,21 +94,21 @@ def read_selected_families(config):
     """Read and select families based on family number, validity and length."""
     family_numbers = _build_family_number_list(config)
     families = read_families(config)
-    families_selected = list()
+    families_selected = []
     for family in families:
         if family.number not in family_numbers:
             continue
         if not family.valid:
-            msg = 'Family "{}" is flagged as not valid'.format(family.number)
+            msg = f'Family "{family.number}" is flagged as not valid'
             logger.warning(msg)
             continue
         if (family.endtime - family.starttime) < config.args.longerthan:
-            msg = 'Family "{}" is too short'.format(family.number)
+            msg = f'Family "{family.number}" is too short'
             logger.warning(msg)
             continue
         families_selected.append(family)
     if not families_selected:
-        msg = 'No family found with numbers "{}"'.format(family_numbers)
+        msg = f'No family found with numbers "{family_numbers}"'
         raise Exception(msg)
     return families_selected
 
@@ -119,13 +119,13 @@ def get_family(config, families, family_number):
         if family.number != family_number:
             continue
         if not family.valid:
-            msg = 'Family "{}" is flagged as not valid'.format(family_number)
+            msg = f'Family "{family_number}" is flagged as not valid'
             raise Exception(msg)
         if (family.endtime - family.starttime) < config.args.longerthan:
-            msg = 'Family "{}" is too short'.format(family.number)
+            msg = f'Family "{family.number}" is too short'
             raise Exception(msg)
         return family
-    msg = 'No family found with number "{}"'.format(family_number)
+    msg = f'No family found with number "{family_number}"'
     raise Exception(msg)
 
 
@@ -137,9 +137,8 @@ def get_family_waveforms(config, family):
             st += get_event_waveform(config, ev)
         except Exception as m:
             logger.error(str(m))
-            pass
     if not st:
-        msg = 'No traces found for family {}'.format(family.number)
+        msg = f'No traces found for family {family.number}'
         raise Exception(msg)
     return st
 
@@ -158,7 +157,7 @@ def _build_family_number_list(config):
     if family_numbers == 'all':
         with open(config.build_families_outfile, 'r') as fp:
             reader = csv.DictReader(fp)
-            fn = sorted(set(int(row['family_number']) for row in reader))
+            fn = sorted({int(row['family_number']) for row in reader})
         return fn
     try:
         if ',' in family_numbers:
@@ -170,7 +169,6 @@ def _build_family_number_list(config):
             fn = [int(family_numbers), ]
         else:
             raise Exception
-    except Exception:
-        msg = 'Invalid family numbers: {}'.format(family_numbers)
-        raise Exception(msg)
+    except Exception as e:
+        raise Exception(f'Invalid family numbers: {family_numbers}') from e
     return fn

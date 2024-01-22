@@ -46,7 +46,7 @@ def plot_slip(config):
 
     cmap = cm.tab10
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
-    lines = list()
+    lines = []
     for family in families:
         fn = family.number
         label = 'Family {}\n{:.1f}°E {:.1f}°N {:.1f} km'.format(
@@ -79,7 +79,7 @@ def plot_slip(config):
     ax.set_xlabel('Time')
     ax.set_ylabel('Cumulative Slip (cm)')
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, ticks=range(0, 10))
+    cbar = fig.colorbar(sm, ticks=range(10))
     cbar.ax.set_ylabel('mod(family number, 10)')
 
     # Empty annotation that will be updated interactively
@@ -111,6 +111,7 @@ def plot_slip(config):
                     if vis:
                         annot.set_visible(False)
                         fig.canvas.draw_idle()
+
     fig.canvas.mpl_connect('motion_notify_event', hover)
 
     plt.show()

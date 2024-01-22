@@ -44,10 +44,7 @@ def _make_basemap(config):
     ax.set_extent([lonmin, lonmax, latmin, latmax], crs=trans)
     diagonal, _, _ = gps2dist_azimuth(latmin, lonmin, latmax, lonmax)
     diagonal /= 1e3
-    if diagonal <= 100:
-        tile_zoom_level = 12
-    else:
-        tile_zoom_level = 8
+    tile_zoom_level = 12 if diagonal <= 100 else 8
     ax.add_image(stamen_terrain, tile_zoom_level)
     ax.gridlines(draw_labels=True, color='#777777', linestyle='--')
     countries = cfeature.NaturalEarthFeature(
@@ -69,7 +66,7 @@ def map_families(config):
     trans = ccrs.PlateCarree()
     cmap = cm.tab10
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
-    markers = list()
+    markers = []
     for family in families:
         fn = family.number
         nevents = len(family)
@@ -83,7 +80,7 @@ def map_families(config):
             transform=trans, label=label, zorder=10)
         markers.append(marker)
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, ticks=range(0, 10), pad=0.1)
+    cbar = fig.colorbar(sm, ticks=range(10), pad=0.1)
     cbar.ax.set_ylabel('mod(family number, 10)')
 
     # Empty annotation that will be updated interactively
@@ -115,6 +112,7 @@ def map_families(config):
                     if vis:
                         annot.set_visible(False)
                         fig.canvas.draw_idle()
+
     fig.canvas.mpl_connect('motion_notify_event', hover)
 
     plt.show()

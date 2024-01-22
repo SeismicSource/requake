@@ -44,9 +44,8 @@ def _build_template(config, family):
         kt0='Stheo',
     )
     tr_template.write(template_file, format='SAC')
-    logger.info('Template for family {} saved as {}'.format(
-        family.number, template_file
-    ))
+    logger.info(
+        f'Template for family {family.number} saved as {template_file}')
 
 
 def build_templates(config):

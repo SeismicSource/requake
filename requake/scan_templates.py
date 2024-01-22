@@ -20,7 +20,7 @@ from ._version import get_versions
 from .rq_setup import rq_exit
 
 logger = logging.getLogger(__name__.split('.')[-1])
-trace_cache = dict()
+trace_cache = {}
 
 
 def _build_event(tr, template, p_arrival_absolute_time):
@@ -44,7 +44,7 @@ def _build_event(tr, template, p_arrival_absolute_time):
     ev.depth = ev_depth
     ev.trace_id = tr.id
     ev.evid = generate_evid(orig_time)
-    ev.author = 'requake{}'.format(get_versions()['version'])
+    ev.author = f"requake{get_versions()['version']}"
     return ev
 
 
@@ -67,16 +67,15 @@ def _cc_detection(config, tr, template, lag_sec):
 def _scan_family_template(config, template, catalog_file, t0, t1):
     global trace_cache
     trace_id = template.id
-    key = '{}_{}'.format(t0, trace_id)
+    key = f'{t0}_{trace_id}'
     try:
         tr = trace_cache[key]
     except KeyError:
         try:
             tr = get_waveform(config, trace_id, t0, t1)
             trace_cache[key] = tr
-        except Exception:
-            msg = 'No data for {} : {} - {}'.format(trace_id, t0, t1)
-            raise Exception(msg)
+        except Exception as m:
+            raise Exception(f'No data for {trace_id} : {t0} - {t1}') from m
     sys.stdout.write(str(tr) + '\r')
     # We use the time_chunk length as max shift
     config.cc_max_shift = config.time_chunk
@@ -97,7 +96,7 @@ def _read_template_from_file(config):
         family_number = sorted(f.number for f in families)[-1] + 1
     except Exception:
         family_number = 0
-    templates = list()
+    templates = []
     try:
         tr = read(config.args.template_file)[0]
         tr.stats.family_number = family_number
@@ -111,7 +110,7 @@ def _read_templates(config):
     if config.args.template_file is not None:
         return _read_template_from_file(config)
     families = read_selected_families(config)
-    templates = list()
+    templates = []
     for family in families:
         trace_id = family[0].trace_id
         template_file = 'template{:02d}.{}.sac'.format(
@@ -139,7 +138,7 @@ def _template_catalog_files(config, templates):
             template.stats.family_number, template.id
         )
         template_catalog_file_name = os.path.join(
-            template_catalog_dir, 'catalog' + template_signature + '.txt'
+            template_catalog_dir, f'catalog{template_signature}.txt'
         )
         catalog_files[template_signature] = open(
             template_catalog_file_name, 'w')

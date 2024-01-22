@@ -23,8 +23,9 @@ def flag_family(config):
     is_valid = config.args.is_valid
     if is_valid not in true_words + false_words:
         logger.error(
-            'Invalid choice for "is_valid": "{}". '
-            'Enter either "true" ("t") or "false" ("f")'.format(is_valid))
+            f'Invalid choice for "is_valid": "{is_valid}". '
+            'Enter either "true" ("t") or "false" ("f")'
+        )
     is_valid = is_valid in true_words
     tmpfile = NamedTemporaryFile(mode='w', delete=False)
     with open(config.build_families_outfile, 'r') as csvfile, tmpfile:
@@ -38,5 +39,4 @@ def flag_family(config):
             writer.writerow(row)
     shutil.move(tmpfile.name, config.build_families_outfile)
     text = {True: 'valid', False: 'not valid'}
-    logger.info('Family "{}" flagged as {}'.format(
-        family_number, text[is_valid]))
+    logger.info(f'Family "{family_number}" flagged as {text[is_valid]}')

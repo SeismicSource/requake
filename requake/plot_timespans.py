@@ -45,16 +45,15 @@ def plot_timespans(config):
 
     cmap = cm.tab10
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
-    lines = list()
+    lines = []
     if config.args.sortby is not None:
         sort_by = config.args.sortby
         valid_sort_by = (
             'time', 'latitude', 'longitude', 'depth', 'distance_from')
         if sort_by not in valid_sort_by:
-            msg = 'Invalid value for "sortby". Choose from: {}.'.format(
-                valid_sort_by
+            logger.error(
+                f'Invalid value for "sortby". Choose from: {valid_sort_by}.'
             )
-            logger.error(msg)
             rq_exit(1)
     else:
         sort_by = config.sort_families_by
@@ -74,8 +73,10 @@ def plot_timespans(config):
         ax.yaxis.set_minor_locator(months)
     for family in families:
         fn = family.number
-        label = 'Family {}\n{:.1f}°E {:.1f}°N {:.1f} km'.format(
-            fn, family.lon, family.lat, family.depth)
+        label = (
+            f'Family {fn}\n{family.lon:.1f}°E {family.lat:.1f}°N '
+            f'{family.depth:.1f} km'
+        )
         times = [ev.orig_time.matplotlib_date for ev in family]
         if sort_by == 'time':
             yvals = np.ones(len(times)) * family.starttime.matplotlib_date
@@ -91,7 +92,7 @@ def plot_timespans(config):
             ylabel = 'Depth (km)'
         elif sort_by == 'distance_from':
             yvals = np.ones(len(times)) * family.distance_from(lon0, lat0)
-            ylabel = 'Distance from {:.1f}°E, {:.1f}°N (km)'.format(lon0, lat0)
+            ylabel = f'Distance from {lon0:.1f}°E, {lat0:.1f}°N (km)'
         line, = ax.plot(
             times, yvals, lw=1, marker='o', color=cmap(norm(fn % 10)),
             label=label)
@@ -99,7 +100,7 @@ def plot_timespans(config):
     ax.set_xlabel('Time')
     ax.set_ylabel(ylabel)
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, ticks=range(0, 10))
+    cbar = fig.colorbar(sm, ticks=range(10))
     cbar.ax.set_ylabel('mod(family number, 10)')
 
     # Empty annotation that will be updated interactively
@@ -131,6 +132,7 @@ def plot_timespans(config):
                     if vis:
                         annot.set_visible(False)
                         fig.canvas.draw_idle()
+
     fig.canvas.mpl_connect('motion_notify_event', hover)
 
     plt.show()

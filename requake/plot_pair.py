@@ -8,6 +8,7 @@ Download and plot traces for an event pair.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
+import contextlib
 import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -26,19 +27,14 @@ mpl.rcParams['pdf.fonttype'] = 42
 def _download_event(config, evid):
     """Download an event based on its evid."""
     ev = None
-    try:
+    with contextlib.suppress(Exception):
         cat = read_events(config.scan_catalog_file)
-        ev = [e for e in cat if e.evid == evid][0]
-        return ev
-    except Exception:
-        pass
+        return [e for e in cat if e.evid == evid][0]
     for url in config.catalog_fdsn_event_urls:
-        try:
+        with contextlib.suppress(Exception):
             ev = get_events(url, eventid=evid)[0]
-        except Exception:
-            pass
     if ev is None:
-        raise Exception('Cannot download event: {}'.format(evid))
+        raise Exception(f'Cannot download event: {evid}')
     return ev
 
 
@@ -46,7 +42,7 @@ def _get_pair(config):
     """Donwload a pair of events."""
     evid1 = config.args.evid1
     evid2 = config.args.evid2
-    pair = list()
+    pair = []
     for evid in evid1, evid2:
         try:
             pair.append(_download_event(config, evid))
@@ -73,28 +69,25 @@ def plot_pair(config):
         ))
     fig, ax = plt.subplots(
         2, 1, figsize=(12, 6), sharex=True, sharey=True)
-    title = '{}-{}'.format(tr1.stats.evid, tr2.stats.evid)
+    title = f'{tr1.stats.evid}-{tr2.stats.evid}'
     fig.canvas.manager.set_window_title(title)
-    title = '{}-{} CC: {:.2f}'.format(tr1.stats.evid, tr2.stats.evid, cc_max)
+    title = f'{tr1.stats.evid}-{tr2.stats.evid} CC: {cc_max:.2f}'
     ax[0].set_title(title, loc='left')
-    title = '{} | {:.1f}-{:.1f} Hz'.format(
-        tr1.id, config.cc_freq_min, config.cc_freq_max)
+    title = f'{tr1.id} | {config.cc_freq_min:.1f}-{config.cc_freq_max:.1f} Hz'
     ax[0].set_title(title, loc='right')
     stats1 = tr1.stats
     stats2 = tr2.stats
     label1 = (
-        '{}, {} {:.1f}, {}\n'
-        '{:.4f}°N {:.4f}°E {:.3f} km'.format(
-            stats1.evid, stats1.mag_type, stats1.mag,
-            stats1.orig_time.strftime('%Y-%m-%dT%H:%M:%S'),
-            stats1.ev_lat, stats1.ev_lon, stats1.ev_depth)
+        f'{stats1.evid}, {stats1.mag_type} {stats1.mag:.1f}, '
+        f'{stats1.orig_time.strftime("%Y-%m-%dT%H:%M:%S")}\n'
+        f'{stats1.ev_lat:.4f}°N {stats1.ev_lon:.4f}°E '
+        f'{stats1.ev_depth:.3f} km'
     )
     label2 = (
-        '{}, {} {:.1f}, {}\n'
-        '{:.4f}°N {:.4f}°E {:.3f} km'.format(
-            stats2.evid, stats2.mag_type, stats2.mag,
-            stats2.orig_time.strftime('%Y-%m-%dT%H:%M:%S'),
-            stats2.ev_lat, stats2.ev_lon, stats2.ev_depth)
+        f'{stats2.evid}, {stats2.mag_type} {stats2.mag:.1f}, '
+        f'{stats2.orig_time.strftime("%Y-%m-%dT%H:%M:%S")}\n'
+        f'{stats2.ev_lat:.4f}°N {stats2.ev_lon:.4f}°E '
+        f'{stats2.ev_depth:.3f} km'
     )
     lw = 0.8  # linewidth
     data1 = tr1.data

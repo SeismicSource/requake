@@ -8,6 +8,7 @@ Classes and functions for downloading, reading and writing catalogs.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
+import contextlib
 import urllib.request
 from obspy.clients.fdsn.header import URL_MAPPINGS
 from obspy import UTCDateTime
@@ -45,10 +46,7 @@ class RequakeEvent():
     trace_id = None
 
     def __eq__(self, other):
-        if (self.evid == other.evid) and (self.trace_id == other.trace_id):
-            return True
-        else:
-            return False
+        return self.evid == other.evid and self.trace_id == other.trace_id
 
     def __gt__(self, other):
         return self.orig_time > other.orig_time
@@ -66,9 +64,7 @@ class RequakeEvent():
         return self.evid.__hash__()
 
     def __str__(self):
-        s = '{} {} {} {}'.format(
-            self.evid, self.orig_time, self.mag_type, self.mag)
-        return s
+        return f'{self.evid} {self.orig_time} {self.mag_type} {self.mag}'
 
     def from_fdsn_text(self, line):
         word = line.split('|')
@@ -87,9 +83,9 @@ class RequakeEvent():
         self.location_name = word[12]
 
     def fdsn_text(self):
-        line = '|'.join(map(str, (
+        fields = (
             self.evid,
-            self.orig_time,
+            self.orig_time.strftime('%Y-%m-%dT%H:%M:%S'),
             self.lat,
             self.lon,
             self.depth,
@@ -100,17 +96,16 @@ class RequakeEvent():
             self.mag_type,
             self.mag,
             self.mag_author,
-            self.location_name
-        )))
-        return(line)
+            self.location_name,
+        )
+        return '|'.join(map(str, fields))
 
 
 class RequakeCatalog(list):
     """A catalog class."""
 
     def __str__(self):
-        s = '\n'.join(str(ev) for ev in self)
-        return s
+        return '\n'.join(str(ev) for ev in self)
 
     def write(self, filename):
         with open(filename, 'w') as fp:
@@ -140,15 +135,13 @@ def get_events(
             continue
         if isinstance(val, UTCDateTime):
             val = val.strftime('%Y-%m-%dT%H:%M:%S')
-        query += '{}={}&'.format(key, val)
+        query += f'{key}={val}&'
     # remove last "&" symbol
     query = query[:-1]
     # see if baseurl is an alias defined in ObsPy
-    try:
+    with contextlib.suppress(KeyError):
         baseurl = URL_MAPPINGS[baseurl]
-    except KeyError:
-        pass
-    baseurl = baseurl + '/fdsnws/event/1/'
+    baseurl = f'{baseurl}/fdsnws/event/1/'
     url = baseurl + query
     cat = RequakeCatalog()
     with urllib.request.urlopen(url) as f:
@@ -199,9 +192,7 @@ def _base26(val):
         val = val // base
         if val == 0:
             break
-    # pad to 6 characters
-    ret = ret.rjust(6, 'a')
-    return ret
+    return ret.rjust(6, 'a')
 
 
 def generate_evid(orig_time):
@@ -214,5 +205,4 @@ def generate_evid(orig_time):
     maxval = 366*24*3600  # max number of seconds in leap year
     normval = int(val/maxval * (26**6-1))
     ret = _base26(normval)
-    evid = '{}{}{}'.format(prefix, year, ret)
-    return evid
+    return f'{prefix}{year}{ret}'

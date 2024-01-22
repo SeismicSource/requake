@@ -8,6 +8,7 @@ Catalog-based repeater scan for Requake.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
+import contextlib
 import logging
 import csv
 from tqdm import tqdm
@@ -27,18 +28,16 @@ def _get_catalog(config):
 
     Reads a cached catalog file, if available.
     """
-    try:
+    with contextlib.suppress(Exception):
         cat = read_events(config.scan_catalog_file)
-        logger.info('{} events read from catalog file'.format(len(cat)))
+        logger.info(f'{len(cat)} events read from catalog file')
         return cat
-    except Exception:
-        pass
     logger.info('Downloading events...')
     cat_info = zip(
         config.catalog_fdsn_event_urls,
         config.catalog_start_times,
         config.catalog_end_times)
-    catalog = list()
+    catalog = []
     for url, start_time, end_time in cat_info:
         try:
             catalog += get_events(
@@ -55,8 +54,8 @@ def _get_catalog(config):
             )
         except Exception as m:
             logger.warning(
-                'Unable to download events from {} for period {} - {}. '
-                '{}'.format(url, start_time, end_time, m)
+                f'Unable to download events from {url} for period '
+                f'{start_time} - {end_time}. {m}'
             )
     if not catalog:
         logger.error('No event downloaded')
@@ -64,7 +63,7 @@ def _get_catalog(config):
     # Sort catalog in increasing time order
     cat = RequakeCatalog(sorted(catalog, key=lambda ev: ev.orig_time))
     cat.write(config.scan_catalog_file)
-    logger.info('{} events downloaded'.format(len(cat)))
+    logger.info(f'{len(cat)} events downloaded')
     return cat
 
 
@@ -73,9 +72,7 @@ def _pair_ok(config, pair):
     ev1, ev2 = pair
     distance, _, _ = gps2dist_azimuth(ev1.lat, ev1.lon, ev2.lat, ev2.lon)
     distance /= 1e3
-    if distance <= config.catalog_search_range:
-        return True
-    return False
+    return distance <= config.catalog_search_range
 
 
 def scan_catalog(config):

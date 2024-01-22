@@ -26,19 +26,15 @@ def err_exit(msg):
 def parse_configspec():
     curdir = os.path.dirname(__file__)
     configspec_file = os.path.join(curdir, 'conf', 'configspec.conf')
-    configspec = read_config(configspec_file)
-    return configspec
+    return read_config(configspec_file)
 
 
 def write_ok(filepath):
     if os.path.exists(filepath):
         ans = input(
-            '"{}" already exists. '
-            'Do you want to overwrite it? [y/N] '.format(filepath))
-        if ans in ['y', 'Y']:
-            return True
-        else:
-            return False
+            f'"{filepath}" already exists. Do you want to overwrite it? [y/N] '
+        )
+        return ans in ['y', 'Y']
     return True
 
 
@@ -49,11 +45,11 @@ def write_sample_config(configspec, progname):
     c.defaults = []
     c.initial_comment = configspec.initial_comment
     c.comments = configspec.comments
-    configfile = progname + '.conf'
+    configfile = f'{progname}.conf'
     if write_ok(configfile):
         with open(configfile, 'wb') as fp:
             c.write(fp)
-        print('Sample config file written to: "{}"'.format(configfile))
+        print(f'Sample config file written to: "{configfile}"')
 
 
 def read_config(config_file, configspec=None):
@@ -67,7 +63,7 @@ def read_config(config_file, configspec=None):
     except IOError as err:
         err_exit(err)
     except Exception as err:
-        msg = 'Unable to read "{}": {}'.format(config_file, err)
+        msg = f'Unable to read "{config_file}": {err}'
         err_exit(msg)
     return config_obj
 
@@ -79,8 +75,7 @@ def validate_config(config_obj):
         for entry in test:
             if not test[entry]:
                 sys.stderr.write(
-                    'Invalid value for "{}": "{}"\n'.format(
-                        entry, config_obj[entry]))
+                    f'Invalid value for "{entry}": "{config_obj[entry]}"\n')
         sys.exit(1)
     if not test:
         err_exit('No configuration value present!')

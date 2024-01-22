@@ -8,6 +8,7 @@ Functions for downloading and processing waveforms.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
+import contextlib
 import logging
 import numpy as np
 from itertools import combinations
@@ -42,7 +43,7 @@ def _get_metadata(config):
                 starttime=start_time, endtime=end_time, level='channel'
             )
         except Exception as m:
-            logger.error('Unable to download station metadata. ' + str(m))
+            logger.error(f'Unable to download station metadata. {str(m)}')
             rq_exit(1)
     channels = inv.get_contents()['channels']
     unique_channels = set(channels)
@@ -50,13 +51,12 @@ def _get_metadata(config):
     for channel, count in zip(unique_channels, channel_count):
         if count > 1:
             logger.warning(
-                'Channel {} is present {} times in inventory'.format(
-                    channel, count
-                )
-            )
+                f'Channel {channel} is present {count} times in inventory')
     config.inventory = inv
-    logger.info('Metadata downloaded for channels: {}'.format(
-        set(config.inventory.get_contents()['channels'])))
+    logger.info(
+        'Metadata downloaded for channels: '
+        f"{set(config.inventory.get_contents()['channels'])}"
+    )
 
 
 def _get_trace_id(config, ev):
@@ -75,9 +75,9 @@ def _get_trace_id(config, ev):
             coords = config.inventory.get_coordinates(trace_id, orig_time)
         except Exception:
             logger.error(
-                'Unable to find coordinates for trace {} at time {}'.format(
-                    trace_id, orig_time
-                ))
+                f'Unable to find coordinates for trace {trace_id} '
+                f'at time {orig_time}'
+            )
             rq_exit(1)
         trace_lat = coords['latitude']
         trace_lon = coords['longitude']
@@ -115,16 +115,15 @@ def get_event_waveform(config, ev):
     orig_time = ev.orig_time
     mag = ev.mag
     mag_type = ev.mag_type
-    if config.args.traceid is not None:
-        traceid = config.args.traceid
-    else:
-        traceid = ev.trace_id
+    traceid = ev.trace_id if config.args.traceid is None\
+        else config.args.traceid
     try:
         coords = config.inventory.get_coordinates(traceid, orig_time)
-    except Exception:
-        msg = 'Unable to find coordinates for trace {} at time {}'.format(
-                    traceid, orig_time)
-        raise Exception(msg)
+    except Exception as m:
+        raise Exception(
+            f'Unable to find coordinates for trace {traceid} '
+            f'at time {orig_time}'
+        ) from m
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
     P_arrival, S_arrival, distance, dist_deg = get_arrivals(
@@ -163,8 +162,8 @@ def process_waveforms(config, st):
     return st
 
 
-skipped_evids = list()
-tr_cache = dict()
+skipped_evids = []
+tr_cache = {}
 old_cache_key = None
 
 
@@ -181,36 +180,30 @@ def get_waveform_pair(config, pair):
     cache_key = '_'.join((ev1.evid, ev1.trace_id))
     # remove trace from cache when evid and/or trace_id changes
     if old_cache_key is not None and cache_key != old_cache_key:
-        try:
+        with contextlib.suppress(KeyError):
             del tr_cache[cache_key]
-        except KeyError:
-            pass
     old_cache_key = cache_key
     for ev in pair:
         if ev.evid in skipped_evids:
             raise Exception
         # use cached trace, if possible
         cache_key = '_'.join((ev.evid, ev.trace_id))
-        try:
+        with contextlib.suppress(KeyError):
             st.append(tr_cache[cache_key])
             continue
-        except KeyError:
-            pass
         try:
             tr = get_event_waveform(config, ev)
             tr_cache[cache_key] = tr
             st.append(tr)
         except Exception as m:
             skipped_evids.append(ev.evid)
-            m = str(m).replace('\n', ' ')
-            msg = (
-                'Unable to download waveform data for '
-                'event {} and trace_id {}. '
-                'Skipping all pairs containig '
-                'this event.\n'
-                'Error message: {}'.format(ev.evid, ev.trace_id, m)
-            )
-            raise Exception(msg)
+            msg = str(m).replace('\n', ' ')
+            raise Exception(
+                f'Unable to download waveform data for event {ev.evid} '
+                f'and trace_id {ev.trace_id}. '
+                'Skipping all pairs containig this event.\n'
+                f'Error message: {msg}'
+            ) from m
     return st
 
 
@@ -223,8 +216,10 @@ def cc_waveform_pair(config, tr1, tr2, mode='events'):
             evid1 = tr1.stats.evid
             evid2 = tr2.stats.evid
             logger.warning(
-                '{} {} - The two traces have a different sampling interval.'
-                'Skipping pair.'.format(evid1, evid2))
+                f'{evid1} {evid2} - '
+                'The two traces have a different sampling interval. '
+                'Skipping pair.'
+            )
         elif mode == 'scan':
             logger.error(
                 'The two traces have a different sampling interval.')
@@ -236,12 +231,11 @@ def cc_waveform_pair(config, tr1, tr2, mode='events'):
     abs_max = bool(config.cc_allow_negative)
     lag, cc_max = xcorr_max(cc, abs_max)
     lag_sec = lag*dt1
-    if mode == 'scan':
-        # compute median absolute deviation for the non-zero portion of cc
-        cc_mad = median_abs_deviation(cc[np.abs(cc) > 1e-5])
-        return lag, lag_sec, cc_max, cc_mad
-    else:
+    if mode != 'scan':
         return lag, lag_sec, cc_max
+    # compute median absolute deviation for the non-zero portion of cc
+    cc_mad = median_abs_deviation(cc[np.abs(cc) > 1e-5])
+    return lag, lag_sec, cc_max, cc_mad
 
 
 def align_pair(config, tr1, tr2):

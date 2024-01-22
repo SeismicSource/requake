@@ -8,6 +8,7 @@ Download and plot traces for one or more event families.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
+import contextlib
 import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -30,10 +31,8 @@ mpl.rcParams['pdf.fonttype'] = 42
 mpl.rcParams['keymap.back'].remove('left')
 mpl.rcParams['keymap.forward'].remove('right')
 # the follwing keymap is not defined in mpl 3.5
-try:
+with contextlib.suppress(KeyError):
     mpl.rcParams['keymap.all_axes'].remove('a')
-except KeyError:
-    pass
 
 
 def _plot_family(config, family):
@@ -63,9 +62,9 @@ def _plot_family(config, family):
         t1 = times[env > 0.3*env_max][-1]
 
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
-    tracelines = list()
-    P_bars = list()
-    S_bars = list()
+    tracelines = []
+    P_bars = []
+    S_bars = []
     for n, tr in enumerate(st.sort()):
         average_trace = 'average' in tr.stats.evid
         # Normalize trace between t0 and t1
@@ -76,10 +75,7 @@ def _plot_family(config, family):
         tr.detrend('demean')
         tr.data *= 0.5
         # substract t0, so that time axis starts at 0
-        if average_trace:
-            color = '#cc8800'
-        else:
-            color = 'black'
+        color = '#cc8800' if average_trace else 'black'
         l, = ax.plot(tr.times()-t0, tr.data+n, color=color, linewidth=0.5)
         tracelines.append(l)
         P_arrival = tr.stats.P_arrival_time - tr.stats.starttime - t0
@@ -162,6 +158,7 @@ def _plot_family(config, family):
             bar.set_visible(_toggle_arrivals.visible)
         legend.set_visible(_toggle_arrivals.visible)
         fig.canvas.draw_idle()
+
     _toggle_arrivals.visible = False
 
     def _keypress(event):
@@ -193,6 +190,7 @@ def _plot_family(config, family):
             _keypress.pan_amount = 0
         elif event.key == 'a':
             _toggle_arrivals()
+
     _keypress.zoom_level = 1
     _keypress.time_zoom_level = 1
     _keypress.pan_amount = 0

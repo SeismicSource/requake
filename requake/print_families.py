@@ -27,10 +27,6 @@ def print_families(config):
         logger.error(msg)
         rq_exit(1)
 
-    format_dict = {
-        'simple': 'simple',
-        'markdown': 'github'
-    }
     headers = [
         'family',
         'nevents',
@@ -42,20 +38,9 @@ def print_families(config):
         'duration (y)',
         'slip rate (cm/y)'
     ]
-    floatfmt = [
-        None,
-        None,
-        '.4f',
-        '.4f',
-        '.3f',
-        None,
-        None,
-        '.2f',
-        '.1f'
-    ]
-    table = list()
-    format = config.args.format
-    if format == 'csv':
+    table = []
+    tablefmt = config.args.format
+    if tablefmt == 'csv':
         writer = csv.writer(sys.stdout)
         writer.writerow(headers)
     for family in families:
@@ -75,10 +60,26 @@ def print_families(config):
         slip_rate = d_slip/family.duration
         row.append(slip_rate)
         table.append(row)
-    if format == 'csv':
+    if tablefmt == 'csv':
         writer.writerows(table)
     else:
-        format = format_dict[config.args.format]
-        tab = tabulate(
-            table, headers=headers, floatfmt=floatfmt, tablefmt=format)
-        print(tab)
+        format_dict = {
+            'simple': 'simple',
+            'markdown': 'github'
+        }
+        tablefmt = format_dict[config.args.format]
+        floatfmt = [
+            None,
+            None,
+            '.4f',
+            '.4f',
+            '.3f',
+            None,
+            None,
+            '.2f',
+            '.1f'
+        ]
+        print(
+            tabulate(
+                table, headers=headers, floatfmt=floatfmt, tablefmt=tablefmt)
+        )

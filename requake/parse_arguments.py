@@ -18,20 +18,29 @@ from ._version import get_versions
 def parse_arguments(progname='requake'):
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description='{}: Repeating earthquakes '
-                    'search and analysis.'.format(progname))
+        description=f'{progname}: Repeating earthquakes search and analysis.'
+    )
     subparser = parser.add_subparsers(dest='action')
     parser.add_argument(
-        '-c', '--configfile', type=str, default='{}.conf'.format(progname),
-        help='config file (default: {}.conf)'.format(progname)
+        '-c',
+        '--configfile',
+        type=str,
+        default=f'{progname}.conf',
+        help=f'config file (default: {progname}.conf)',
     )
     parser.add_argument(
-        '-o', '--outdir', type=str, default='{}_out'.format(progname),
-        help='save output to OUTDIR (default: {}_out)'.format(progname)
+        '-o',
+        '--outdir',
+        type=str,
+        default=f'{progname}_out',
+        help=f'save output to OUTDIR (default: {progname}_out)',
     )
     parser.add_argument(
-        '-v', '--version', action='version',
-        version='%(prog)s {}'.format(get_versions()['version']))
+        '-v',
+        '--version',
+        action='version',
+        version=f"%(prog)s {get_versions()['version']}",
+    )
     # --- sample_config
     subparser.add_parser(
         'sample_config',
@@ -183,8 +192,8 @@ def parse_arguments(progname='requake'):
     if args.action is None:
         parser.print_usage(sys.stderr)
         sys.stderr.write(
-            '{}: error: at least one positional argument '
-            'is required\n'.format(progname)
+            f'{progname}: '
+            'error: at least one positional argument is required\n'
         )
         sys.exit(2)
     # Additional code for "longerthan" option
@@ -205,8 +214,8 @@ def parse_arguments(progname='requake'):
         pass
     except ValueError:
         sys.stderr.write(
-            '{} {}: error: argument -l/--longerthan: '
-            "invalid value: '{}'\n".format(progname, args.action, lt)
+            f"{progname} {args.action}: "
+            f"error: argument -l/--longerthan: invalid value: '{lt}'\n"
         )
         sys.exit(2)
     # args.traceid need to exist

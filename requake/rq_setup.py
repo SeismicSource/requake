@@ -8,6 +8,7 @@ Setup functions for Requake.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
+import contextlib
 import sys
 import os
 import shutil
@@ -43,14 +44,14 @@ class Config(dict):
         try:
             return self.__getitem__(key)
         except KeyError as err:
-            raise AttributeError(err)
+            raise AttributeError(err) from err
 
     __setattr__ = __setitem__
 
 
 def _check_library_versions():
     global PYTHON_VERSION_STR
-    PYTHON_VERSION_STR = '{}.{}.{}'.format(*sys.version_info[0:3])
+    PYTHON_VERSION_STR = '{}.{}.{}'.format(*sys.version_info[:3])
     import numpy
     global NUMPY_VERSION_STR
     NUMPY_VERSION_STR = numpy.__version__
@@ -68,10 +69,8 @@ def _setup_logging(config, progname, action_name):
 
     logger_root = logging.getLogger()
     # captureWarnings is not supported in old versions of python
-    try:
+    with contextlib.suppress(Exception):
         logging.captureWarnings(True)
-    except Exception:
-        pass
     logger_root.setLevel(logging.DEBUG)
 
     # Actions that will produce a logfile
@@ -84,8 +83,7 @@ def _setup_logging(config, progname, action_name):
         if not os.path.exists(config.args.outdir):
             os.makedirs(config.args.outdir)
         logfile = os.path.join(
-            config.args.outdir,
-            '{}.{}.log'.format(progname, action_name))
+            config.args.outdir, f'{progname}.{action_name}.log')
         filehand = logging.FileHandler(filename=logfile, mode='a')
         filehand.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(asctime)s %(name)-20s '
@@ -93,7 +91,6 @@ def _setup_logging(config, progname, action_name):
         filehand.setFormatter(formatter)
         logger_root.addHandler(filehand)
 
-    # tqdm compatible console handler
     class TqdmLoggingHandler(logging.Handler):
         def __init__(self, level=logging.NOTSET):
             super().__init__(level)
@@ -111,12 +108,12 @@ def _setup_logging(config, progname, action_name):
 
     logger = logging.getLogger(progname)
 
-    logger.debug('{} START'.format(progname))
-    logger.debug('{} version: {}'.format(progname, get_versions()['version']))
-    logger.debug('Python version: ' + PYTHON_VERSION_STR)
-    logger.debug('NumPy version: ' + NUMPY_VERSION_STR)
-    logger.debug('SciPy version: ' + SCIPY_VERSION_STR)
-    logger.debug('ObsPy version: ' + OBSPY_VERSION_STR)
+    logger.debug(f'{progname} START')
+    logger.debug(f"{progname} version: {get_versions()['version']}")
+    logger.debug(f'Python version: {PYTHON_VERSION_STR}')
+    logger.debug(f'NumPy version: {NUMPY_VERSION_STR}')
+    logger.debug(f'SciPy version: {SCIPY_VERSION_STR}')
+    logger.debug(f'ObsPy version: {OBSPY_VERSION_STR}')
     logger.debug('Running arguments:')
     logger.debug(' '.join(sys.argv))
 
@@ -124,19 +121,18 @@ def _setup_logging(config, progname, action_name):
 def _connect_fdsn_station_dataselect(config):
     """Connect to FDSN station and dataselect services."""
     config.fdsn_station_client = Client(config.fdsn_station_url)
-    logger.info('Connected to FDSN station server: {}'.format(
-        config.fdsn_station_url))
+    logger.info(f'Connected to FDSN station server: {config.fdsn_station_url}')
     config.fdsn_dataselect_client = Client(config.fdsn_dataselect_url)
-    logger.info('Connected to FDSN dataselect server: {}'.format(
-        config.fdsn_dataselect_url))
+    logger.info(
+        f'Connected to FDSN dataselect server: {config.fdsn_dataselect_url}'
+    )
 
 
 def _parse_catalog_options(config):
     """Parse catalog options into lists."""
-    config.catalog_fdsn_event_urls = list()
-    config.catalog_start_times = list()
-    config.catalog_end_times = list()
-    config.catalog_fdsn_event_urls.append(config.catalog_fdsn_event_url)
+    config.catalog_start_times = []
+    config.catalog_end_times = []
+    config.catalog_fdsn_event_urls = [config.catalog_fdsn_event_url]
     config.catalog_start_times.append(
         UTCDateTime(config.catalog_start_time))
     config.catalog_end_times.append(
@@ -156,10 +152,10 @@ def _parse_catalog_options(config):
 
 def _connect_fdsn_catalog(config):
     """Connect to FDSN catalog services."""
-    config.catalog_fdsn_event_clients = list()
+    config.catalog_fdsn_event_clients = []
     for url in config.catalog_fdsn_event_urls:
         config.catalog_fdsn_event_clients.append(Client(url))
-        logger.info('Connected to FDSN event server: {}'.format(url))
+        logger.info(f'Connected to FDSN event server: {url}')
 
 
 def configure(args):
@@ -231,9 +227,9 @@ def rq_exit(retval=0, abort=False, progname='requake'):
     """Exit as gracefully as possible."""
     if abort:
         print('\nAborting.')
-        logger.debug('{} ABORTED\n\n'.format(progname))
+        logger.debug(f'{progname} ABORTED\n\n')
     else:
-        logger.debug('{} END\n\n'.format(progname))
+        logger.debug(f'{progname} END\n\n')
     logging.shutdown()
     sys.exit(retval)
 
