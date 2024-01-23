@@ -14,16 +14,26 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 def _mag_to_moment(magnitude, unit='N.m'):
     if unit == 'N.m':
-        Mo = 10**(3/2*(magnitude+6.07))
+        moment = 10**(3/2*(magnitude+6.07))
     elif unit == 'dyne.cm':
-        Mo = 10**(3/2*(magnitude+10.7))
+        moment = 10**(3/2*(magnitude+10.7))
     else:
         raise ValueError(f'Wrong unit for seismic moment: {unit}')
-    return Mo
+    return moment
 
 
 def mag_to_slip_in_cm(config, magnitude):
-    Mo = _mag_to_moment(magnitude, unit='dyne.cm')
+    """
+    Convert magnitude to slip in cm.
+
+    :param config: requake configuration object
+    :config type: config.Config
+    :param magnitude: earthquake magnitude
+    :type magnitude: float
+    :returns: slip in cm
+    :rtype: float
+    """
+    moment = _mag_to_moment(magnitude, unit='dyne.cm')
     # TODO: add other laws via config parameter
     # Nadeau and Johnson (1998)
-    return (10**(-2.36))*(Mo**(0.17))
+    return (10**(-2.36))*(moment**(0.17))

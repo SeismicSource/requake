@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 def _read_pairs(config):
     pairs = []
-    with open(config.scan_catalog_pairs_file, 'r') as fp:
+    with open(config.scan_catalog_pairs_file, 'r', encoding='utf8') as fp:
         reader = csv.DictReader(fp)
         for row in reader:
             cc_max = float(row['cc_max'])
@@ -50,6 +50,12 @@ def _read_pairs(config):
 
 
 def build_families(config):
+    """
+    Build families of repeating earthquakes from a catalog of pairs.
+
+    :param config: configuration object
+    :type config: config.Config
+    """
     # Check options
     sort_by = config.sort_families_by
     lon0, lat0 = config.distance_from_lon, config.distance_from_lat
@@ -89,7 +95,7 @@ def build_families(config):
         'distance_from': lambda f: f.distance_from(lon0, lat0)
     }
     families = sorted(families, key=sort_keys[sort_by])
-    with open(config.build_families_outfile, 'w') as fp_out:
+    with open(config.build_families_outfile, 'w', encoding='utf-8') as fp_out:
         fieldnames = [
             'evid', 'trace_id', 'orig_time', 'lon', 'lat', 'depth_km',
             'mag_type', 'mag', 'family_number', 'valid'

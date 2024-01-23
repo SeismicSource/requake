@@ -18,35 +18,17 @@ import signal
 from obspy import UTCDateTime
 from obspy.clients.fdsn import Client
 from ._version import get_versions
+from .config import Config
 from .utils import (
     parse_configspec, read_config, validate_config, write_sample_config,
     write_ok
 )
-
 
 logger = None
 PYTHON_VERSION_STR = None
 NUMPY_VERSION_STR = None
 SCIPY_VERSION_STR = None
 OBSPY_VERSION_STR = None
-
-
-class Config(dict):
-    """A class to access config values with dot notation."""
-
-    def __setitem__(self, key, value):
-        """Make Config keys accessible as attributes."""
-        super(Config, self).__setattr__(key, value)
-        super(Config, self).__setitem__(key, value)
-
-    def __getattr__(self, key):
-        """Make Config keys accessible as attributes."""
-        try:
-            return self.__getitem__(key)
-        except KeyError as err:
-            raise AttributeError(err) from err
-
-    __setattr__ = __setitem__
 
 
 def _check_library_versions():
@@ -138,12 +120,12 @@ def _parse_catalog_options(config):
     config.catalog_end_times.append(
         UTCDateTime(config.catalog_end_time))
     for n in 1, 2, 3:
-        url = config['catalog_fdsn_event_url_{:1d}'.format(n)]
+        url = config[f'catalog_fdsn_event_url_{n:1d}']
         if url is None:
             continue
         config.catalog_fdsn_event_urls.append(url)
-        start_time = config['catalog_start_time_{:1d}'.format(n)]
-        end_time = config['catalog_end_time_{:1d}'.format(n)]
+        start_time = config[f'catalog_start_time_{n:1d}']
+        end_time = config[f'catalog_end_time_{n:1d}']
         if start_time is None or end_time is None:
             continue
         config.catalog_start_times.append(UTCDateTime(start_time))
@@ -234,7 +216,7 @@ def rq_exit(retval=0, abort=False, progname='requake'):
     sys.exit(retval)
 
 
-def sigint_handler(sig, frame):
+def sigint_handler(_sig, _frame):
     """Abort gracefully."""
     rq_exit(1, abort=True)
 

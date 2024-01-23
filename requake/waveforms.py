@@ -167,7 +167,16 @@ old_cache_key = None
 
 
 def get_waveform_pair(config, pair):
-    """Download traces for a given pair."""
+    """
+    Download traces for a given pair.
+
+    :param config: requake config object
+    :type config: config.Config
+    :param pair: pair of events
+    :type pair: tuple of RequakeEvent
+    :return: stream containing the two traces
+    :rtype: obspy.Stream
+    """
     if config.inventory is None:
         _get_metadata(config)
     ev1, ev2 = pair

@@ -46,9 +46,8 @@ class CachedTiler(object):
         tile_fname = os.path.join(
             cache_dir, '_'.join(str(v) for v in tile) + '.png')
         if not os.path.exists(tile_fname):
-            response = requests.get(self._image_url(tile),
-                                    stream=True)
-
+            response = requests.get(
+                self._image_url(tile), stream=True, timeout=30)
             with open(tile_fname, "wb") as fh:
                 for chunk in response:
                     fh.write(chunk)

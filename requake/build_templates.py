@@ -48,6 +48,12 @@ def _build_template(config, family):
 
 
 def build_templates(config):
+    """
+    Build waveform templates for one or more event families.
+
+    :param config: requake configuration object
+    :type config: config.Config
+    """
     try:
         families = read_selected_families(config)
     except Exception as m:

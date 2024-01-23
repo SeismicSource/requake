@@ -16,16 +16,27 @@ model = TauPyModel(model='ak135')
 
 
 def get_arrivals(trace_lat, trace_lon, ev_lat, ev_lon, ev_depth):
+    """
+    Compute P and S arrivals for a given trace and event.
+
+    :param trace_lat: trace latitude
+    :param trace_lon: trace longitude
+    :param ev_lat: event latitude
+    :param ev_lon: event longitude
+    :param ev_depth: event depth
+    :return: P and S arrivals, distance (km), distance (deg)
+    :rtype: tuple
+    """
     dist_deg = locations2degrees(trace_lat, trace_lon, ev_lat, ev_lon)
     distance, _, _ = gps2dist_azimuth(
         trace_lat, trace_lon, ev_lat, ev_lon)
     distance /= 1e3
-    P_arrivals = model.get_travel_times(
+    p_arrivals = model.get_travel_times(
         source_depth_in_km=ev_depth,
         distance_in_degree=dist_deg,
         phase_list=['p', 'P'])
-    S_arrivals = model.get_travel_times(
+    s_arrivals = model.get_travel_times(
         source_depth_in_km=ev_depth,
         distance_in_degree=dist_deg,
         phase_list=['s', 'S'])
-    return P_arrivals[0], S_arrivals[0], distance, dist_deg
+    return p_arrivals[0], s_arrivals[0], distance, dist_deg

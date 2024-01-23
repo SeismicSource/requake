@@ -85,7 +85,7 @@ def _scan_family_template(config, template, catalog_file, t0, t1):
         cc_max, p_arrival_absolute_time = _cc_detection(
             config, tr, template, lag_sec)
         ev = _build_event(tr, template, p_arrival_absolute_time)
-        catalog_file.write('{}|{:.2f}\n'.format(ev.fdsn_text(), cc_max))
+        catalog_file.write(f'{ev.fdsn_text()}|{cc_max:.2f}\n')
         catalog_file.flush()
 
 
@@ -112,9 +112,7 @@ def _read_templates(config):
     templates = []
     for family in families:
         trace_id = family[0].trace_id
-        template_file = 'template{:02d}.{}.sac'.format(
-            family.number, trace_id
-        )
+        template_file = f'template{family.number:02d}.{trace_id}.sac'
         template_file = os.path.join(config.template_dir, template_file)
         try:
             tr = read(template_file)[0]
@@ -133,19 +131,23 @@ def _template_catalog_files(config, templates):
         )
         if not os.path.exists(template_catalog_dir):
             os.makedirs(template_catalog_dir)
-        template_signature = '{:02d}.{}'.format(
-            template.stats.family_number, template.id
-        )
+        template_signature =\
+            f'{template.stats.family_number:02d}.{template.id}'
         template_catalog_file_name = os.path.join(
             template_catalog_dir, f'catalog{template_signature}.txt'
         )
         catalog_files[template_signature] = open(
-            template_catalog_file_name, 'w')
+            template_catalog_file_name, 'w', encoding='utf-8')
     return catalog_files
 
 
 def scan_templates(config):
-    """Scan a continuous waveform stream using one or more templates."""
+    """
+    Scan a continuous waveform stream using one or more templates.
+
+    :param config: Configuration object.
+    :type config: config.Config
+    """
     try:
         templates = _read_templates(config)
         catalog_files = _template_catalog_files(config, templates)
@@ -158,9 +160,8 @@ def scan_templates(config):
     global trace_cache
     while time <= config.template_end_time:
         for template in templates:
-            template_signature = '{:02d}.{}'.format(
-                template.stats.family_number, template.id
-            )
+            template_signature =\
+                f'{template.stats.family_number:02d}.{template.id}'
             catalog_file = catalog_files[template_signature]
             try:
                 t0 = time

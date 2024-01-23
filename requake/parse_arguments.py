@@ -16,7 +16,14 @@ from ._version import get_versions
 
 
 def parse_arguments(progname='requake'):
-    """Parse command line arguments."""
+    """
+    Parse command line arguments.
+
+    :param progname: Program name (default: "requake").
+    :type progname: str
+    :return: Parsed arguments.
+    :rtype: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(
         description=f'{progname}: Repeating earthquakes search and analysis.'
     )

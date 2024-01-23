@@ -8,10 +8,10 @@ Print families to screen.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
-import logging
-import numpy as np
 import sys
 import csv
+import logging
+import numpy as np
 from tabulate import tabulate
 from .families import read_selected_families
 from .rq_setup import rq_exit
@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def print_families(config):
+    """
+    Print families to screen.
+
+    :param config: Configuration object.
+    :type config: config.Config
+    """
     try:
         families = read_selected_families(config)
     except Exception as msg:

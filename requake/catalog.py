@@ -30,20 +30,21 @@ class RequakeEvent():
     trace_id field.
     """
 
-    evid = None
-    orig_time = None
-    lon = None
-    lat = None
-    depth = None
-    mag_type = None
-    mag = None
-    author = None
-    catalog = None
-    contributor = None
-    contributor_id = None
-    mag_author = None
-    location_name = None
-    trace_id = None
+    def __init__(self):
+        self.evid = None
+        self.orig_time = None
+        self.lon = None
+        self.lat = None
+        self.depth = None
+        self.mag_type = None
+        self.mag = None
+        self.author = None
+        self.catalog = None
+        self.contributor = None
+        self.contributor_id = None
+        self.mag_author = None
+        self.location_name = None
+        self.trace_id = None
 
     def __eq__(self, other):
         return self.evid == other.evid and self.trace_id == other.trace_id
@@ -67,6 +68,12 @@ class RequakeEvent():
         return f'{self.evid} {self.orig_time} {self.mag_type} {self.mag}'
 
     def from_fdsn_text(self, line):
+        """
+        Initialize from a line in FDSN text file format.
+
+        :param line: a line in FDSN text file format
+        :type line: str
+        """
         word = line.split('|')
         self.evid = word[0]
         self.orig_time = UTCDateTime(word[1])
@@ -83,6 +90,12 @@ class RequakeEvent():
         self.location_name = word[12]
 
     def fdsn_text(self):
+        """
+        Return a string in FDSN text file format.
+
+        :return: a string in FDSN text file format
+        :rtype: str
+        """
         fields = (
             self.evid,
             self.orig_time.strftime('%Y-%m-%dT%H:%M:%S'),
@@ -108,7 +121,13 @@ class RequakeCatalog(list):
         return '\n'.join(str(ev) for ev in self)
 
     def write(self, filename):
-        with open(filename, 'w') as fp:
+        """
+        Write in FDSN text file format.
+
+        :param filename: output filename
+        :type filename: str
+        """
+        with open(filename, 'w', encoding='utf8') as fp:
             for ev in self:
                 fp.write(ev.fdsn_text() + '\n')
 
@@ -124,7 +143,39 @@ def get_events(
     """
     Download from a fdsn-event webservice using text format.
 
-    Returns a RequakeCatalog object.
+    :param baseurl: base URL of the fdsn-event webservice
+    :type baseurl: str
+    :param starttime: start time
+    :type starttime: obspy.UTCDateTime or str
+    :param endtime: end time
+    :type endtime: obspy.UTCDateTime or str
+    :param minlatitude: minimum latitude
+    :type minlatitude: float
+    :param maxlatitude: maximum latitude
+    :type maxlatitude: float
+    :param minlongitude: minimum longitude
+    :type minlongitude: float
+    :param maxlongitude: maximum longitude
+    :type maxlongitude: float
+    :param latitude: latitude of radius center
+    :type latitude: float
+    :param longitude: longitude of radius center
+    :type longitude: float
+    :param minradius: minimum radius
+    :type minradius: float
+    :param maxradius: maximum radius
+    :type maxradius: float
+    :param mindepth: minimum depth
+    :type mindepth: float
+    :param maxdepth: maximum depth
+    :type maxdepth: float
+    :param minmagnitude: minimum magnitude
+    :type minmagnitude: float
+    :param maxmagnitude: maximum magnitude
+    :type maxmagnitude: float
+
+    :return: a RequakeCatalog object
+    :rtype: RequakeCatalog
     """
     arguments = locals()
     query = 'query?format=text&nodata=404&'
@@ -164,10 +215,14 @@ def read_events(filename):
     """
     Read events in FDSN text file format.
 
-    Returns a RequakeCatalog object.
+    :param filename: input filename
+    :type filename: str
+
+    :return: a RequakeCatalog object
+    :rtype: RequakeCatalog
     """
     cat = RequakeCatalog()
-    for line in open(filename, 'r'):
+    for line in open(filename, 'r', encoding='utf8'):
         if not line:
             continue
         if line[0] == '#':
@@ -179,7 +234,15 @@ def read_events(filename):
 
 
 def _base26(val):
-    """Represent value using 6 characters from latin alphabet (26 chars)."""
+    """
+    Represent value using 6 characters from latin alphabet (26 chars).
+
+    :param val: value to represent
+    :type val: int
+
+    :return: a string of 6 characters from latin alphabet
+    :rtype: str
+    """
     chars = [
       'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
       'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
@@ -196,7 +259,15 @@ def _base26(val):
 
 
 def generate_evid(orig_time):
-    """Generate an event id from origin time."""
+    """
+    Generate an event id from origin time.
+
+    :param orig_time: origin time
+    :type orig_time: obspy.UTCDateTime
+
+    :return: an event id
+    :rtype: str
+    """
     prefix = 'reqk'
     year = orig_time.year
     orig_year = UTCDateTime(year=year, month=1, day=1)

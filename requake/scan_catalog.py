@@ -11,9 +11,9 @@ Catalog-based repeater scan for Requake.
 import contextlib
 import logging
 import csv
-from tqdm import tqdm
 from math import factorial
 from itertools import combinations
+from tqdm import tqdm
 from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeCatalog, get_events, read_events
 from .waveforms import get_waveform_pair, cc_waveform_pair
@@ -74,7 +74,6 @@ def _pair_ok(config, pair):
     return distance <= config.catalog_search_range
 
 
-# TODO Rename this here and in `scan_catalog`
 def _process_pairs(fp_out, nevents, catalog, config):
     """Process event pairs."""
     fieldnames = [
@@ -93,11 +92,13 @@ def _process_pairs(fp_out, nevents, catalog, config):
             if not _pair_ok(config, pair):
                 continue
             try:
-                st = get_waveform_pair(config, pair)
-                lag, lag_sec, cc_max = cc_waveform_pair(config, st[0], st[1])
-                stats1, stats2 = [tr.stats for tr in st]
+                pair_st = get_waveform_pair(config, pair)
+                tr1, tr2 = pair_st.traces
+                lag, lag_sec, cc_max = cc_waveform_pair(config, tr1, tr2)
+                stats1 = tr1.stats
+                stats2 = tr2.stats
                 writer.writerow([
-                    stats1.evid, stats2.evid, st[0].id,
+                    stats1.evid, stats2.evid, tr1.id,
                     stats1.orig_time, stats1.ev_lon, stats1.ev_lat,
                     stats1.ev_depth, stats1.mag_type, stats1.mag,
                     stats2.orig_time, stats2.ev_lon, stats2.ev_lat,
@@ -112,12 +113,17 @@ def _process_pairs(fp_out, nevents, catalog, config):
 
 
 def scan_catalog(config):
-    """Perform cross-correlation on catalog events."""
+    """
+    Perform cross-correlation on catalog events.
+
+    :param config: Configuration object.
+    :type config: config.Config
+    """
     catalog = _get_catalog(config)
     nevents = len(catalog)
     logger.info('Building event pairs...')
     logger.info('Computing waveform cross-correlation...')
-    with open(config.scan_catalog_pairs_file, 'w') as fp_out:
+    with open(config.scan_catalog_pairs_file, 'w', encoding='utf-8') as fp_out:
         npairs = _process_pairs(fp_out, nevents, catalog, config)
     logger.info(f'Processed {npairs:n} event pairs')
     logger.info(f'Done! Output written to {config.scan_catalog_pairs_file}')

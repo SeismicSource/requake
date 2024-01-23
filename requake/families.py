@@ -20,14 +20,18 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 class Family(list):
-    lon = None
-    lat = None
-    depth = None  # km
-    starttime = None
-    endtime = None
-    duration = None  # years
-    number = None
-    valid = True
+    """
+    A list of events belonging to the same family.
+    """
+    def __init__(self):
+        self.lon = None
+        self.lat = None
+        self.depth = None  # km
+        self.starttime = None
+        self.endtime = None
+        self.duration = None  # years
+        self.number = None
+        self.valid = True
 
     def __str__(self):
         return (
@@ -37,6 +41,12 @@ class Family(list):
         )
 
     def append(self, ev):
+        """
+        Append an event to the family and update family attributes.
+
+        :param ev: Event to append.
+        :type ev: RequakeEvent
+        """
         if ev in self:
             return
         super().append(ev)
@@ -49,48 +59,78 @@ class Family(list):
         year = 365*24*60*60
         self.duration = (self.endtime - self.starttime)/year
 
-    def extend(self, item):
-        for ev in item:
+    def extend(self, ev_list):
+        """
+        Extend the family with a list of events.
+
+        :param ev_list: List of events to append.
+        :type ev_list: list of RequakeEvent
+        """
+        for ev in ev_list:
             self.append(ev)
 
     def distance_from(self, lon, lat):
+        """
+        Return the distance in km from the family to a given point.
+
+        :param lon: Longitude of the point.
+        :type lon: float
+        :param lat: Latitude of the point.
+        :type lat: float
+        :return: Distance in km.
+        :rtype: float
+        """
         distance, _, _ = gps2dist_azimuth(self.lat, self.lon, lat, lon)
         return distance/1e3
 
 
 def read_families(config):
-    """Read a list of families from file."""
-    fp = open(config.build_families_outfile, 'r')
-    reader = csv.DictReader(fp)
-    old_family_number = -1
-    families = []
-    family = None
-    for row in reader:
-        ev = RequakeEvent()
-        ev.evid = row['evid']
-        ev.orig_time = UTCDateTime(row['orig_time'])
-        ev.lon = float(row['lon'])
-        ev.lat = float(row['lat'])
-        ev.depth = float(row['depth_km'])
-        ev.mag_type = row['mag_type']
-        ev.mag = float(row['mag'])
-        ev.trace_id = row['trace_id']
-        family_number = int(row['family_number'])
-        if family_number != old_family_number:
-            if family is not None:
-                families.append(family)
-            family = Family()
-            family.number = family_number
-            old_family_number = family_number
-        family.append(ev)
-        family.valid = row['valid'] in ['True', 'true']
-    # append last family
-    families.append(family)
+    """
+    Read a list of families from file.
+
+    :param config: requake configuration object
+    :type config: config.Config
+    :return: List of families.
+    :rtype: list of Family
+    """
+    with open(config.build_families_outfile, 'r', encoding='utf-8') as fp:
+        reader = csv.DictReader(fp)
+        old_family_number = -1
+        families = []
+        family = None
+        for row in reader:
+            ev = RequakeEvent()
+            ev.evid = row['evid']
+            ev.orig_time = UTCDateTime(row['orig_time'])
+            ev.lon = float(row['lon'])
+            ev.lat = float(row['lat'])
+            ev.depth = float(row['depth_km'])
+            ev.mag_type = row['mag_type']
+            ev.mag = float(row['mag'])
+            ev.trace_id = row['trace_id']
+            family_number = int(row['family_number'])
+            if family_number != old_family_number:
+                if family is not None:
+                    families.append(family)
+                family = Family()
+                family.number = family_number
+                old_family_number = family_number
+            family.append(ev)
+            family.valid = row['valid'] in ['True', 'true']
+        # append last family
+        families.append(family)
     return families
 
 
 def read_selected_families(config):
-    """Read and select families based on family number, validity and length."""
+    """
+    Read and select families based on family number, validity and length.
+
+    :param config: requake configuration object
+    :type config: config.Config
+    :return: List of families.
+    :rtype: list of Family
+    """
     family_numbers = _build_family_number_list(config)
     families = read_families(config)
     families_selected = []
@@ -113,7 +153,18 @@ def read_selected_families(config):
 
 
 def get_family(config, families, family_number):
-    """Get a given family from a list of families."""
+    """
+    Get a given family from a list of families.
+
+    :param config: requake configuration object
+    :type config: config.Config
+    :param families: List of families.
+    :type families: list of Family
+    :param family_number: Family number.
+    :type family_number: int
+    :return: The family.
+    :rtype: Family
+    """
     for family in families:
         if family.number != family_number:
             continue
@@ -129,7 +180,16 @@ def get_family(config, families, family_number):
 
 
 def get_family_waveforms(config, family):
-    """Get waveforms for a given family."""
+    """
+    Get waveforms for a given family.
+
+    :param config: requake configuration object
+    :type config: config.Config
+    :param family: The family.
+    :type family: Family
+    :return: The waveforms.
+    :rtype: obspy.Stream
+    """
     st = Stream()
     for ev in family:
         try:
@@ -143,7 +203,16 @@ def get_family_waveforms(config, family):
 
 
 def get_family_aligned_waveforms_and_template(config, family):
-    """Get aligned waveforms and template for a given family."""
+    """
+    Get aligned waveforms and template for a given family.
+
+    :param config: requake configuration object
+    :type config: config.Config
+    :param family: The family.
+    :type family: Family
+    :return: An obspy stream containing the aligned waveforms and the template.
+    :rtype: obspy.Stream
+    """
     st = get_family_waveforms(config, family)
     align_traces(config, st)
     build_template(config, st, family)
@@ -154,7 +223,7 @@ def _build_family_number_list(config):
     """Build a list of family numbers from config option."""
     family_numbers = config.args.family_numbers
     if family_numbers == 'all':
-        with open(config.build_families_outfile, 'r') as fp:
+        with open(config.build_families_outfile, 'r', encoding='utf-8') as fp:
             reader = csv.DictReader(fp)
             fn = sorted({int(row['family_number']) for row in reader})
         return fn
