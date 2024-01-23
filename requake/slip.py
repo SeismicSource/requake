@@ -9,8 +9,7 @@ Functions to compute slip for repeaters.
     (http://www.cecill.info/index.en.html)
 """
 import logging
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def _mag_to_moment(magnitude, unit='N.m'):

@@ -18,8 +18,7 @@ import numpy as np
 from .families import read_selected_families
 from .slip import mag_to_slip_in_cm
 from .rq_setup import rq_exit
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)

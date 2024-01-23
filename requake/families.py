@@ -16,8 +16,7 @@ from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeEvent
 from .waveforms import (
     get_event_waveform, align_traces, build_template)
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 class Family(list):

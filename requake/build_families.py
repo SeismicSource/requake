@@ -14,8 +14,7 @@ from obspy import UTCDateTime
 from .catalog import RequakeEvent
 from .families import Family
 from .rq_setup import rq_exit
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def _read_pairs(config):

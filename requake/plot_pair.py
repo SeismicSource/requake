@@ -15,8 +15,7 @@ import matplotlib.pyplot as plt
 from .rq_setup import rq_exit
 from .catalog import get_events, read_events
 from .waveforms import get_waveform_pair, process_waveforms, align_pair
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)

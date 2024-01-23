@@ -16,8 +16,7 @@ from tabulate import tabulate
 from .families import read_selected_families
 from .rq_setup import rq_exit
 from .slip import mag_to_slip_in_cm
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def print_families(config):

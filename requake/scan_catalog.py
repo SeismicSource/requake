@@ -18,8 +18,7 @@ from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeCatalog, get_events, read_events
 from .waveforms import get_waveform_pair, cc_waveform_pair
 from .rq_setup import rq_exit
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def _get_catalog(config):

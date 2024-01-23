@@ -18,8 +18,7 @@ from .arrivals import get_arrivals
 from .catalog import RequakeEvent, generate_evid
 from ._version import get_versions
 from .rq_setup import rq_exit
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 trace_cache = {}
 
 

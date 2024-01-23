@@ -11,8 +11,7 @@ Functions for computing P and S arrivals.
 import logging
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 model = TauPyModel(model='ak135')
 
 

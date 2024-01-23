@@ -14,8 +14,7 @@ from .families import (
     read_selected_families,
     get_family_aligned_waveforms_and_template)
 from .rq_setup import rq_exit
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def _build_template(config, family):

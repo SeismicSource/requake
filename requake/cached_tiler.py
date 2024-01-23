@@ -6,10 +6,9 @@ https://github.com/SciTools/cartopy/issues/732#issuecomment-191423035
 """
 import os
 import types
+import logging
 import requests
 import PIL
-import logging
-
 PIL_logger = logging.getLogger('PIL')
 PIL_logger.setLevel(logging.WARNING)
 

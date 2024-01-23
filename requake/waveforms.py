@@ -19,8 +19,7 @@ from obspy.signal.cross_correlation import correlate, xcorr_max
 from scipy.stats import median_abs_deviation
 from .arrivals import get_arrivals
 from .rq_setup import rq_exit
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 model = TauPyModel(model='ak135')
 
 

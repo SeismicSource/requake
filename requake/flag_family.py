@@ -12,8 +12,7 @@ import logging
 import csv
 import shutil
 from tempfile import NamedTemporaryFile
-
-logger = logging.getLogger(__name__.split('.')[-1])
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def flag_family(config):
