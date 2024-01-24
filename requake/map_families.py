@@ -70,8 +70,10 @@ def map_families(config):
         fn = family.number
         nevents = len(family)
         duration = (family.endtime - family.starttime)/(365*24*60*60)
-        label = 'Family {}\n{} evts\n{:.1f} yrs\nZ {:.1f} km'.format(
-            fn, nevents, duration, family.depth)
+        label = (
+            f'Family {fn}\n{nevents} evts\n{duration:.1f} yrs\n'
+            f'Z {family.depth:.1f} km'
+        )
         marker = ax.scatter(
             family.lon, family.lat,
             marker='o', s=100,

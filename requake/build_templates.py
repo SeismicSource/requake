@@ -25,9 +25,7 @@ def _build_template(config, family):
         return
     tr_template = [tr for tr in st if 'average' in tr.stats.evid][0]
     os.makedirs(config.template_dir, exist_ok=True)
-    template_file = 'template{:02d}.{}.sac'.format(
-        family.number, tr_template.id
-    )
+    template_file = f'template{family.number:02d}.{tr_template.id}.sac'
     template_file = os.path.join(config.template_dir, template_file)
     tr_template.stats.sac = dict(
         kevnm=tr_template.stats.evid,

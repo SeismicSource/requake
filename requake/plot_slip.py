@@ -48,8 +48,10 @@ def plot_slip(config):
     lines = []
     for family in families:
         fn = family.number
-        label = 'Family {}\n{:.1f}°E {:.1f}°N {:.1f} km'.format(
-            fn, family.lon, family.lat, family.depth)
+        label = (
+            f'Family {fn}\n{family.lon:.1f}°E {family.lat:.1f}°N '
+            f'{family.depth:.1f} km'
+        )
         times = [ev.orig_time.matplotlib_date for ev in family]
         slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
         cum_slip = np.cumsum(slip)

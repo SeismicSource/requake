@@ -87,14 +87,17 @@ def _plot_family(config, family):
         trans = ax.get_yaxis_transform()
         if average_trace:
             y_label = 'average'
-            info_text = '{:.4f}°E {:.4f}°N {:.3f} km'.format(
-                tr.stats.ev_lon, tr.stats.ev_lat, tr.stats.ev_depth)
+            info_text = (
+                f'{tr.stats.ev_lon:.4f}°E {tr.stats.ev_lat:.4f}°N '
+                f'{tr.stats.ev_depth:.3f} km'
+            )
         else:
             y_label = tr.stats.orig_time.strftime('%Y-%m-%d\n%H:%M:%S')
-            info_text = '{} {} {:.1f}\n'.format(
-                tr.stats.evid, tr.stats.mag_type, tr.stats.mag)
-            info_text += '{:.4f}°E {:.4f}°N {:.3f} km'.format(
-                tr.stats.ev_lon, tr.stats.ev_lat, tr.stats.ev_depth)
+            info_text = (
+                f'{tr.stats.evid} {tr.stats.mag_type} {tr.stats.mag:.1f}\n'
+                f'{tr.stats.ev_lon:.4f}°E {tr.stats.ev_lat:.4f}°N '
+                f'{tr.stats.ev_depth:.3f} km'
+            )
         ax.text(
             -0.01, n, y_label, transform=trans, ha='right', va='center',
             color=color, fontsize=8, linespacing=1.5)
@@ -104,7 +107,7 @@ def _plot_family(config, family):
         txt.set_path_effects(
             [PathEffects.withStroke(linewidth=3, foreground='w')])
         if not average_trace:
-            text = 'CC mean {:.2f}'.format(tr.stats.cc_mean)
+            text = f'CC mean {tr.stats.cc_mean:.2f}'
             txt = ax.text(
                 0.98, n+0.2, text, ha='right',
                 color=color, transform=trans, fontsize=8)
@@ -121,11 +124,13 @@ def _plot_family(config, family):
     ax.tick_params(axis='x', which='both', direction='in')
     ax.set_xlim(0, t1-t0)
     ax.set_xlabel('Time (s)')
-    title = 'Family {} | {} events'.format(family.number, len(st)-1)
+    title = f'Family {family.number} | {len(st)-1} events'
     ax.set_title(title, loc='left')
     fig.canvas.manager.set_window_title(title)
-    title = '{} | {:.1f} km | {:.1f}-{:.1f} Hz'.format(
-        tr0.id, tr0.stats.distance, config.cc_freq_min, config.cc_freq_max)
+    title = (
+        f'{tr0.id} | {tr0.stats.distance:.1f} km | '
+        f'{config.cc_freq_min:.1f}-{config.cc_freq_max:.1f} Hz'
+    )
     ax.set_title(title, loc='right')
 
     def _zoom_lines(zoom_level):

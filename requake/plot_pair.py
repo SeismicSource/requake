@@ -63,9 +63,9 @@ def plot_pair(config):
     st.normalize()
     tr1, tr2 = st
     logger.info(
-        '{} {} -- lag: {} lag_sec: {:.1f} cc_max: {:.2f}'.format(
-            tr1.stats.evid, tr2.stats.evid, lag, lag_sec, cc_max
-        ))
+        f'{tr1.stats.evid} {tr2.stats.evid} -- '
+        f'lag: {lag} lag_sec: {lag_sec:.1f} cc_max: {cc_max:.2f}'
+    )
     fig, ax = plt.subplots(
         2, 1, figsize=(12, 6), sharex=True, sharey=True)
     title = f'{tr1.stats.evid}-{tr2.stats.evid}'
