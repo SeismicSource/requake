@@ -4,14 +4,17 @@
 Main script for Requake.
 
 :copyright:
-    2021-2022 Claudio Satriano <satriano@ipgp.fr>
+    2021-2024 Claudio Satriano <satriano@ipgp.fr>
 :license:
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
+# Note: modules are lazily imported to speed up the startup time.
+# pylint: disable=relative-beyond-top-level,import-outside-toplevel
 
 
 def main():
+    """Main function for Requake."""
     from ..parse_arguments import parse_arguments
     args = parse_arguments()
     from ..rq_setup import configure, rq_exit
