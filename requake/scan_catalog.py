@@ -27,8 +27,11 @@ def _get_catalog(config):
 
     Reads a cached catalog file, if available.
     """
-    with contextlib.suppress(Exception):
+    with contextlib.suppress(FileNotFoundError):
         cat = read_events(config.scan_catalog_file)
+        logger.info(
+            f'An existing catalog file was found at {config.scan_catalog_file}'
+        )
         logger.info(f'{len(cat)} events read from catalog file')
         return cat
     logger.info('Downloading events...')
