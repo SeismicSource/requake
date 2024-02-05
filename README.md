@@ -18,7 +18,9 @@ Requake is written in Python and uses [ObsPy](https://obspy.org) as backend.
 
 ## Installation
 
-### Using pip and PyPI (preferred method)
+### Installing the latest release
+
+#### Using pip and PyPI (preferred method)
 
 The latest release of Requake is available on the
 [Python Package Index](https://pypi.org/project/requake/).
@@ -27,28 +29,45 @@ You can install it easily through `pip`:
 
     pip install requake
 
+### Installing a development snapshot
 
-### From the Requake GitHub repository
-
-If you need an unreleased feature, or if you want to play with the source
-code, you can pull the most recent code from the
+If you need a recent feature that is not in the latest release (see the
+`unreleased` section in [CHANGELOG](CHANGELOG.md)), you want to use the more
+recent development snapshot from the
 [Requake GitHub repository](https://github.com/SeismicSource/requake).
 
-Clone the project:
+#### Using pip
+
+The easiest way to install the most recent development snapshot is to download
+and install it through `pip`, using its builtin `git` client:
+
+    pip install git+https://github.com/SeismicSource/requake.git
+
+Run this command again, from times to times, to keep Requake updated with
+the development version.
+
+#### Cloning the Requake GitHub repository
+
+If you want to take a look at the source code (and possibly modify it 😉),
+clone the project using `git`:
 
     git clone https://github.com/SeismicSource/requake.git
 
+or, using SSH:
+
+    git clone git@github.com:SeismicSource/requake.git
+
 (avoid using the "Download ZIP" option from the green "Code" button, since
-version number is lost), then install the code from within the `requake` main
-directory by running:
+version number is lost).
 
-    pip install .
-
-If you want to simultaneously modify and use the code, you can install
-in "editable mode":
+Then, go into the `requake` main directory and install the code in "editable
+mode" by running:
 
     pip install -e .
 
+You can keep your local Requake repository updated by running `git pull`
+from times to times. Thanks to `pip`'s "editable mode", you don't need to
+reinstall Requake after each update.
 
 ## Running
 
@@ -106,7 +125,6 @@ Once done ([it will take time!](#performances)), you are ready to build
 repeating earthquake families:
 
     requake build_families
-
 
 ## Performances
 
