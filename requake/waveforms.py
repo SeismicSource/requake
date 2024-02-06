@@ -130,7 +130,8 @@ def get_event_waveform(config, ev):
     evid = ev.evid
     ev_lat = ev.lat
     ev_lon = ev.lon
-    ev_depth = ev.depth
+    # avoid negative depths
+    ev_depth = max(ev.depth, 0)
     orig_time = ev.orig_time
     mag = ev.mag
     mag_type = ev.mag_type
@@ -223,7 +224,7 @@ def get_waveform_pair(config, pair):
             tr = get_event_waveform(config, ev)
             tr_cache[cache_key] = tr
             st.append(tr)
-        except Exception as m:
+        except NoWaveformError as m:
             skipped_evids.append(ev.evid)
             msg = str(m).replace('\n', ' ')
             raise NoWaveformError(
