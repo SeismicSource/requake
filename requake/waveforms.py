@@ -145,13 +145,13 @@ def get_event_waveform(config, ev):
         ) from m
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
-    P_arrival, S_arrival, distance, dist_deg = get_arrivals(
+    p_arrival, s_arrival, distance, dist_deg = get_arrivals(
         trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
-    P_arrival_time = orig_time + P_arrival.time
-    S_arrival_time = orig_time + S_arrival.time
-    pre_P = config.cc_pre_P
+    p_arrival_time = orig_time + p_arrival.time
+    s_arrival_time = orig_time + s_arrival.time
+    pre_p = config.cc_pre_P
     trace_length = config.cc_trace_length
-    t0 = P_arrival_time - pre_P
+    t0 = p_arrival_time - pre_p
     t1 = t0 + trace_length
     tr = get_waveform(config, traceid, t0, t1)
     tr.stats.evid = evid
@@ -164,8 +164,8 @@ def get_event_waveform(config, ev):
     tr.stats.coords = coords
     tr.stats.dist_deg = dist_deg
     tr.stats.distance = distance
-    tr.stats.P_arrival_time = P_arrival_time
-    tr.stats.S_arrival_time = S_arrival_time
+    tr.stats.P_arrival_time = p_arrival_time
+    tr.stats.S_arrival_time = s_arrival_time
     return tr
 
 
@@ -321,7 +321,7 @@ def build_template(config, st, family):
     tr_template.data /= len(st)
     P_arrival /= len(st)
     S_arrival /= len(st)
-    tr_template.stats.evid = 'average{:02d}'.format(family.number)
+    tr_template.stats.evid = f'average{family.number:02d}'
     tr_template.stats.ev_lat = family.lat
     tr_template.stats.ev_lon = family.lon
     tr_template.stats.ev_depth = family.depth
