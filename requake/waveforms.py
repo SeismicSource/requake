@@ -87,6 +87,7 @@ def _get_trace_id(config, ev):
         try:
             coords = config.inventory.get_coordinates(trace_id, orig_time)
         except Exception as m:
+            # note: get_coordinaets raises a generic Exception
             raise MetadataMismatchError(
                 f'Unable to find coordinates for trace {trace_id} '
                 f'at time {orig_time}'
@@ -140,6 +141,7 @@ def get_event_waveform(config, ev):
     try:
         coords = config.inventory.get_coordinates(traceid, orig_time)
     except Exception as m:
+        # note: get_coordinaets raises a generic Exception
         raise MetadataMismatchError(
             f'Unable to find coordinates for trace {traceid} '
             f'at time {orig_time}'
