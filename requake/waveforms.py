@@ -10,17 +10,28 @@ Functions for downloading and processing waveforms.
 """
 import contextlib
 import logging
-import numpy as np
 from itertools import combinations
+import numpy as np
 from obspy import Inventory, Stream, UTCDateTime
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
 from obspy.signal.cross_correlation import correlate, xcorr_max
+from obspy.clients.fdsn.header import FDSNNoDataException
 from scipy.stats import median_abs_deviation
 from .arrivals import get_arrivals
 from .rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 model = TauPyModel(model='ak135')
+
+
+class NoMetadataError(Exception):
+    """Exception raised for missing metadata."""
+
+class NoWaveformError(Exception):
+    """Exception raised for missing waveform data."""
+
+class MetadataMismatchError(Exception):
+    """Exception raised for mismatched metadata."""
 
 
 def _get_metadata(config):
@@ -41,9 +52,12 @@ def _get_metadata(config):
                 network=net, station=sta, location=loc, channel=chan,
                 starttime=start_time, endtime=end_time, level='channel'
             )
-        except Exception as m:
-            logger.error(f'Unable to download station metadata. {str(m)}')
-            rq_exit(1)
+        except FDSNNoDataException as m:
+            msg = str(m).replace('\n', ' ')
+            raise NoMetadataError(
+                f'Unable to download metadata for trace id: {trace_id}.\n'
+                f'Error message: {msg}'
+            ) from m
     channels = inv.get_contents()['channels']
     unique_channels = set(channels)
     channel_count = [channels.count(id) for id in unique_channels]
@@ -72,12 +86,11 @@ def _get_trace_id(config, ev):
     for trace_id in trace_ids:
         try:
             coords = config.inventory.get_coordinates(trace_id, orig_time)
-        except Exception:
-            logger.error(
+        except Exception as m:
+            raise MetadataMismatchError(
                 f'Unable to find coordinates for trace {trace_id} '
                 f'at time {orig_time}'
-            )
-            rq_exit(1)
+            ) from m
         trace_lat = coords['latitude']
         trace_lon = coords['longitude']
         distance, _, _ = gps2dist_azimuth(
@@ -91,10 +104,17 @@ def get_waveform(config, traceid, starttime, endtime):
     """Download waveform for a given traceid, start and end time."""
     cl = config.fdsn_dataselect_client
     net, sta, loc, chan = traceid.split('.')
-    st = cl.get_waveforms(
-        network=net, station=sta, location=loc, channel=chan,
-        starttime=starttime, endtime=endtime
-    )
+    try:
+        st = cl.get_waveforms(
+            network=net, station=sta, location=loc, channel=chan,
+            starttime=starttime, endtime=endtime
+        )
+    except FDSNNoDataException as m:
+        msg = str(m).replace('\n', ' ')
+        raise NoWaveformError(
+            f'Unable to download waveform data for trace id: {traceid}.\n'
+            f'Error message: {msg}'
+        ) from m
     # webservices sometimes return longer traces: trim to be sure
     st.trim(starttime=starttime, endtime=endtime)
     st.merge(fill_value='interpolate')
@@ -119,7 +139,7 @@ def get_event_waveform(config, ev):
     try:
         coords = config.inventory.get_coordinates(traceid, orig_time)
     except Exception as m:
-        raise Exception(
+        raise MetadataMismatchError(
             f'Unable to find coordinates for trace {traceid} '
             f'at time {orig_time}'
         ) from m
@@ -193,7 +213,7 @@ def get_waveform_pair(config, pair):
     old_cache_key = cache_key
     for ev in pair:
         if ev.evid in skipped_evids:
-            raise Exception
+            raise NoWaveformError
         # use cached trace, if possible
         cache_key = '_'.join((ev.evid, ev.trace_id))
         with contextlib.suppress(KeyError):
@@ -206,7 +226,7 @@ def get_waveform_pair(config, pair):
         except Exception as m:
             skipped_evids.append(ev.evid)
             msg = str(m).replace('\n', ' ')
-            raise Exception(
+            raise NoWaveformError(
                 f'Unable to download waveform data for event {ev.evid} '
                 f'and trace_id {ev.trace_id}. '
                 'Skipping all pairs containig this event.\n'
@@ -231,7 +251,7 @@ def cc_waveform_pair(config, tr1, tr2, mode='events'):
         elif mode == 'scan':
             logger.error(
                 'The two traces have a different sampling interval.')
-        raise
+            rq_exit(1)
     tr1 = process_waveforms(config, tr1)
     tr2 = process_waveforms(config, tr2)
     shift = int(config.cc_max_shift/dt1)
