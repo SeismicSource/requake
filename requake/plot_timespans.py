@@ -48,7 +48,9 @@ def plot_timespans(config):
     if config.args.sortby is not None:
         sort_by = config.args.sortby
         valid_sort_by = (
-            'time', 'latitude', 'longitude', 'depth', 'distance_from')
+            'time', 'latitude', 'longitude', 'depth', 'distance_from',
+            'family_number'
+        )
         if sort_by not in valid_sort_by:
             logger.error(
                 f'Invalid value for "sortby". Choose from: {valid_sort_by}.'
@@ -92,6 +94,9 @@ def plot_timespans(config):
         elif sort_by == 'distance_from':
             yvals = np.ones(len(times)) * family.distance_from(lon0, lat0)
             ylabel = f'Distance from {lon0:.1f}°E, {lat0:.1f}°N (km)'
+        elif sort_by == 'family_number':
+            yvals = np.ones(len(times)) * fn
+            ylabel = 'Family Number'
         line, = ax.plot(
             times, yvals, lw=1, marker='o', color=cmap(norm(fn % 10)),
             label=label)
