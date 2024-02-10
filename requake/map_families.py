@@ -81,7 +81,7 @@ def map_families(config):
             transform=trans, label=label, zorder=10)
         markers.append(marker)
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, ticks=range(10), pad=0.1)
+    cbar = fig.colorbar(sm, ticks=range(10), pad=0.1, ax=ax)
     cbar.ax.set_ylabel('mod(family number, 10)')
 
     # Empty annotation that will be updated interactively
