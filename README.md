@@ -2,7 +2,11 @@
 
 Repeating earthquakes search and analysis.
 
-(c) 2021-2024 - Claudio Satriano <satriano@ipgp.fr>
+[![changelog-badge]][changelog-link]
+[![PyPI-badge]][PyPI-link]
+[![license-badge]][license-link]
+
+Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
 ## Description
 
@@ -135,3 +139,11 @@ yet parallel: some improvements might come in future versions, when
 parallelization will be implemented.
 
 - `requake build_families` is fast™.
+
+<!-- Badges and project links -->
+[PyPI-badge]: http://img.shields.io/pypi/v/requake.svg
+[PyPI-link]: https://pypi.python.org/pypi/requake
+[license-badge]: https://img.shields.io/badge/license-CeCILL--2.1-green.svg
+[license-link]: http://www.cecill.info/licences.en.html
+[changelog-badge]: https://img.shields.io/badge/Changelog-136CB6.svg
+[changelog-link]: https://github.com/SeismicSource/requake/blob/main/CHANGELOG.md
