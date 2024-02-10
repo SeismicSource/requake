@@ -42,7 +42,7 @@ def plot_timespans(config):
     ax.tick_params(which='both', top=True, labeltop=True)
     ax.tick_params(axis='x', which='both', direction='in')
 
-    cmap = cm.tab10
+    cmap = mpl.colormaps['tab10']
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
     lines = []
     if config.args.sortby is not None:

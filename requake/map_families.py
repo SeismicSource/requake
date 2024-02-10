@@ -63,7 +63,7 @@ def map_families(config):
         rq_exit(1)
     fig, ax = _make_basemap(config)
     trans = ccrs.PlateCarree()
-    cmap = cm.tab10
+    cmap = mpl.colormaps['tab10']
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
     markers = []
     for family in families:
