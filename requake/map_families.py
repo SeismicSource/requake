@@ -11,8 +11,8 @@ Plot families on a map.
 import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import matplotlib.colors as colors
+from matplotlib import cm
+from matplotlib import colors
 import cartopy.crs as ccrs
 import cartopy.io.img_tiles as cimgt
 import cartopy.feature as cfeature

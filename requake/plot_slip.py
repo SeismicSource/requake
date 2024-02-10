@@ -12,8 +12,8 @@ import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-import matplotlib.cm as cm
-import matplotlib.colors as colors
+from matplotlib import cm
+from matplotlib import colors
 import numpy as np
 from .families import read_selected_families
 from .slip import mag_to_slip_in_cm
