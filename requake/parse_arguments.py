@@ -155,10 +155,30 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- map_families
-    subparser.add_parser(
+    mapfamilies = subparser.add_parser(
         'map_families',
         parents=[longerthan, familynumbers],
         help='plot families on a map'
+    )
+    mapfamilies.add_argument(
+        '-m', '--mapstyle', type=str, default='satellite',
+        choices=[
+            'stamen_terrain', 'satellite', 'street', 'hillshade',
+            'hillshade_dark', 'ocean'
+        ],
+        help='style of map to plot. Possible values are: '
+             'stamen_terrain, satellite, street, hillshade, hillshade_dark, '
+             'ocean'
+    )
+    mapfamilies.add_argument(
+        '-k', '--apikey', type=str, default=None,
+        help='API key for Stamen Terrain map tiles (default: None). '
+             'You can get a free API key at https://stadiamaps.com/'
+    )
+    mapfamilies.add_argument(
+        '-z', '--zoom', type=int, default=None,
+        help='zoom level for the map tiles (default: None). Note that '
+             'certain map tiles might not be available at all zoom levels.'
     )
     # ---
     # --- flag_family

@@ -14,10 +14,16 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
 import cartopy.crs as ccrs
-import cartopy.io.img_tiles as cimgt
 import cartopy.feature as cfeature
 from obspy.geodetics import gps2dist_azimuth
 from .cached_tiler import CachedTiler
+from .map_tiles import (
+    EsriHillshade,
+    EsriHillshadeDark,
+    EsriOcean,
+    EsriImagery,
+    StamenTerrain,
+)
 from .families import read_selected_families
 from .rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -26,6 +32,23 @@ mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 # Make text editable in Illustrator
 mpl.rcParams['pdf.fonttype'] = 42
+TILER = {
+    'hillshade': EsriHillshade,
+    'hillshade_dark': EsriHillshadeDark,
+    'ocean': EsriOcean,
+    'satellite': EsriImagery,
+    'stamen_terrain': StamenTerrain,
+}
+
+
+def _add_tiles(config, ax, tiler, alpha=1):
+    """Add map tiles to basemap."""
+    if config.args.zoom is not None:
+        tile_zoom_level = config.args.zoom
+    else:
+        tile_zoom_level = 12 if ax.maxdiagonal <= 100 else 8
+        logger.info(f'Map zoom level autoset to: {tile_zoom_level}')
+    ax.add_image(tiler, tile_zoom_level, alpha=alpha)
 
 
 def _make_basemap(config):
@@ -33,25 +56,44 @@ def _make_basemap(config):
     lonmax = config.catalog_lon_max
     latmin = config.catalog_lat_min
     latmax = config.catalog_lat_max
+    land_10m = cfeature.NaturalEarthFeature(
+        'physical', 'land', '10m',
+        edgecolor='face',
+        facecolor=cfeature.COLORS['land'])
+    ocean_10m = cfeature.NaturalEarthFeature(
+        'physical', 'ocean', '10m',
+        edgecolor='face',
+        facecolor=cfeature.COLORS['water'])
     tile_dir = 'maptiles'
-    stamen_terrain = CachedTiler(cimgt.Stamen('terrain-background'), tile_dir)
     # Create a GeoAxes
     figsize = (8, 8)
     fig = plt.figure(figsize=figsize)
-    ax = fig.add_subplot(111, projection=stamen_terrain.crs)
+    map_style = config.args.mapstyle
+    api_key = config.args.apikey
+    if map_style == 'no_basemap':
+        ax = fig.add_subplot(111, projection=ccrs.Mercator())
+        ax.add_feature(land_10m)
+        ax.add_feature(ocean_10m)
+    else:
+        tile_dir = 'maptiles'
+        tiler = CachedTiler(
+            TILER[map_style](apikey=api_key),
+            tile_dir
+        )
+        ax = fig.add_subplot(111, projection=tiler.crs)
     trans = ccrs.Geodetic()
     ax.set_extent([lonmin, lonmax, latmin, latmax], crs=trans)
     diagonal, _, _ = gps2dist_azimuth(latmin, lonmin, latmax, lonmax)
-    diagonal /= 1e3
-    tile_zoom_level = 12 if diagonal <= 100 else 8
-    ax.add_image(stamen_terrain, tile_zoom_level)
+    ax.maxdiagonal = diagonal / 1e3
+    if map_style != 'no_basemap':
+        _add_tiles(config, ax, tiler)
+    if map_style in {'hillshade', 'hillshade_dark', 'ocean', 'satellite'}:
+        ax.attribution_text = 'Map powered by Esri and Natural Earth'
+    elif map_style == 'stamen_terrain':
+        ax.attribution_text = 'Map powered by Stamen Design and Natural Earth'
+    else:
+        ax.attribution_text = 'Map powered by Natural Earth'
     ax.gridlines(draw_labels=True, color='#777777', linestyle='--')
-    countries = cfeature.NaturalEarthFeature(
-        category='cultural',
-        name='admin_0_countries',
-        scale='10m',
-        facecolor='none')
-    ax.add_feature(countries, edgecolor='k')
     return fig, ax
 
 

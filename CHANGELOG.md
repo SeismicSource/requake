@@ -13,6 +13,8 @@
 - Config parameter `trace_average_from_normalized_traces` renamed to
   `normalize_traces_before_averaging`
 - Bugfix: `plot_timespans`: correctly plot x time axis when sort by `time`
+- New options for `map_families` to select a map style and a zoom level for the
+  map tiles
 
 ## v0.3 - 2021-11-08
 
