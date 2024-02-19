@@ -130,7 +130,7 @@ def map_families(config):
     annot = ax.annotate(
         '', xy=(0, 0), xytext=(5, 5),
         textcoords='offset points',
-        bbox=dict(boxstyle='round', fc='w'),
+        bbox={'boxstyle': 'round', 'fc': 'w'},
         zorder=20
     )
     annot.set_visible(False)
@@ -139,7 +139,7 @@ def map_families(config):
         vis = annot.get_visible()
         if event.inaxes == ax:
             for marker in markers:
-                cont, ind = marker.contains(event)
+                cont, _ind = marker.contains(event)
                 if cont:
                     color = marker.get_facecolor()[0]
                     marker.set_linewidth(3)
@@ -150,11 +150,10 @@ def map_families(config):
                     annot.set_visible(True)
                     fig.canvas.draw_idle()
                     break
-                else:
-                    marker.set_linewidth(1)
-                    if vis:
-                        annot.set_visible(False)
-                        fig.canvas.draw_idle()
+                marker.set_linewidth(1)
+                if vis:
+                    annot.set_visible(False)
+                    fig.canvas.draw_idle()
 
     fig.canvas.mpl_connect('motion_notify_event', hover)
 

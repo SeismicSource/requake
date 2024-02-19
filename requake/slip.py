@@ -22,7 +22,7 @@ def _mag_to_moment(magnitude, unit='N.m'):
     return moment
 
 
-def mag_to_slip_in_cm(config, magnitude):
+def mag_to_slip_in_cm(_config, magnitude):
     """
     Convert magnitude to slip in cm.
 

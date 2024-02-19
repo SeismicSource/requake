@@ -90,11 +90,17 @@ def read_config(config_file, configspec=None):
     :return: Configuration object.
     :rtype: configobj.ConfigObj
     """
-    kwargs = dict(
-        configspec=configspec, file_error=True, default_encoding='utf8')
+    kwargs = {
+        'configspec': configspec,
+        'file_error': True,
+        'default_encoding': 'utf8'
+    }
     if configspec is None:
-        kwargs.update(
-            dict(interpolation=False, list_values=False, _inspec=True))
+        kwargs.update({
+            'interpolation': False,
+            'list_values': False,
+            '_inspec': True
+        })
     try:
         config_obj = ConfigObj(config_file, **kwargs)
     except IOError as err:

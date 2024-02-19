@@ -30,7 +30,7 @@ def _build_event(tr, template, p_arrival_absolute_time):
         ev_lat = template.stats.sac.evla
         ev_lon = template.stats.sac.evlo
         ev_depth = template.stats.sac.evdp
-        P_arrival, S_arrival, distance, dist_deg = get_arrivals(
+        P_arrival, _S_arrival, _distance, _dist_deg = get_arrivals(
             trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
         orig_time = p_arrival_absolute_time - P_arrival.time
     except Exception:
@@ -78,7 +78,7 @@ def _scan_family_template(config, template, catalog_file, t0, t1):
     sys.stdout.write(str(tr) + '\r')
     # We use the time_chunk length as max shift
     config.cc_max_shift = config.time_chunk
-    lag, lag_sec, cc_max, cc_mad = cc_waveform_pair(
+    _lag, lag_sec, cc_max, cc_mad = cc_waveform_pair(
         config, tr, template, mode='scan')
     cc_peak = cc_max/cc_mad
     if cc_peak > config.min_cc_mad_ratio:

@@ -27,19 +27,19 @@ def _build_template(config, family):
     os.makedirs(config.template_dir, exist_ok=True)
     template_file = f'template{family.number:02d}.{tr_template.id}.sac'
     template_file = os.path.join(config.template_dir, template_file)
-    tr_template.stats.sac = dict(
-        kevnm=tr_template.stats.evid,
-        stla=tr_template.stats.coords['latitude'],
-        stlo=tr_template.stats.coords['longitude'],
-        stel=tr_template.stats.coords['elevation'],
-        evla=tr_template.stats.ev_lat,
-        evlo=tr_template.stats.ev_lon,
-        evdp=tr_template.stats.ev_depth,
-        a=tr_template.stats.P_arrival_time - tr_template.stats.starttime,
-        ka='Ptheo',
-        t0=tr_template.stats.S_arrival_time - tr_template.stats.starttime,
-        kt0='Stheo',
-    )
+    tr_template.stats.sac = {
+        'kevnm': tr_template.stats.evid,
+        'stla': tr_template.stats.coords['latitude'],
+        'stlo': tr_template.stats.coords['longitude'],
+        'stel': tr_template.stats.coords['elevation'],
+        'evla': tr_template.stats.ev_lat,
+        'evlo': tr_template.stats.ev_lon,
+        'evdp': tr_template.stats.ev_depth,
+        'a': tr_template.stats.P_arrival_time - tr_template.stats.starttime,
+        'ka': 'Ptheo',
+        't0': tr_template.stats.S_arrival_time - tr_template.stats.starttime,
+        'kt0': 'Stheo',
+    }
     tr_template.write(template_file, format='SAC')
     logger.info(
         f'Template for family {family.number} saved as {template_file}')

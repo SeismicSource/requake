@@ -13,8 +13,8 @@ import sys
 import os
 import shutil
 import logging
-import tqdm
 import signal
+import tqdm
 from obspy import UTCDateTime
 from obspy.clients.fdsn import Client
 from ._version import get_versions
@@ -23,8 +23,9 @@ from .utils import (
     parse_configspec, read_config, validate_config, write_sample_config,
     write_ok
 )
+# pylint: disable=global-statement,import-outside-toplevel
 
-logger = None
+logger = None #pylint: disable=invalid-name
 PYTHON_VERSION_STR = None
 NUMPY_VERSION_STR = None
 SCIPY_VERSION_STR = None
@@ -33,7 +34,7 @@ OBSPY_VERSION_STR = None
 
 def _check_library_versions():
     global PYTHON_VERSION_STR
-    PYTHON_VERSION_STR = '{}.{}.{}'.format(*sys.version_info[:3])
+    PYTHON_VERSION_STR = '.'.join(map(str, sys.version_info[:3]))
     import numpy
     global NUMPY_VERSION_STR
     NUMPY_VERSION_STR = numpy.__version__
@@ -74,6 +75,7 @@ def _setup_logging(config, progname, action_name):
         logger_root.addHandler(filehand)
 
     class TqdmLoggingHandler(logging.Handler):
+        """A logging handler that writes to tqdm."""
         def __init__(self, level=logging.NOTSET):
             super().__init__(level)
 

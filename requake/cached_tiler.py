@@ -13,7 +13,7 @@ PIL_logger = logging.getLogger('PIL')
 PIL_logger.setLevel(logging.WARNING)
 
 
-class CachedTiler(object):
+class CachedTiler():
     """A Cached Tiler for Cartopy."""
 
     def __init__(self, tiler, cache_dir=None):

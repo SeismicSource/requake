@@ -177,6 +177,7 @@ def get_events(
     :return: a RequakeCatalog object
     :rtype: RequakeCatalog
     """
+    # pylint: disable=unused-argument
     arguments = locals()
     query = 'query?format=text&nodata=404&'
     for key, val in arguments.items():
@@ -222,14 +223,15 @@ def read_events(filename):
     :rtype: RequakeCatalog
     """
     cat = RequakeCatalog()
-    for line in open(filename, 'r', encoding='utf8'):
-        if not line:
-            continue
-        if line[0] == '#':
-            continue
-        ev = RequakeEvent()
-        ev.from_fdsn_text(line)
-        cat.append(ev)
+    with open(filename, 'r', encoding='utf8') as fp:
+        for line in fp:
+            if not line:
+                continue
+            if line[0] == '#':
+                continue
+            ev = RequakeEvent()
+            ev.from_fdsn_text(line)
+            cat.append(ev)
     return cat
 
 

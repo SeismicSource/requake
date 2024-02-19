@@ -87,7 +87,7 @@ def plot_slip(config):
     annot = ax.annotate(
         '', xy=(0, 0), xytext=(5, 5),
         textcoords='offset points',
-        bbox=dict(boxstyle='round', fc='w'),
+        bbox={'boxstyle': 'round', 'fc': 'w'},
         zorder=20
     )
     annot.set_visible(False)
@@ -96,7 +96,7 @@ def plot_slip(config):
         vis = annot.get_visible()
         if event.inaxes == ax:
             for line in lines:
-                cont, ind = line.contains(event)
+                cont, _ind = line.contains(event)
                 if cont:
                     color = line.get_color()
                     line.set_linewidth(3)
@@ -107,11 +107,10 @@ def plot_slip(config):
                     annot.set_visible(True)
                     fig.canvas.draw_idle()
                     break
-                else:
-                    line.set_linewidth(1)
-                    if vis:
-                        annot.set_visible(False)
-                        fig.canvas.draw_idle()
+                line.set_linewidth(1)
+                if vis:
+                    annot.set_visible(False)
+                    fig.canvas.draw_idle()
 
     fig.canvas.mpl_connect('motion_notify_event', hover)
 
