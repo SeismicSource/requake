@@ -23,14 +23,14 @@ class Family(list):
     """
     A list of events belonging to the same family.
     """
-    def __init__(self):
+    def __init__(self, number=None):
         self.lon = None
         self.lat = None
         self.depth = None  # km
         self.starttime = None
         self.endtime = None
         self.duration = None  # years
-        self.number = None
+        self.number = number
         self.valid = True
 
     def __str__(self):

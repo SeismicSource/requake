@@ -8,6 +8,9 @@
   or more templates. Templates can be from families or from file
 - New verb: `print_families`: print families to screen
 - New verb: `plot_slip`: plot cumulative slip for one or more families
+- New config parameter: `clustering_algorithm` to select the algorithm
+  for building event families. Currently supported options are `shared` and
+  `UPGMA` (default: `shared`)
 - `family_numbers` argument is no more mandatory (default: `all`)
   - argument added to `map_families` and `plot_timespans`
 - Config parameter `trace_average_from_normalized_traces` renamed to

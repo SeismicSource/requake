@@ -10,6 +10,8 @@ Build families of repeating earthquakes from a catalog of pairs.
 """
 import logging
 import csv
+from itertools import combinations
+from scipy.cluster.hierarchy import average, fcluster
 from obspy import UTCDateTime
 from .catalog import RequakeEvent
 from .families import Family
@@ -104,6 +106,45 @@ def _build_families_from_shared_events(pairs):
     return families
 
 
+def _build_families_from_upgma(pairs, cc_min):
+    """
+    Build families from pairs using the UPGMA algorithm.
+
+    Reference: https://en.wikipedia.org/wiki/UPGMA
+
+    :param pairs: list of pairs
+    :type pairs: list
+    :return: list of families
+    :rtype: list
+    """
+    events = {ev.evid: ev for pair in pairs for ev in pair}
+    evids = sorted(set(events.keys()))
+    # We use sorted tuples of evids as keys to avoid duplicates with inverted
+    # order of evids, e.g. (evid1, evid2) and (evid2, evid1)
+    correlations = {
+        tuple(sorted((evid1, evid2))): cc
+        for evid1, ev in events.items()
+        for evid2, cc in ev.correlations.items()
+    }
+    # Build distance dictionary. Distance is 1 - correlation.
+    # We use cc_min-0.1 for pairs with no correlation, so that they are not
+    # clustered together
+    distances = {
+        k: 1-correlations.get(k, cc_min-0.1) for k in combinations(evids, 2)}
+    # Build pairwise distance matrix, then the linkage matrix,
+    # then the clusters
+    pairwise_distances = [distances[k] for k in sorted(distances.keys())]
+    linkage_matrix = average(pairwise_distances)
+    clusters = fcluster(linkage_matrix, 1-cc_min, criterion='distance')
+    # Build families
+    families = [Family(number=n) for n in range(max(clusters))]
+    for evid, cluster in zip(evids, clusters):
+        families[cluster-1].append(events[evid])
+    # Remove families with only one event
+    families = [f for f in families if len(f) > 1]
+    return families
+
+
 def _write_families(config, families):
     """
     Write families to file.
@@ -151,8 +192,8 @@ def build_families(config):
     except ValueError as e:
         logger.error(e)
         rq_exit(1)
-    logger.info('Building event families...')
     try:
+        logger.info('Reading pairs...')
         pairs = _read_pairs(config)
     except FileNotFoundError:
         logger.error(
@@ -160,6 +201,11 @@ def build_families(config):
             f'{config.scan_catalog_pairs_file}'
         )
         rq_exit(1)
-    families = _build_families_from_shared_events(pairs)
+    if config.clustering_algorithm == 'shared':
+        logger.info('Building families from shared events...')
+        families = _build_families_from_shared_events(pairs)
+    elif config.clustering_algorithm == 'UPGMA':
+        logger.info('Building families using UPGMA...')
+        families = _build_families_from_upgma(pairs, config.cc_min)
     _write_families(config, families)
     logger.info(f'Done! Output written to: {config.build_families_outfile}')
