@@ -45,30 +45,36 @@ def _read_pairs(config):
     :rtype: list
     """
     pairs = []
+    events = {}
     with open(config.scan_catalog_pairs_file, 'r', encoding='utf8') as fp:
         reader = csv.DictReader(fp)
         for row in reader:
             cc_max = float(row['cc_max'])
             if abs(cc_max) < config.cc_min:
                 continue
-            ev1 = RequakeEvent()
-            ev1.evid = row['evid1']
-            ev1.orig_time = UTCDateTime(row['orig_time1'])
-            ev1.lon = float(row['lon1'])
-            ev1.lat = float(row['lat1'])
-            ev1.depth = float(row['depth_km1'])
-            ev1.mag_type = row['mag_type1']
-            ev1.mag = float(row['mag1'])
-            ev1.trace_id = row['trace_id']
-            ev2 = RequakeEvent()
-            ev2.evid = row['evid2']
-            ev2.orig_time = UTCDateTime(row['orig_time2'])
-            ev2.lon = float(row['lon2'])
-            ev2.lat = float(row['lat2'])
-            ev2.depth = float(row['depth_km2'])
-            ev2.mag_type = row['mag_type2']
-            ev2.mag = float(row['mag2'])
-            ev2.trace_id = row['trace_id']
+            evid1 = row['evid1']
+            try:
+                ev1 = events[evid1]
+            except KeyError:
+                ev1 = RequakeEvent(
+                    evid=evid1, orig_time=UTCDateTime(row['orig_time1']),
+                    lon=float(row['lon1']), lat=float(row['lat1']),
+                    depth=float(row['depth_km1']), mag_type=row['mag_type1'],
+                    mag=float(row['mag1']), trace_id=row['trace_id']
+                )
+                events[evid1] = ev1
+            evid2 = row['evid2']
+            try:
+                ev2 = events[evid2]
+            except KeyError:
+                ev2 = RequakeEvent(
+                    evid=evid2, orig_time=UTCDateTime(row['orig_time2']),
+                    lon=float(row['lon2']), lat=float(row['lat2']),
+                    depth=float(row['depth_km2']), mag_type=row['mag_type2'],
+                    mag=float(row['mag2']), trace_id=row['trace_id']
+                )
+                events[evid2] = ev2
+            ev1.correlations[ev2.evid] = ev2.correlations[ev1.evid] = cc_max
             pair = Family()
             pair.extend([ev1, ev2])
             pairs.append(pair)

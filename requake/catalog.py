@@ -27,24 +27,28 @@ class RequakeEvent():
     A hashable event class.
 
     Contains the same fields as in the FDSN text file format, plus a
-    trace_id field.
+    trace_id field and a correlations dictionary.
     """
 
-    def __init__(self):
-        self.evid = None
-        self.orig_time = None
-        self.lon = None
-        self.lat = None
-        self.depth = None
-        self.mag_type = None
-        self.mag = None
-        self.author = None
-        self.catalog = None
-        self.contributor = None
-        self.contributor_id = None
-        self.mag_author = None
-        self.location_name = None
-        self.trace_id = None
+    def __init__(self, evid=None, orig_time=None, lon=None, lat=None,
+                 depth=None, mag_type=None, mag=None, author=None,
+                 catalog=None, contributor=None, contributor_id=None,
+                 mag_author=None, location_name=None, trace_id=None):
+        self.evid = evid
+        self.orig_time = orig_time
+        self.lon = lon
+        self.lat = lat
+        self.depth = depth
+        self.mag_type = mag_type
+        self.mag = mag
+        self.author = author
+        self.catalog = catalog
+        self.contributor = contributor
+        self.contributor_id = contributor_id
+        self.mag_author = mag_author
+        self.location_name = location_name
+        self.trace_id = trace_id
+        self.correlations = {}
 
     def __eq__(self, other):
         return self.evid == other.evid and self.trace_id == other.trace_id
