@@ -17,7 +17,33 @@ from .rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
+def _check_options(config):
+    """
+    Check the consistency of the configuration options.
+
+    :param config: configuration object
+    :type config: config.Config
+
+    :raises ValueError: if the configuration options are inconsistent
+    """
+    sort_by = config.sort_families_by
+    lon0, lat0 = config.distance_from_lon, config.distance_from_lat
+    if sort_by == 'distance_from' and (lon0 is None or lat0 is None):
+        raise ValueError(
+            '"sort_families_by" set to "distance_from", '
+            'but "distance_from_lon" and/or "distance_from_lat" '
+            'are not specified')
+
+
 def _read_pairs(config):
+    """
+    Read pairs from file.
+
+    :param config: configuration object
+    :type config: config.Config
+    :return: list of pairs
+    :rtype: list
+    """
     pairs = []
     with open(config.scan_catalog_pairs_file, 'r', encoding='utf8') as fp:
         reader = csv.DictReader(fp)
@@ -49,32 +75,15 @@ def _read_pairs(config):
     return pairs
 
 
-def build_families(config):
+def _build_families_from_shared_events(pairs):
     """
-    Build families of repeating earthquakes from a catalog of pairs.
+    Build families from pairs sharing an event.
 
-    :param config: configuration object
-    :type config: config.Config
+    :param pairs: list of pairs
+    :type pairs: list
+    :return: list of families
+    :rtype: list
     """
-    # Check options
-    sort_by = config.sort_families_by
-    lon0, lat0 = config.distance_from_lon, config.distance_from_lat
-    if sort_by == 'distance_from' and (lon0 is None or lat0 is None):
-        logger.error(
-            '"sort_families_by" set to "distance_from", '
-            'but "distance_from_lon" and/or "distance_from_lat" '
-            'are not specified')
-        rq_exit(1)
-    logger.info('Building event families...')
-    try:
-        pairs = _read_pairs(config)
-    except FileNotFoundError:
-        logger.error(
-            'Unable to find event pairs file: '
-            f'{config.scan_catalog_pairs_file}'
-        )
-        rq_exit(1)
-    # Build families from pairs sharing an event
     families = []
     for pair in pairs:
         ev1, ev2 = pair
@@ -86,7 +95,20 @@ def build_families(config):
                 break
         if not found_family:
             families.append(pair)
-    # Sort families
+    return families
+
+
+def _write_families(config, families):
+    """
+    Write families to file.
+
+    :param config: configuration object
+    :type config: config.Config
+    :param families: list of families
+    :type families: list
+    """
+    sort_by = config.sort_families_by
+    lon0, lat0 = config.distance_from_lon, config.distance_from_lat
     sort_keys = {
         'time': lambda f: f.starttime,
         'longitude': lambda f: f.lon,
@@ -102,10 +124,36 @@ def build_families(config):
         ]
         writer = csv.writer(fp_out)
         writer.writerow(fieldnames)
+        valid = True  # families are valid by default
         for number, family in enumerate(families):
             for ev in family:
                 writer.writerow([
                     ev.evid, ev.trace_id, ev.orig_time, ev.lon, ev.lat,
-                    ev.depth, ev.mag_type, ev.mag, number, True
+                    ev.depth, ev.mag_type, ev.mag, number, valid
                 ])
+
+
+def build_families(config):
+    """
+    Build families of repeating earthquakes from a catalog of pairs.
+
+    :param config: configuration object
+    :type config: config.Config
+    """
+    try:
+        _check_options(config)
+    except ValueError as e:
+        logger.error(e)
+        rq_exit(1)
+    logger.info('Building event families...')
+    try:
+        pairs = _read_pairs(config)
+    except FileNotFoundError:
+        logger.error(
+            'Unable to find event pairs file: '
+            f'{config.scan_catalog_pairs_file}'
+        )
+        rq_exit(1)
+    families = _build_families_from_shared_events(pairs)
+    _write_families(config, families)
     logger.info(f'Done! Output written to: {config.build_families_outfile}')
