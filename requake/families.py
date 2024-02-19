@@ -37,7 +37,8 @@ class Family(list):
         return (
             f'{self.number:2d} {len(self):2d} '
             f'{self.lon:8.4f} {self.lat:8.4f} {self.depth:7.3f} '
-            f'{self.starttime} {self.endtime} {self.duration:4.1f}'
+            f'{self.starttime} {self.endtime} {self.duration:4.1f} '
+            f'{self.valid}'
         )
 
     def append(self, ev):
