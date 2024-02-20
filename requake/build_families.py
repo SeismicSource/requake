@@ -37,23 +37,22 @@ def _check_options(config):
             'are not specified')
 
 
-def _read_pairs(config):
+def _read_events_from_pairs_file(config):
     """
-    Read pairs from file.
+    Read events from pairs file.
 
     :param config: configuration object
     :type config: config.Config
-    :return: list of pairs
-    :rtype: list
+    :return: dictionary of events
+    :rtype: dict
+
+    :raises FileNotFoundError: if the pairs file is not found
     """
-    pairs = []
     events = {}
     with open(config.scan_catalog_pairs_file, 'r', encoding='utf8') as fp:
         reader = csv.DictReader(fp)
         for row in reader:
             cc_max = float(row['cc_max'])
-            if abs(cc_max) < config.cc_min:
-                continue
             evid1 = row['evid1']
             try:
                 ev1 = events[evid1]
@@ -76,48 +75,57 @@ def _read_pairs(config):
                     mag=float(row['mag2']), trace_id=row['trace_id']
                 )
                 events[evid2] = ev2
+            # Store the correlation between the two events in both events
             ev1.correlations[ev2.evid] = ev2.correlations[ev1.evid] = cc_max
-            pair = Family()
-            pair.extend([ev1, ev2])
-            pairs.append(pair)
-    return pairs
+    return events
 
 
-def _build_families_from_shared_events(pairs):
+def _build_families_from_shared_events(events, cc_min):
     """
-    Build families from pairs sharing an event.
+    Build families by clustering all event pairs sharing an event.
 
-    :param pairs: list of pairs
-    :type pairs: list
+    Valid event pairs are those with a correlation above cc_min.
+
+    :param events: dictionary of events
+    :type events: dict
     :return: list of families
     :rtype: list
     """
+    # Build families from events with correlation above cc_min
     families = []
-    for pair in pairs:
-        ev1, ev2 = pair
-        found_family = False
-        for family in families:
-            if ev1 in family or ev2 in family:
-                found_family = True
-                family.extend(pair)
+    for ev in events.values():
+        new_family = Family()
+        new_family.append(ev)
+        for evid, cc in ev.correlations.items():
+            if cc < cc_min:
+                continue
+            new_family.append(events[evid])
+        if len(new_family) == 1:
+            continue
+        # Check if the new family shares events with an existing family
+        # and merge them, if necessary
+        found_existing_family = False
+        for existing_family in families:
+            if set(existing_family).intersection(new_family):
+                found_existing_family = True
+                existing_family.extend(new_family)
                 break
-        if not found_family:
-            families.append(pair)
+        if not found_existing_family:
+            families.append(new_family)
     return families
 
 
-def _build_families_from_upgma(pairs, cc_min):
+def _build_families_from_upgma(events, cc_min):
     """
-    Build families from pairs using the UPGMA algorithm.
+    Build families of similar events using the UPGMA algorithm.
 
     Reference: https://en.wikipedia.org/wiki/UPGMA
 
-    :param pairs: list of pairs
-    :type pairs: list
+    :param events: dictionary of events
+    :type events: dict
     :return: list of families
     :rtype: list
     """
-    events = {ev.evid: ev for pair in pairs for ev in pair}
     evids = sorted(set(events.keys()))
     # We use sorted tuples of evids as keys to avoid duplicates with inverted
     # order of evids, e.g. (evid1, evid2) and (evid2, evid1)
@@ -193,8 +201,8 @@ def build_families(config):
         logger.error(e)
         rq_exit(1)
     try:
-        logger.info('Reading pairs...')
-        pairs = _read_pairs(config)
+        logger.info('Reading events from pairs file...')
+        events = _read_events_from_pairs_file(config)
     except FileNotFoundError:
         logger.error(
             'Unable to find event pairs file: '
@@ -203,9 +211,9 @@ def build_families(config):
         rq_exit(1)
     if config.clustering_algorithm == 'shared':
         logger.info('Building families from shared events...')
-        families = _build_families_from_shared_events(pairs)
+        families = _build_families_from_shared_events(events, config.cc_min)
     elif config.clustering_algorithm == 'UPGMA':
         logger.info('Building families using UPGMA...')
-        families = _build_families_from_upgma(pairs, config.cc_min)
+        families = _build_families_from_upgma(events, config.cc_min)
     _write_families(config, families)
     logger.info(f'Done! Output written to: {config.build_families_outfile}')

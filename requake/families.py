@@ -23,7 +23,7 @@ class Family(list):
     """
     A list of events belonging to the same family.
     """
-    def __init__(self, number=None):
+    def __init__(self, number=-1):
         self.lon = None
         self.lat = None
         self.depth = None  # km
@@ -45,6 +45,8 @@ class Family(list):
         """
         Append an event to the family and update family attributes.
 
+        If the event is already in the family, it is not appended.
+
         :param ev: Event to append.
         :type ev: RequakeEvent
         """
@@ -63,6 +65,8 @@ class Family(list):
     def extend(self, ev_list):
         """
         Extend the family with a list of events.
+
+        Events already in the family are not added.
 
         :param ev_list: List of events to append.
         :type ev_list: list of RequakeEvent
