@@ -69,7 +69,10 @@ class RequakeEvent():
         return self.evid.__hash__()
 
     def __str__(self):
-        return f'{self.evid} {self.orig_time} {self.mag_type} {self.mag}'
+        return (
+            f'{self.evid} {self.orig_time} '
+            f'{self.lon} {self.lat} {self.depth} {self.mag_type} {self.mag}'
+        )
 
     def from_fdsn_text(self, line):
         """
@@ -77,21 +80,26 @@ class RequakeEvent():
 
         :param line: a line in FDSN text file format
         :type line: str
+
+        :raises ValueError: if line is not in FDSN text file format
         """
-        word = line.split('|')
-        self.evid = word[0]
-        self.orig_time = UTCDateTime(word[1])
-        self.lat = _float_or_none(word[2])
-        self.lon = _float_or_none(word[3])
-        self.depth = _float_or_none(word[4])
-        self.author = word[5]
-        self.catalog = word[6]
-        self.contributor = word[7]
-        self.contributor_id = word[8]
-        self.mag_type = word[9]
-        self.mag = _float_or_none(word[10])
-        self.mag_author = word[11]
-        self.location_name = word[12]
+        try:
+            word = line.split('|')
+            self.evid = word[0]
+            self.orig_time = UTCDateTime(word[1])
+            self.lat = _float_or_none(word[2])
+            self.lon = _float_or_none(word[3])
+            self.depth = _float_or_none(word[4])
+            self.author = word[5]
+            self.catalog = word[6]
+            self.contributor = word[7]
+            self.contributor_id = word[8]
+            self.mag_type = word[9]
+            self.mag = _float_or_none(word[10])
+            self.mag_author = word[11]
+            self.location_name = word[12]
+        except IndexError as e:
+            raise ValueError(f'Invalid line: {line}') from e
 
     def fdsn_text(self):
         """
@@ -210,7 +218,7 @@ def get_events(
         try:
             ev = RequakeEvent()
             ev.from_fdsn_text(line)
-        except Exception:
+        except ValueError:
             continue
         cat.append(ev)
     return cat
@@ -225,6 +233,9 @@ def read_events(filename):
 
     :return: a RequakeCatalog object
     :rtype: RequakeCatalog
+
+    :raises FileNotFoundError: if filename does not exist
+    :raises ValueError: if line is not in FDSN text file format
     """
     cat = RequakeCatalog()
     with open(filename, 'r', encoding='utf8') as fp:
