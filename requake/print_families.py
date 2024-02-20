@@ -13,7 +13,7 @@ import csv
 import logging
 import numpy as np
 from tabulate import tabulate
-from .families import read_selected_families
+from .families import FamilyNotFoundError, read_selected_families
 from .rq_setup import rq_exit
 from .slip import mag_to_slip_in_cm
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -28,7 +28,7 @@ def print_families(config):
     """
     try:
         families = read_selected_families(config)
-    except Exception as msg:
+    except FamilyNotFoundError as msg:
         logger.error(msg)
         rq_exit(1)
 

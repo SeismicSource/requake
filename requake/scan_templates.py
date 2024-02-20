@@ -12,7 +12,8 @@ import logging
 import os
 import sys
 from obspy import read
-from .families import read_families, read_selected_families
+from .families import (
+    FamilyNotFoundError, read_families, read_selected_families)
 from .waveforms import get_waveform, cc_waveform_pair
 from .arrivals import get_arrivals
 from .catalog import RequakeEvent, generate_evid
@@ -108,7 +109,10 @@ def _read_template_from_file(config):
 def _read_templates(config):
     if config.args.template_file is not None:
         return _read_template_from_file(config)
-    families = read_selected_families(config)
+    try:
+        families = read_selected_families(config)
+    except FamilyNotFoundError as m:
+        raise FamilyNotFoundError(m) from m
     templates = []
     for family in families:
         trace_id = family[0].trace_id
@@ -150,6 +154,10 @@ def scan_templates(config):
     """
     try:
         templates = _read_templates(config)
+    except FamilyNotFoundError as m:
+        logger.error(m)
+        rq_exit(1)
+    try:
         catalog_files = _template_catalog_files(config, templates)
     except Exception as m:
         logger.error(str(m))

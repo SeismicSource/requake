@@ -85,6 +85,15 @@ def parse_arguments(progname='requake'):
              'or in years (e.g., 2.5y).'
     )
     # ---
+    # --- minevents
+    #     a parent parser for the "minevents" option,
+    #     used by several subparsers
+    minevents = argparse.ArgumentParser(add_help=False)
+    minevents.add_argument(
+        '-m', '--minevents', type=int, default=0, metavar='NEVENTS',
+        help='only use families with at least NEVENTS events.'
+    )
+    # ---
     # --- familynumbers
     #     a parent parser for the "family_numbers" option,
     #     used by several subparsers
@@ -109,7 +118,7 @@ def parse_arguments(progname='requake'):
     # --- print_families
     printfamilies = subparser.add_parser(
         'print_families',
-        parents=[longerthan, familynumbers],
+        parents=[longerthan, minevents, familynumbers],
         help='print families to screen'
     )
     printfamilies.add_argument(
@@ -121,7 +130,7 @@ def parse_arguments(progname='requake'):
     # --- plot_families
     plotfamilies = subparser.add_parser(
         'plot_families',
-        parents=[longerthan, familynumbers, traceid],
+        parents=[longerthan, minevents, familynumbers, traceid],
         help='plot traces for one ore more event families'
     )
     plotfamilies.add_argument(
@@ -136,7 +145,7 @@ def parse_arguments(progname='requake'):
     # --- plot_timespans
     timespans = subparser.add_parser(
         'plot_timespans',
-        parents=[longerthan, familynumbers],
+        parents=[longerthan, minevents, familynumbers],
         help='plot family timespans'
     )
     timespans.add_argument(
@@ -154,18 +163,18 @@ def parse_arguments(progname='requake'):
     # --- plot_slip
     subparser.add_parser(
         'plot_slip',
-        parents=[longerthan, familynumbers],
+        parents=[longerthan, minevents, familynumbers],
         help='plot cumulative slip for one or more families'
     )
     # ---
     # --- map_families
     mapfamilies = subparser.add_parser(
         'map_families',
-        parents=[longerthan, familynumbers],
+        parents=[longerthan, minevents, familynumbers],
         help='plot families on a map'
     )
     mapfamilies.add_argument(
-        '-m', '--mapstyle', type=str, default='satellite',
+        '-M', '--mapstyle', type=str, default='satellite',
         choices=[
             'stamen_terrain', 'satellite', 'street', 'hillshade',
             'hillshade_dark', 'ocean'
@@ -201,14 +210,14 @@ def parse_arguments(progname='requake'):
     # --- build_templates
     subparser.add_parser(
         'build_templates',
-        parents=[longerthan, familynumbers, traceid],
+        parents=[longerthan, minevents, familynumbers, traceid],
         help='build waveform templates for one or more event families'
     )
     # ---
     # --- scan_templates
     scantemplates = subparser.add_parser(
         'scan_templates',
-        parents=[longerthan, familynumbers, traceid],
+        parents=[longerthan, minevents, familynumbers, traceid],
         help='scan a continuous waveform stream using one or more templates'
     )
     scantemplates.add_argument(

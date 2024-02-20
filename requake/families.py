@@ -19,6 +19,10 @@ from .waveforms import (
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
+class FamilyNotFoundError(Exception):
+    """Exception raised when a family is not found."""
+
+
 class Family(list):
     """
     A list of events belonging to the same family.
@@ -129,12 +133,15 @@ def read_families(config):
 
 def read_selected_families(config):
     """
-    Read and select families based on family number, validity and length.
+    Read and select families based on family number, validity, length
+    and number of events.
 
     :param config: requake configuration object
     :type config: config.Config
     :return: List of families.
     :rtype: list of Family
+
+    :raises FamilyNotFoundError: if no family is found
     """
     family_numbers = _build_family_number_list(config)
     families = read_families(config)
@@ -143,17 +150,20 @@ def read_selected_families(config):
         if family.number not in family_numbers:
             continue
         if not family.valid:
-            msg = f'Family "{family.number}" is flagged as not valid'
-            logger.warning(msg)
+            logger.warning(f'Family "{family.number}" is flagged as not valid')
             continue
         if (family.endtime - family.starttime) < config.args.longerthan:
-            msg = f'Family "{family.number}" is too short'
-            logger.warning(msg)
+            logger.warning(f'Family "{family.number}" is too short')
+            continue
+        if len(family) < config.args.minevents:
+            logger.warning(
+                f'Family "{family.number}" has less than '
+                f'{config.args.minevents} events'
+            )
             continue
         families_selected.append(family)
     if not families_selected:
-        msg = f'No family found with numbers "{family_numbers}"'
-        raise Exception(msg)
+        raise FamilyNotFoundError('No family found')
     return families_selected
 
 

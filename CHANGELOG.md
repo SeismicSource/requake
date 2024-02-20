@@ -16,9 +16,11 @@
 - Config parameter `trace_average_from_normalized_traces` renamed to
   `normalize_traces_before_averaging`
 - `plot_timespans`: possibility to sort by `family_number`
-- Bugfix: `plot_timespans`: correctly plot x time axis when sort by `time`
 - New options for `map_families` to select a map style and a zoom level for the
   map tiles
+- New option `--minevents` (`-m`) for many verbs, to select families with a
+  minimum number of events
+- Bugfix: `plot_timespans`: correctly plot x time axis when sort by `time`
 
 ## v0.3 - 2021-11-08
 

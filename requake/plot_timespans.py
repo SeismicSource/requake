@@ -15,7 +15,7 @@ import matplotlib.dates as mdates
 from matplotlib import cm
 from matplotlib import colors
 import numpy as np
-from .families import read_selected_families
+from .families import FamilyNotFoundError, read_selected_families
 from .rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
@@ -28,7 +28,7 @@ mpl.rcParams['pdf.fonttype'] = 42
 def plot_timespans(config):
     try:
         families = read_selected_families(config)
-    except Exception as msg:
+    except FamilyNotFoundError as msg:
         logger.error(msg)
         rq_exit(1)
     fig, ax = plt.subplots(figsize=(8, 8))

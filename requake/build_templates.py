@@ -11,6 +11,7 @@ Build waveform templates for one or more event families.
 import logging
 import os
 from .families import (
+    FamilyNotFoundError,
     read_selected_families,
     get_family_aligned_waveforms_and_template)
 from .rq_setup import rq_exit
@@ -54,7 +55,7 @@ def build_templates(config):
     """
     try:
         families = read_selected_families(config)
-    except Exception as m:
+    except FamilyNotFoundError as m:
         logger.error(str(m))
         rq_exit(1)
     for family in families:
