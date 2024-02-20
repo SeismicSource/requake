@@ -27,8 +27,10 @@ model = TauPyModel(model='ak135')
 class NoMetadataError(Exception):
     """Exception raised for missing metadata."""
 
+
 class NoWaveformError(Exception):
     """Exception raised for missing waveform data."""
+
 
 class MetadataMismatchError(Exception):
     """Exception raised for mismatched metadata."""
