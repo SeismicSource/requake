@@ -12,20 +12,17 @@ import contextlib
 import logging
 from itertools import combinations
 import numpy as np
-from obspy import Inventory, Stream, UTCDateTime
+from obspy import Stream, UTCDateTime
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
 from obspy.signal.cross_correlation import correlate, xcorr_max
 from obspy.clients.fdsn.header import FDSNNoDataException
 from scipy.stats import median_abs_deviation
+from .station_metadata import get_metadata
 from .arrivals import get_arrivals
 from .rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 model = TauPyModel(model='ak135')
-
-
-class NoMetadataError(Exception):
-    """Exception raised for missing metadata."""
 
 
 class NoWaveformError(Exception):
@@ -36,48 +33,10 @@ class MetadataMismatchError(Exception):
     """Exception raised for mismatched metadata."""
 
 
-def _get_metadata(config):
-    """Download metadata for the trace_ids specified in config file."""
-    logger.info('Downloading station metadata...')
-    inv = Inventory()
-    cl = config.fdsn_station_client
-    start_time = min(config.catalog_start_times)
-    end_time = max(config.catalog_end_times)
-    if config.args.traceid is not None:
-        trace_ids = [config.args.traceid, ]
-    else:
-        trace_ids = config.catalog_trace_id
-    for trace_id in trace_ids:
-        net, sta, loc, chan = trace_id.split('.')
-        try:
-            inv += cl.get_stations(
-                network=net, station=sta, location=loc, channel=chan,
-                starttime=start_time, endtime=end_time, level='channel'
-            )
-        except FDSNNoDataException as m:
-            msg = str(m).replace('\n', ' ')
-            raise NoMetadataError(
-                f'Unable to download metadata for trace id: {trace_id}.\n'
-                f'Error message: {msg}'
-            ) from m
-    channels = inv.get_contents()['channels']
-    unique_channels = set(channels)
-    channel_count = [channels.count(id) for id in unique_channels]
-    for channel, count in zip(unique_channels, channel_count):
-        if count > 1:
-            logger.warning(
-                f'Channel {channel} is present {count} times in inventory')
-    config.inventory = inv
-    logger.info(
-        'Metadata downloaded for channels: '
-        f"{set(config.inventory.get_contents()['channels'])}"
-    )
-
-
 def _get_trace_id(config, ev):
     """Get trace id to use with ev."""
     if config.inventory is None:
-        _get_metadata(config)
+        get_metadata(config)
     trace_ids = config.catalog_trace_id
     if len(trace_ids) == 1:
         return trace_ids[0]
@@ -129,7 +88,7 @@ def get_waveform(config, traceid, starttime, endtime):
 def get_event_waveform(config, ev):
     """Download waveform for a given event at a given trace_id."""
     if config.inventory is None:
-        _get_metadata(config)
+        get_metadata(config)
     evid = ev.evid
     ev_lat = ev.lat
     ev_lon = ev.lon
@@ -203,7 +162,7 @@ def get_waveform_pair(config, pair):
     :rtype: obspy.Stream
     """
     if config.inventory is None:
-        _get_metadata(config)
+        get_metadata(config)
     ev1, ev2 = pair
     ev1.trace_id = ev2.trace_id = _get_trace_id(config, ev1)
     st = Stream()
