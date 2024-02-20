@@ -126,7 +126,6 @@ def _build_families_from_upgma(events, cc_min):
     :return: list of families
     :rtype: list
     """
-    evids = sorted(set(events.keys()))
     # We use sorted tuples of evids as keys to avoid duplicates with inverted
     # order of evids, e.g. (evid1, evid2) and (evid2, evid1)
     correlations = {
@@ -134,11 +133,14 @@ def _build_families_from_upgma(events, cc_min):
         for evid1, ev in events.items()
         for evid2, cc in ev.correlations.items()
     }
+    min_correlation = min(correlations.values())
     # Build distance dictionary. Distance is 1 - correlation.
-    # We use cc_min-0.1 for pairs with no correlation, so that they are not
-    # clustered together
+    # We use min_correlation for pairs for which no correlation is available
+    evids = sorted(set(events.keys()))
     distances = {
-        k: 1-correlations.get(k, cc_min-0.1) for k in combinations(evids, 2)}
+        k: 1-correlations.get(k, min_correlation)
+        for k in combinations(evids, 2)
+    }
     # Build pairwise distance matrix, then the linkage matrix,
     # then the clusters
     pairwise_distances = [distances[k] for k in sorted(distances.keys())]
