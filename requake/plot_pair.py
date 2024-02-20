@@ -26,9 +26,17 @@ mpl.rcParams['pdf.fonttype'] = 42
 def _download_event(config, evid):
     """Download an event based on its evid."""
     ev = None
-    with contextlib.suppress(Exception):
+    try:
         cat = read_events(config.scan_catalog_file)
         return [e for e in cat if e.evid == evid][0]
+    except ValueError as m:
+        logger.error(
+            f'Error reading catalog file {config.scan_catalog_file}'
+        )
+        logger.error(m)
+        rq_exit(1)
+    except FileNotFoundError:
+        pass
     for url in config.catalog_fdsn_event_urls:
         with contextlib.suppress(Exception):
             ev = get_events(url, eventid=evid)[0]
