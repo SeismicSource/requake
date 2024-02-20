@@ -8,7 +8,6 @@ Catalog-based repeater scan for Requake.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
-import contextlib
 import logging
 import csv
 from math import factorial
@@ -29,13 +28,21 @@ def _get_catalog(config):
 
     Reads a cached catalog file, if available.
     """
-    with contextlib.suppress(FileNotFoundError):
+    try:
         cat = read_events(config.scan_catalog_file)
         logger.info(
             f'An existing catalog file was found at {config.scan_catalog_file}'
         )
         logger.info(f'{len(cat)} events read from catalog file')
         return cat
+    except ValueError as m:
+        logger.error(
+            f'Error reading catalog file {config.scan_catalog_file}'
+        )
+        logger.error(m)
+        rq_exit(1)
+    except FileNotFoundError:
+        pass
     logger.info('Downloading events...')
     cat_info = zip(
         config.catalog_fdsn_event_urls,
