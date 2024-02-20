@@ -153,7 +153,8 @@ def get_events(
         minlongitude=None, maxlongitude=None,
         latitude=None, longitude=None, minradius=None, maxradius=None,
         mindepth=None, maxdepth=None,
-        minmagnitude=None, maxmagnitude=None):
+        minmagnitude=None, maxmagnitude=None,
+        eventid=None):
     """
     Download from a fdsn-event webservice using text format.
 
