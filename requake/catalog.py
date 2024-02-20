@@ -10,8 +10,10 @@ Classes and functions for downloading, reading and writing catalogs.
 """
 import contextlib
 import urllib.request
+import numpy as np
 from obspy.clients.fdsn.header import URL_MAPPINGS
 from obspy import UTCDateTime
+from .station_metadata import get_traceid_coords
 
 
 def _float_or_none(string):
@@ -248,6 +250,27 @@ def read_events(filename):
             ev.from_fdsn_text(line)
             cat.append(ev)
     return cat
+
+
+def fix_non_locatable_events(catalog, config):
+    """
+    Fix non-locatable events in catalog.
+
+    :param catalog: a RequakeCatalog object
+    :type catalog: RequakeCatalog
+    :param config: a Config object
+    :type config: config.Config
+    """
+    traceid_coords = get_traceid_coords(config)
+    mean_lat = np.mean([
+        coords['latitude'] for coords in traceid_coords.values()])
+    mean_lon = np.mean([
+        coords['longitude'] for coords in traceid_coords.values()])
+    for ev in catalog:
+        if ev.lat is None or ev.lon is None:
+            ev.lat = mean_lat
+            ev.lon = mean_lon
+            ev.depth = 10.0
 
 
 def _base26(val):

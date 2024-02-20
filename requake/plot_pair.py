@@ -13,7 +13,7 @@ import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from .rq_setup import rq_exit
-from .catalog import get_events, read_events
+from .catalog import get_events, read_events, fix_non_locatable_events
 from .waveforms import get_waveform_pair, process_waveforms, align_pair
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
@@ -28,6 +28,7 @@ def _download_event(config, evid):
     ev = None
     try:
         cat = read_events(config.scan_catalog_file)
+        fix_non_locatable_events(cat, config)
         return [e for e in cat if e.evid == evid][0]
     except ValueError as m:
         logger.error(
@@ -84,14 +85,22 @@ def plot_pair(config):
     ax[0].set_title(title, loc='right')
     stats1 = tr1.stats
     stats2 = tr2.stats
+    if stats1.mag is not None:
+        mag1_str = f'{stats1.mag_type} {stats1.mag:.1f}'
+    else:
+        mag1_str = 'no mag'
+    if stats2.mag is not None:
+        mag2_str = f'{stats2.mag_type} {stats2.mag:.1f}'
+    else:
+        mag2_str = 'no mag'
     label1 = (
-        f'{stats1.evid}, {stats1.mag_type} {stats1.mag:.1f}, '
+        f'{stats1.evid}, {mag1_str}, '
         f'{stats1.orig_time.strftime("%Y-%m-%dT%H:%M:%S")}\n'
         f'{stats1.ev_lat:.4f}°N {stats1.ev_lon:.4f}°E '
         f'{stats1.ev_depth:.3f} km'
     )
     label2 = (
-        f'{stats2.evid}, {stats2.mag_type} {stats2.mag:.1f}, '
+        f'{stats2.evid}, {mag2_str}, '
         f'{stats2.orig_time.strftime("%Y-%m-%dT%H:%M:%S")}\n'
         f'{stats2.ev_lat:.4f}°N {stats2.ev_lon:.4f}°E '
         f'{stats2.ev_depth:.3f} km'
