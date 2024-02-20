@@ -20,6 +20,7 @@
   map tiles
 - New option `--minevents` (`-m`) for many verbs, to select families with a
   minimum number of events
+- Support for events with no location
 - Bugfix: `plot_timespans`: correctly plot x time axis when sort by `time`
 
 ## v0.3 - 2021-11-08

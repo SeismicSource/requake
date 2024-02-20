@@ -18,7 +18,7 @@ from obspy.taup import TauPyModel
 from obspy.signal.cross_correlation import correlate, xcorr_max
 from obspy.clients.fdsn.header import FDSNNoDataException
 from scipy.stats import median_abs_deviation
-from .station_metadata import get_metadata
+from .station_metadata import get_traceid_coords
 from .arrivals import get_arrivals
 from .rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -29,37 +29,36 @@ class NoWaveformError(Exception):
     """Exception raised for missing waveform data."""
 
 
-class MetadataMismatchError(Exception):
-    """Exception raised for mismatched metadata."""
-
-
 def _get_trace_id(config, ev):
-    """Get trace id to use with ev."""
-    if config.inventory is None:
-        get_metadata(config)
+    """
+    Get trace id to use with the given event.
+
+    If there is only one trace_id in the config file, return it.
+    If there are multiple trace_ids, return the one closest to the event.
+
+    :param config: a Config object
+    :type config: config.Config
+    :param ev: an event
+    :type ev: RequakeEvent
+    :return: the trace_id to use
+    :rtype: str
+    """
     trace_ids = config.catalog_trace_id
     if len(trace_ids) == 1:
         return trace_ids[0]
     ev_lat = ev.lat
     ev_lon = ev.lon
     orig_time = ev.orig_time
-    distances = []
-    for trace_id in trace_ids:
-        try:
-            coords = config.inventory.get_coordinates(trace_id, orig_time)
-        except Exception as m:
-            # note: get_coordinaets raises a generic Exception
-            raise MetadataMismatchError(
-                f'Unable to find coordinates for trace {trace_id} '
-                f'at time {orig_time}'
-            ) from m
+    traceid_coords = get_traceid_coords(config, orig_time)
+    distances = {}
+    for trace_id, coords in traceid_coords.items():
         trace_lat = coords['latitude']
         trace_lon = coords['longitude']
         distance, _, _ = gps2dist_azimuth(
             trace_lat, trace_lon, ev_lat, ev_lon)
-        distances.append(distance)
+        distances[trace_id] = distance
     # return the trace_id for the closest trace
-    return min(zip(trace_ids, distances), key=lambda x: x[1])[0]
+    return min(distances, key=distances.get)
 
 
 def get_waveform(config, traceid, starttime, endtime):
@@ -87,8 +86,6 @@ def get_waveform(config, traceid, starttime, endtime):
 
 def get_event_waveform(config, ev):
     """Download waveform for a given event at a given trace_id."""
-    if config.inventory is None:
-        get_metadata(config)
     evid = ev.evid
     ev_lat = ev.lat
     ev_lon = ev.lon
@@ -99,16 +96,9 @@ def get_event_waveform(config, ev):
     mag_type = ev.mag_type
     traceid = ev.trace_id if config.args.traceid is None\
         else config.args.traceid
-    try:
-        coords = config.inventory.get_coordinates(traceid, orig_time)
-    except Exception as m:
-        # note: get_coordinaets raises a generic Exception
-        raise MetadataMismatchError(
-            f'Unable to find coordinates for trace {traceid} '
-            f'at time {orig_time}'
-        ) from m
-    trace_lat = coords['latitude']
-    trace_lon = coords['longitude']
+    traceid_coords = get_traceid_coords(config, orig_time)
+    trace_lat = traceid_coords[traceid]['latitude']
+    trace_lon = traceid_coords[traceid]['longitude']
     p_arrival, s_arrival, distance, dist_deg = get_arrivals(
         trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
     p_arrival_time = orig_time + p_arrival.time
@@ -125,7 +115,7 @@ def get_event_waveform(config, ev):
     tr.stats.orig_time = orig_time
     tr.stats.mag = mag
     tr.stats.mag_type = mag_type
-    tr.stats.coords = coords
+    tr.stats.coords = traceid_coords[traceid]
     tr.stats.dist_deg = dist_deg
     tr.stats.distance = distance
     tr.stats.P_arrival_time = p_arrival_time
@@ -161,8 +151,6 @@ def get_waveform_pair(config, pair):
     :return: stream containing the two traces
     :rtype: obspy.Stream
     """
-    if config.inventory is None:
-        get_metadata(config)
     ev1, ev2 = pair
     ev1.trace_id = ev2.trace_id = _get_trace_id(config, ev1)
     st = Stream()

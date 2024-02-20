@@ -18,6 +18,10 @@ class NoMetadataError(Exception):
     """Exception raised for missing metadata."""
 
 
+class MetadataMismatchError(Exception):
+    """Exception raised for mismatched metadata."""
+
+
 def get_metadata(config):
     """
     Download metadata for the trace_ids specified in config file.
@@ -61,3 +65,32 @@ def get_metadata(config):
         'Metadata downloaded for channels: '
         f"{set(config.inventory.get_contents()['channels'])}"
     )
+
+
+def get_traceid_coords(config, orig_time=None):
+    """
+    Get coordinates for the trace_ids specified in config file.
+
+    :param config: a Config object
+    :type config: config.Config
+    :param orig_time: origin time
+    :type orig_time: obspy.UTCDateTime
+    :return: a dictionary with trace_id as key and coordinates as value
+    :rtype: dict
+
+    :raises MetadataMismatchError: if coordinates are not found
+    """
+    if config.inventory is None:
+        get_metadata(config)
+    traceid_coords = {}
+    for trace_id in config.catalog_trace_id:
+        try:
+            coords = config.inventory.get_coordinates(trace_id, orig_time)
+        except Exception as m:
+            # note: get_coordinaets raises a generic Exception
+            raise MetadataMismatchError(
+                f'Unable to find coordinates for trace {trace_id} '
+                f'at time {orig_time}'
+            ) from m
+        traceid_coords[trace_id] = coords
+    return traceid_coords

@@ -13,9 +13,10 @@ import csv
 from math import factorial
 from itertools import combinations
 from tqdm import tqdm
+import numpy as np
 from obspy.geodetics import gps2dist_azimuth
 from .catalog import RequakeCatalog, get_events, read_events
-from .station_metadata import get_metadata, NoMetadataError
+from .station_metadata import get_metadata, get_traceid_coords, NoMetadataError
 from .waveforms import (
     get_waveform_pair, cc_waveform_pair, NoWaveformError,
 )
@@ -79,6 +80,20 @@ def _get_catalog(config):
     return cat
 
 
+def _fix_non_locatable_events(catalog, config):
+    """Fix non-locatable events."""
+    traceid_coords = get_traceid_coords(config)
+    mean_lat = np.mean([
+        coords['latitude'] for coords in traceid_coords.values()])
+    mean_lon = np.mean([
+        coords['longitude'] for coords in traceid_coords.values()])
+    for ev in catalog:
+        if ev.lat is None or ev.lon is None:
+            ev.lat = mean_lat
+            ev.lon = mean_lon
+            ev.depth = 10.0
+
+
 def _pair_ok(config, pair):
     """Check if events in pair are close enough."""
     ev1, ev2 = pair
@@ -137,6 +152,7 @@ def scan_catalog(config):
     """
     get_metadata(config)
     catalog = _get_catalog(config)
+    _fix_non_locatable_events(catalog, config)
     nevents = len(catalog)
     logger.info('Building event pairs...')
     logger.info('Computing waveform cross-correlation...')
