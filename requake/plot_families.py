@@ -94,8 +94,12 @@ def _plot_family(config, family):
             )
         else:
             y_label = tr.stats.orig_time.strftime('%Y-%m-%d\n%H:%M:%S')
+            mag_str = (
+                f'{tr.stats.mag_type} {tr.stats.mag:.1f}'
+                if tr.stats.mag else ''
+            )
             info_text = (
-                f'{tr.stats.evid} {tr.stats.mag_type} {tr.stats.mag:.1f}\n'
+                f'{tr.stats.evid} {mag_str}\n'
                 f'{tr.stats.ev_lon:.4f}°E {tr.stats.ev_lat:.4f}°N '
                 f'{tr.stats.ev_depth:.3f} km'
             )
@@ -209,11 +213,7 @@ def plot_families(config):
         logger.error(str(m))
         rq_exit(1)
     for family in families:
-        try:
-            _plot_family(config, family)
-        except Exception as m:
-            logger.error(str(m))
-            continue
+        _plot_family(config, family)
     print('''
     Use left/right arrow keys to scroll backwards/forward in time.
     Use shift+left/shift+right to increase/decrease the time window.
