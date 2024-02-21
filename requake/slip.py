@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def _mag_to_moment(magnitude, unit='N.m'):
+    if magnitude is None:
+        return 0
     if unit == 'N.m':
         moment = 10**(3/2*(magnitude+6.07))
     elif unit == 'dyne.cm':
@@ -33,6 +35,8 @@ def mag_to_slip_in_cm(_config, magnitude):
     :returns: slip in cm
     :rtype: float
     """
+    if magnitude is None:
+        return 0
     moment = _mag_to_moment(magnitude, unit='dyne.cm')
     # TODO: add other laws via config parameter
     # Nadeau and Johnson (1998)
