@@ -13,15 +13,8 @@ import urllib.request
 import numpy as np
 from obspy.clients.fdsn.header import URL_MAPPINGS
 from obspy import UTCDateTime
+from .utils import float_or_none
 from .station_metadata import get_traceid_coords
-
-
-def _float_or_none(string):
-    try:
-        val = float(string)
-    except (TypeError, ValueError):
-        val = None
-    return val
 
 
 class RequakeEvent():
@@ -89,15 +82,15 @@ class RequakeEvent():
             word = line.split('|')
             self.evid = word[0]
             self.orig_time = UTCDateTime(word[1])
-            self.lat = _float_or_none(word[2])
-            self.lon = _float_or_none(word[3])
-            self.depth = _float_or_none(word[4])
+            self.lat = float_or_none(word[2])
+            self.lon = float_or_none(word[3])
+            self.depth = float_or_none(word[4])
             self.author = word[5]
             self.catalog = word[6]
             self.contributor = word[7]
             self.contributor_id = word[8]
             self.mag_type = word[9]
-            self.mag = _float_or_none(word[10])
+            self.mag = float_or_none(word[10])
             self.mag_author = word[11]
             self.location_name = word[12]
         except IndexError as e:

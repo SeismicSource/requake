@@ -128,3 +128,19 @@ def validate_config(config_obj):
         sys.exit(1)
     if not test:
         err_exit('No configuration value present!')
+
+
+def float_or_none(string):
+    """
+    Convert string to float, return None if conversion fails.
+
+    :param string: Input string.
+    :type string: str
+    :return: Float value or None.
+    :rtype: float or None
+    """
+    try:
+        val = float(string)
+    except (TypeError, ValueError):
+        val = None
+    return val

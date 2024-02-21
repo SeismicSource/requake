@@ -13,6 +13,7 @@ import csv
 import numpy as np
 from obspy import UTCDateTime, Stream
 from obspy.geodetics import gps2dist_azimuth
+from .utils import float_or_none
 from .catalog import RequakeEvent
 from .waveforms import (
     get_event_waveform, align_traces, build_template)
@@ -111,11 +112,11 @@ def read_families(config):
             ev = RequakeEvent()
             ev.evid = row['evid']
             ev.orig_time = UTCDateTime(row['orig_time'])
-            ev.lon = float(row['lon'])
-            ev.lat = float(row['lat'])
-            ev.depth = float(row['depth_km'])
+            ev.lon = float_or_none(row['lon'])
+            ev.lat = float_or_none(row['lat'])
+            ev.depth = float_or_none(row['depth_km'])
             ev.mag_type = row['mag_type']
-            ev.mag = float(row['mag'])
+            ev.mag = float_or_none(row['mag'])
             ev.trace_id = row['trace_id']
             family_number = int(row['family_number'])
             if family_number != old_family_number:

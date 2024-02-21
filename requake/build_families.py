@@ -13,6 +13,7 @@ import csv
 from itertools import combinations
 from scipy.cluster.hierarchy import average, fcluster
 from obspy import UTCDateTime
+from .utils import float_or_none
 from .catalog import RequakeEvent
 from .families import Family
 from .rq_setup import rq_exit
@@ -58,10 +59,14 @@ def _read_events_from_pairs_file(config):
                 ev1 = events[evid1]
             except KeyError:
                 ev1 = RequakeEvent(
-                    evid=evid1, orig_time=UTCDateTime(row['orig_time1']),
-                    lon=float(row['lon1']), lat=float(row['lat1']),
-                    depth=float(row['depth_km1']), mag_type=row['mag_type1'],
-                    mag=float(row['mag1']), trace_id=row['trace_id']
+                    evid=evid1,
+                    orig_time=UTCDateTime(row['orig_time1']),
+                    lon=float_or_none(row['lon1']),
+                    lat=float_or_none(row['lat1']),
+                    depth=float_or_none(row['depth_km1']),
+                    mag_type=row['mag_type1'],
+                    mag=float_or_none(row['mag1']),
+                    trace_id=row['trace_id']
                 )
                 events[evid1] = ev1
             evid2 = row['evid2']
@@ -69,10 +74,14 @@ def _read_events_from_pairs_file(config):
                 ev2 = events[evid2]
             except KeyError:
                 ev2 = RequakeEvent(
-                    evid=evid2, orig_time=UTCDateTime(row['orig_time2']),
-                    lon=float(row['lon2']), lat=float(row['lat2']),
-                    depth=float(row['depth_km2']), mag_type=row['mag_type2'],
-                    mag=float(row['mag2']), trace_id=row['trace_id']
+                    evid=evid2,
+                    orig_time=UTCDateTime(row['orig_time2']),
+                    lon=float_or_none(row['lon2']),
+                    lat=float_or_none(row['lat2']),
+                    depth=float_or_none(row['depth_km2']),
+                    mag_type=row['mag_type2'],
+                    mag=float_or_none(row['mag2']),
+                    trace_id=row['trace_id']
                 )
                 events[evid2] = ev2
             # Store the correlation between the two events in both events
