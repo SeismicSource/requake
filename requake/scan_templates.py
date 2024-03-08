@@ -154,7 +154,7 @@ def scan_templates(config):
     """
     try:
         templates = _read_templates(config)
-    except FamilyNotFoundError as m:
+    except (FileNotFoundError, FamilyNotFoundError) as m:
         logger.error(m)
         rq_exit(1)
     try:

@@ -207,10 +207,13 @@ def _plot_family(config, family):
 
 
 def plot_families(config):
+    """"
+    Plot traces for one or more event families.
+    """
     try:
         families = read_selected_families(config)
-    except FamilyNotFoundError as m:
-        logger.error(str(m))
+    except (FileNotFoundError, FamilyNotFoundError) as m:
+        logger.error(m)
         rq_exit(1)
     for family in families:
         _plot_family(config, family)

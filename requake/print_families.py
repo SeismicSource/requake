@@ -28,7 +28,7 @@ def print_families(config):
     """
     try:
         families = read_selected_families(config)
-    except FamilyNotFoundError as msg:
+    except (FileNotFoundError, FamilyNotFoundError) as msg:
         logger.error(msg)
         rq_exit(1)
 

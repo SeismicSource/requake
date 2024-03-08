@@ -26,10 +26,13 @@ mpl.rcParams['pdf.fonttype'] = 42
 
 
 def plot_timespans(config):
+    """
+    Plot family timespans.
+    """
     try:
         families = read_selected_families(config)
-    except FamilyNotFoundError as msg:
-        logger.error(msg)
+    except (FileNotFoundError, FamilyNotFoundError) as m:
+        logger.error(m)
         rq_exit(1)
     fig, ax = plt.subplots(figsize=(8, 8))
     years = mdates.YearLocator()   # every year

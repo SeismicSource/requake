@@ -27,10 +27,13 @@ mpl.rcParams['pdf.fonttype'] = 42
 
 
 def plot_slip(config):
+    """
+    Plot cumulative slip for one or more families.
+    """
     try:
         families = read_selected_families(config)
-    except FamilyNotFoundError as msg:
-        logger.error(msg)
+    except (FileNotFoundError, FamilyNotFoundError) as m:
+        logger.error(m)
         rq_exit(1)
     fig, ax = plt.subplots(figsize=(8, 4))
     years = mdates.YearLocator()   # every year

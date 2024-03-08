@@ -98,10 +98,13 @@ def _make_basemap(config):
 
 
 def map_families(config):
+    """
+    Plot families on a map.
+    """
     try:
         families = read_selected_families(config)
-    except FamilyNotFoundError as msg:
-        logger.error(msg)
+    except (FileNotFoundError, FamilyNotFoundError) as m:
+        logger.error(m)
         rq_exit(1)
     fig, ax = _make_basemap(config)
     trans = ccrs.PlateCarree()
