@@ -144,3 +144,19 @@ def float_or_none(string):
     except (TypeError, ValueError):
         val = None
     return val
+
+
+def int_or_none(string):
+    """
+    Convert string to int, return None if conversion fails.
+
+    :param string: Input string.
+    :type string: str
+    :return: Integer value or None.
+    :rtype: int or None
+    """
+    try:
+        val = int(string)
+    except (TypeError, ValueError):
+        val = None
+    return val

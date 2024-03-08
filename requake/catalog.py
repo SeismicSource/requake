@@ -8,10 +8,7 @@ Classes and functions for downloading, reading and writing catalogs.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
-import contextlib
-import urllib.request
 import numpy as np
-from obspy.clients.fdsn.header import URL_MAPPINGS
 from obspy import UTCDateTime
 from .utils import float_or_none
 from .station_metadata import get_traceid_coords
@@ -79,7 +76,7 @@ class RequakeEvent():
         :raises ValueError: if line is not in FDSN text file format
         """
         try:
-            word = line.split('|')
+            word = line.strip().split('|')
             self.evid = word[0]
             self.orig_time = UTCDateTime(word[1])
             self.lat = float_or_none(word[2])
@@ -125,11 +122,56 @@ class RequakeCatalog(list):
     """A catalog class."""
 
     def __str__(self):
+        """
+        Return a string representation of the catalog.
+
+        :return: a string representation of the catalog
+        :rtype: str
+        """
         return '\n'.join(str(ev) for ev in self)
+
+    def deduplicate(self):
+        """
+        Deduplicate events in the catalog.
+
+        The operation is in place.
+        """
+        self[:] = list(set(self))
+
+    def sort(self):
+        """
+        Sort events by origin time.
+
+        The operation is in place.
+        """
+        self[:] = sorted(self, key=lambda ev: ev.orig_time)
+
+    def read(self, filename):
+        """
+        Read catalog from FDSN text file format.
+
+        Skips events already in the catalog.
+
+        :param filename: input filename
+        :type filename: str
+
+        :raises FileNotFoundError: if filename does not exist
+        :raises ValueError: if line is not in FDSN text file format
+        """
+        with open(filename, 'r', encoding='utf8') as fp:
+            for line in fp:
+                if not line:
+                    continue
+                if line[0] == '#':
+                    continue
+                ev = RequakeEvent()
+                ev.from_fdsn_text(line)
+                self.append(ev)
+        self.deduplicate()
 
     def write(self, filename):
         """
-        Write in FDSN text file format.
+        Write catalog in FDSN text file format.
 
         :param filename: output filename
         :type filename: str
@@ -139,111 +181,31 @@ class RequakeCatalog(list):
                 fp.write(ev.fdsn_text() + '\n')
 
 
-def get_events(
-        baseurl,
-        starttime=None, endtime=None,
-        minlatitude=None, maxlatitude=None,
-        minlongitude=None, maxlongitude=None,
-        latitude=None, longitude=None, minradius=None, maxradius=None,
-        mindepth=None, maxdepth=None,
-        minmagnitude=None, maxmagnitude=None,
-        eventid=None):
+def read_stored_catalog(config):
     """
-    Download from a fdsn-event webservice using text format.
+    Read the catalog stored in the output directory.
 
-    :param baseurl: base URL of the fdsn-event webservice
-    :type baseurl: str
-    :param starttime: start time
-    :type starttime: obspy.UTCDateTime or str
-    :param endtime: end time
-    :type endtime: obspy.UTCDateTime or str
-    :param minlatitude: minimum latitude
-    :type minlatitude: float
-    :param maxlatitude: maximum latitude
-    :type maxlatitude: float
-    :param minlongitude: minimum longitude
-    :type minlongitude: float
-    :param maxlongitude: maximum longitude
-    :type maxlongitude: float
-    :param latitude: latitude of radius center
-    :type latitude: float
-    :param longitude: longitude of radius center
-    :type longitude: float
-    :param minradius: minimum radius
-    :type minradius: float
-    :param maxradius: maximum radius
-    :type maxradius: float
-    :param mindepth: minimum depth
-    :type mindepth: float
-    :param maxdepth: maximum depth
-    :type maxdepth: float
-    :param minmagnitude: minimum magnitude
-    :type minmagnitude: float
-    :param maxmagnitude: maximum magnitude
-    :type maxmagnitude: float
+    :param config: Configuration object.
+    :type config: config.Config
 
-    :return: a RequakeCatalog object
-    :rtype: RequakeCatalog
-    """
-    # pylint: disable=unused-argument
-    arguments = locals()
-    query = 'query?format=text&nodata=404&'
-    for key, val in arguments.items():
-        if key in ['baseurl']:
-            continue
-        if val is None:
-            continue
-        if isinstance(val, UTCDateTime):
-            val = val.strftime('%Y-%m-%dT%H:%M:%S')
-        query += f'{key}={val}&'
-    # remove last "&" symbol
-    query = query[:-1]
-    # see if baseurl is an alias defined in ObsPy
-    with contextlib.suppress(KeyError):
-        baseurl = URL_MAPPINGS[baseurl]
-    baseurl = f'{baseurl}/fdsnws/event/1/'
-    url = baseurl + query
-    cat = RequakeCatalog()
-    with urllib.request.urlopen(url) as f:
-        content = f.read().decode('utf-8')
-    for line in content.split('\n'):
-        if not line:
-            continue
-        if line[0] == '#':
-            continue
-        try:
-            ev = RequakeEvent()
-            ev.from_fdsn_text(line)
-        except ValueError:
-            continue
-        cat.append(ev)
-    return cat
-
-
-def read_events(filename):
-    """
-    Read events in FDSN text file format.
-
-    :param filename: input filename
-    :type filename: str
-
-    :return: a RequakeCatalog object
+    :return: Catalog object.
     :rtype: RequakeCatalog
 
-    :raises FileNotFoundError: if filename does not exist
-    :raises ValueError: if line is not in FDSN text file format
+    :raises ValueError: if error reading catalog file
+    :raises FileNotFoundError: if catalog file not found
     """
-    cat = RequakeCatalog()
-    with open(filename, 'r', encoding='utf8') as fp:
-        for line in fp:
-            if not line:
-                continue
-            if line[0] == '#':
-                continue
-            ev = RequakeEvent()
-            ev.from_fdsn_text(line)
-            cat.append(ev)
-    return cat
+    try:
+        cat = RequakeCatalog()
+        cat.read(config.scan_catalog_file)
+        return cat
+    except ValueError as m:
+        raise ValueError(
+            f'Error reading catalog file {config.scan_catalog_file}'
+        ) from m
+    except FileNotFoundError as m:
+        raise FileNotFoundError(
+            f'Catalog file {config.scan_catalog_file} not found'
+        ) from m
 
 
 def fix_non_locatable_events(catalog, config):
@@ -255,6 +217,8 @@ def fix_non_locatable_events(catalog, config):
     :param config: a Config object
     :type config: config.Config
     """
+    if not any(ev.lat is None or ev.lon is None for ev in catalog):
+        return
     traceid_coords = get_traceid_coords(config)
     mean_lat = np.mean([
         coords['latitude'] for coords in traceid_coords.values()])

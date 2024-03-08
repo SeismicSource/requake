@@ -14,70 +14,13 @@ from math import factorial
 from itertools import combinations
 from tqdm import tqdm
 from obspy.geodetics import gps2dist_azimuth
-from .catalog import (
-    RequakeCatalog, get_events, read_events, fix_non_locatable_events)
-from .station_metadata import get_metadata, NoMetadataError
+from .catalog import fix_non_locatable_events, read_stored_catalog
+from .station_metadata import NoMetadataError
 from .waveforms import (
     get_waveform_pair, cc_waveform_pair, NoWaveformError,
 )
 from .rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
-
-
-def _get_catalog(config):
-    """
-    Download events based on user-defined criteria.
-
-    Reads a cached catalog file, if available.
-    """
-    try:
-        cat = read_events(config.scan_catalog_file)
-        logger.info(
-            f'An existing catalog file was found at {config.scan_catalog_file}'
-        )
-        logger.info(f'{len(cat)} events read from catalog file')
-        return cat
-    except ValueError as m:
-        logger.error(
-            f'Error reading catalog file {config.scan_catalog_file}'
-        )
-        logger.error(m)
-        rq_exit(1)
-    except FileNotFoundError:
-        pass
-    logger.info('Downloading events...')
-    cat_info = zip(
-        config.catalog_fdsn_event_urls,
-        config.catalog_start_times,
-        config.catalog_end_times)
-    catalog = []
-    for url, start_time, end_time in cat_info:
-        try:
-            catalog += get_events(
-                url,
-                starttime=start_time, endtime=end_time,
-                minlatitude=config.catalog_lat_min,
-                maxlatitude=config.catalog_lat_max,
-                minlongitude=config.catalog_lon_min,
-                maxlongitude=config.catalog_lon_max,
-                mindepth=config.catalog_depth_min,
-                maxdepth=config.catalog_depth_max,
-                minmagnitude=config.catalog_mag_min,
-                maxmagnitude=config.catalog_mag_max
-            )
-        except Exception as m:
-            logger.warning(
-                f'Unable to download events from {url} for period '
-                f'{start_time} - {end_time}. {m}'
-            )
-    if not catalog:
-        logger.error('No event downloaded')
-        rq_exit(1)
-    # Sort catalog in increasing time order
-    cat = RequakeCatalog(sorted(catalog, key=lambda ev: ev.orig_time))
-    cat.write(config.scan_catalog_file)
-    logger.info(f'{len(cat)} events downloaded')
-    return cat
 
 
 def _pair_ok(config, pair):
@@ -136,10 +79,14 @@ def scan_catalog(config):
     :param config: Configuration object.
     :type config: config.Config
     """
-    get_metadata(config)
-    catalog = _get_catalog(config)
+    try:
+        catalog = read_stored_catalog(config)
+    except (ValueError, FileNotFoundError) as m:
+        logger.error(m)
+        rq_exit(1)
     fix_non_locatable_events(catalog, config)
     nevents = len(catalog)
+    logger.info(f'{nevents} events read from catalog file')
     logger.info('Building event pairs...')
     logger.info('Computing waveform cross-correlation...')
     with open(config.scan_catalog_pairs_file, 'w', encoding='utf-8') as fp_out:

@@ -19,6 +19,9 @@ def main():
     args = parse_arguments()
     from ..rq_setup import configure, rq_exit
     config = configure(args)
+    if config.args.action == 'read_catalog':
+        from ..read_catalog import read_catalog
+        read_catalog(config)
     if config.args.action == 'scan_catalog':
         from ..scan_catalog import scan_catalog
         scan_catalog(config)

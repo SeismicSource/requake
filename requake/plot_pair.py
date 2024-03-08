@@ -8,12 +8,11 @@ Download and plot traces for an event pair.
     CeCILL Free Software License Agreement, Version 2.1
     (http://www.cecill.info/index.en.html)
 """
-import contextlib
 import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from .rq_setup import rq_exit
-from .catalog import get_events, read_events, fix_non_locatable_events
+from .catalog import fix_non_locatable_events, read_stored_catalog
 from .waveforms import get_waveform_pair, process_waveforms, align_pair
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
@@ -23,51 +22,46 @@ mpl_logger.setLevel(logging.WARNING)
 mpl.rcParams['pdf.fonttype'] = 42
 
 
-def _download_event(config, evid):
-    """Download an event based on its evid."""
-    ev = None
-    try:
-        cat = read_events(config.scan_catalog_file)
-        fix_non_locatable_events(cat, config)
-        return [e for e in cat if e.evid == evid][0]
-    except ValueError as m:
-        logger.error(
-            f'Error reading catalog file {config.scan_catalog_file}'
-        )
-        logger.error(m)
-        rq_exit(1)
-    except FileNotFoundError:
-        pass
-    for url in config.catalog_fdsn_event_urls:
-        with contextlib.suppress(Exception):
-            ev = get_events(url, eventid=evid)[0]
-    if ev is None:
-        raise Exception(f'Cannot download event: {evid}')
-    return ev
-
-
 def _get_pair(config):
-    """Donwload a pair of events."""
+    """
+    Get a pair of events, whose evid is defined in the arguments.
+
+    :param config: Configuration object.
+    :type config: requake.configobj.ConfigObj
+    :return: A pair of events.
+    :rtype: list
+
+    :raises ValueError: If an event is not found in the catalog.
+    :raises ValueError: If an error occurs while reading the catalog.
+    :raises FileNotFoundError: If the catalog file is not found.
+    """
+    catalog = read_stored_catalog(config)
+    fix_non_locatable_events(catalog, config)
     evid1 = config.args.evid1
     evid2 = config.args.evid2
     pair = []
     for evid in evid1, evid2:
-        try:
-            pair.append(_download_event(config, evid))
-        except Exception as m:
-            logger.error(str(m))
-            rq_exit(1)
+        found_events = [e for e in catalog if e.evid == evid]
+        if not found_events:
+            raise ValueError(f'Event {evid} not found in catalog')
+        pair.append(found_events[0])
     return pair
 
 
 def plot_pair(config):
+    """
+    Download and plot traces for an event pair.
+
+    :param config: Configuration object.
+    :type config: requake.configobj.ConfigObj
+    """
     try:
         pair = _get_pair(config)
         st = get_waveform_pair(config, pair)
         lag, lag_sec, cc_max = align_pair(config, st[0], st[1])
         st = process_waveforms(config, st)
     except Exception as m:
-        logger.error(str(m))
+        logger.error(m)
         rq_exit(1)
     st.normalize()
     tr1, tr2 = st

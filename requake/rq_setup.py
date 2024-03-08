@@ -25,7 +25,7 @@ from .utils import (
 )
 # pylint: disable=global-statement,import-outside-toplevel
 
-logger = None #pylint: disable=invalid-name
+logger = None  # pylint: disable=invalid-name
 PYTHON_VERSION_STR = None
 NUMPY_VERSION_STR = None
 SCIPY_VERSION_STR = None
@@ -57,12 +57,13 @@ def _setup_logging(config, progname, action_name):
     logger_root.setLevel(logging.DEBUG)
 
     # Actions that will produce a logfile
-    loggin_actions = [
+    logging_actions = [
+        'read_catalog',
         'scan_catalog',
         'scan_templates',
         'build_families'
     ]
-    if action_name in loggin_actions:
+    if action_name in logging_actions:
         if not os.path.exists(config.args.outdir):
             os.makedirs(config.args.outdir)
         logfile = os.path.join(
@@ -169,12 +170,23 @@ def configure(args):
     config.template_dir = os.path.join(
         config.args.outdir, 'templates'
     )
-    if (args.action == 'scan_catalog' and
-            not write_ok(config.scan_catalog_pairs_file)):
+    if (
+        args.action == 'read_catalog' and
+        not args.append and
+        not write_ok(config.scan_catalog_file)
+    ):
         print('Exiting now.')
         sys.exit(0)
-    if (args.action == 'build_families' and
-            not write_ok(config.build_families_outfile)):
+    if (
+        args.action == 'scan_catalog' and
+        not write_ok(config.scan_catalog_pairs_file)
+    ):
+        print('Exiting now.')
+        sys.exit(0)
+    if (
+        args.action == 'build_families' and
+        not write_ok(config.build_families_outfile)
+    ):
         print('Exiting now.')
         sys.exit(0)
     # config.inventory needs to exist
@@ -190,13 +202,10 @@ def configure(args):
         'scan_catalog', 'plot_pair', 'plot_families', 'build_templates',
         'scan_templates'
     )
-    actions_needing_fdsn_catalog = (
-        'scan_catalog',
-    )
     try:
         if args.action in actions_needing_fdsn_station_dataselect:
             _connect_fdsn_station_dataselect(config)
-        if args.action in actions_needing_fdsn_catalog:
+        if args.action == 'read_catalog' and not args.catalog_file:
             _connect_fdsn_catalog(config)
     except Exception as m:
         logger.error(m)

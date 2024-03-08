@@ -87,6 +87,7 @@ The different running modes are specified as "verbs" (positional arguments).
 Currently supported verbs are:
 
     sample_config       write sample config file to current directory and exit
+    read_catalog        read an event catalog from web services or from a file
     scan_catalog        scan an existing catalog for earthquake pairs
     plot_pair           plot traces for a given event pair
     build_families      build families of repeating earthquakes from a catalog
@@ -120,8 +121,16 @@ The first thing you will want to do is to generate a sample config file:
 
     requake sample_config
 
-Edit the config file according to your needs, then build the catalog of event
-pairs with:
+Edit the config file according to your needs, then read or download the event
+catalog:
+
+    requake read_catalog
+
+or
+
+    requake read_catalog CATALOG_FILE
+
+Now, build the catalog of event pairs with:
 
     requake scan_catalog
 
