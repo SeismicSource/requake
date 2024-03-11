@@ -3,6 +3,7 @@
 from setuptools import setup, find_packages
 import versioneer
 
+
 with open('README.md', 'rb') as f:
     long_descr = f.read().decode('utf-8')
 
@@ -22,19 +23,22 @@ setup(
     author='Claudio Satriano',
     author_email='satriano@ipgp.fr',
     url='http://www.ipgp.fr/~satriano',
-    license='CeCILL Free Software License Agreement, Version 2.1',
+    license='GNU General Public License v3 or later (GPLv3+)',
     platforms='OS Independent',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',
         'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: CEA CNRS Inria Logiciel Libre '
-            'License, version 2.1 (CeCILL-2.1)',
+        'License :: OSI Approved :: '
+            'GNU General Public License v3 or later (GPLv3+)',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Physics'],
     install_requires=[
