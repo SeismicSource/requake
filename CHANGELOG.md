@@ -2,8 +2,9 @@
 
 (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
-## unreleased
+## v0.4 - 2024-03-11
 
+- Package license changed to GPL-3.0 or later
 - New verb: `read_catalog`: read a catalog from web services or from a file
   (FDSN text, QuakeML, or CSV)
 - New verb: `scan_templates`: scan a continuous waveform stream using one
