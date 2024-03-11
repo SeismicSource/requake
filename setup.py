@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: GPL-3.0-or-later
 """setup.py: setuptools control."""
 from setuptools import setup, find_packages
 import versioneer
@@ -7,6 +8,11 @@ import versioneer
 with open('README.md', 'rb') as f:
     long_descr = f.read().decode('utf-8')
 
+project_urls = {
+    'Homepage': 'https://requake.seismicsource.org',
+    'Source': 'https://github.com/SeismicSource/requake',
+    'Documentation': 'https://requake.readthedocs.io'
+}
 
 setup(
     name='requake',
@@ -22,7 +28,8 @@ setup(
     long_description_content_type='text/markdown',
     author='Claudio Satriano',
     author_email='satriano@ipgp.fr',
-    url='http://www.ipgp.fr/~satriano',
+    url=project_urls['Homepage'],
+    project_urls=project_urls,
     license='GNU General Public License v3 or later (GPLv3+)',
     platforms='OS Independent',
     classifiers=[
