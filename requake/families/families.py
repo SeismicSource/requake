@@ -13,9 +13,9 @@ import csv
 import numpy as np
 from obspy import UTCDateTime, Stream
 from obspy.geodetics import gps2dist_azimuth
-from .utils import float_or_none
-from .catalog import RequakeEvent
-from .waveforms import (
+from ..formulas.conversion import float_or_none
+from ..catalog.catalog import RequakeEvent
+from ..waveforms.waveforms import (
     get_event_waveform, align_traces, build_template)
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 

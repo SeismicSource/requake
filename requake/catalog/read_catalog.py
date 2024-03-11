@@ -14,10 +14,10 @@ import urllib.request
 import csv
 from obspy import UTCDateTime
 from obspy.clients.fdsn.header import URL_MAPPINGS
-from .utils import float_or_none, int_or_none
-from .catalog import (
+from ..formulas.conversion import float_or_none, int_or_none
+from ..catalog.catalog import (
     RequakeCatalog, RequakeEvent, generate_evid)
-from .rq_setup import rq_exit
+from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 

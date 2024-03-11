@@ -15,12 +15,12 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as PathEffects
 from obspy.signal.filter import envelope
 from obspy.signal.util import smooth
-from .families import (
+from ..families.families import (
     FamilyNotFoundError,
     read_selected_families,
     get_family_aligned_waveforms_and_template)
-from .waveforms import process_waveforms
-from .rq_setup import rq_exit
+from ..waveforms.waveforms import process_waveforms
+from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')

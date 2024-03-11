@@ -1,5 +1,5 @@
 [MAIN]
-ignore-paths=requake/configobj
+ignore-paths=requake/config/configobj
 ignore-patterns=^\.,_version.py,versioneer.py
 
 [MESSAGES CONTROL]

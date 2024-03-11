@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """setup.py: setuptools control."""
-from setuptools import setup
+from setuptools import setup, find_packages
 import versioneer
 
 with open('README.md', 'rb') as f:
@@ -9,7 +9,7 @@ with open('README.md', 'rb') as f:
 
 setup(
     name='requake',
-    packages=['requake', 'requake.scripts', 'requake.configobj'],
+    packages=find_packages(),
     include_package_data=True,
     entry_points={
         'console_scripts': ['requake = requake.scripts.requake:main']

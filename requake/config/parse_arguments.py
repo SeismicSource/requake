@@ -13,7 +13,7 @@ import sys
 import textwrap
 import argparse
 import argcomplete
-from ._version import get_versions
+from .._version import get_versions
 
 
 class NewlineHelpFormatter(argparse.HelpFormatter):

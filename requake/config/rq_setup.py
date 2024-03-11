@@ -17,7 +17,7 @@ import signal
 import tqdm
 from obspy import UTCDateTime
 from obspy.clients.fdsn import Client
-from ._version import get_versions
+from .._version import get_versions
 from .config import Config
 from .utils import (
     parse_configspec, read_config, validate_config, write_sample_config,

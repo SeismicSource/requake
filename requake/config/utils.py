@@ -36,7 +36,7 @@ def parse_configspec():
     :rtype: configobj.ConfigObj
     """
     curdir = os.path.dirname(__file__)
-    configspec_file = os.path.join(curdir, 'conf', 'configspec.conf')
+    configspec_file = os.path.join(curdir, 'configspec.conf')
     return read_config(configspec_file)
 
 
@@ -128,35 +128,3 @@ def validate_config(config_obj):
         sys.exit(1)
     if not test:
         err_exit('No configuration value present!')
-
-
-def float_or_none(string):
-    """
-    Convert string to float, return None if conversion fails.
-
-    :param string: Input string.
-    :type string: str
-    :return: Float value or None.
-    :rtype: float or None
-    """
-    try:
-        val = float(string)
-    except (TypeError, ValueError):
-        val = None
-    return val
-
-
-def int_or_none(string):
-    """
-    Convert string to int, return None if conversion fails.
-
-    :param string: Input string.
-    :type string: str
-    :return: Integer value or None.
-    :rtype: int or None
-    """
-    try:
-        val = int(string)
-    except (TypeError, ValueError):
-        val = None
-    return val

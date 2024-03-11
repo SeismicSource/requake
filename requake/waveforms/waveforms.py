@@ -20,7 +20,7 @@ from obspy.clients.fdsn.header import FDSNNoDataException
 from scipy.stats import median_abs_deviation
 from .station_metadata import get_traceid_coords
 from .arrivals import get_arrivals
-from .rq_setup import rq_exit
+from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 model = TauPyModel(model='ak135')
 

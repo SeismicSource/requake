@@ -24,8 +24,8 @@ from .map_tiles import (
     EsriImagery,
     StamenTerrain,
 )
-from .families import FamilyNotFoundError, read_selected_families
-from .rq_setup import rq_exit
+from ..families.families import FamilyNotFoundError, read_selected_families
+from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')

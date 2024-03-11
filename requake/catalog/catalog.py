@@ -10,8 +10,8 @@ Classes and functions for downloading, reading and writing catalogs.
 """
 import numpy as np
 from obspy import UTCDateTime
-from .utils import float_or_none
-from .station_metadata import get_traceid_coords
+from ..formulas.conversion import float_or_none
+from ..waveforms.station_metadata import get_traceid_coords
 
 
 class RequakeEvent():

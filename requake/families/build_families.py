@@ -13,10 +13,10 @@ import csv
 from itertools import combinations
 from scipy.cluster.hierarchy import average, fcluster
 from obspy import UTCDateTime
-from .utils import float_or_none
-from .catalog import RequakeEvent
+from ..formulas.conversion import float_or_none
+from ..catalog.catalog import RequakeEvent
 from .families import Family
-from .rq_setup import rq_exit
+from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
