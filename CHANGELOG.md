@@ -2,6 +2,10 @@
 
 (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
+## v0.4.1 - 2024-03-11
+
+- Bugfix: `requake` executable was not installed
+
 ## v0.4 - 2024-03-11
 
 - Package license changed to GPL-3.0 or later
