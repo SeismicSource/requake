@@ -85,6 +85,7 @@ def parse_arguments(progname='requake'):
             'configured in the control file.\n\n'
             'Acceptable catalog file formats are:\n'
             '- FDSN text\n'
+            '- QuakeML\n'
             '- CSV\n'
             '- Space-separated text files.\n\n'
             'For CSV or space-separated formats, the file must include '

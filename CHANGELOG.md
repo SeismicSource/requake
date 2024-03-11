@@ -5,6 +5,7 @@
 ## unreleased
 
 - New verb: `read_catalog`: read a catalog from web services or from a file
+  (FDSN text, QuakeML, or CSV)
 - New verb: `scan_templates`: scan a continuous waveform stream using one
   or more templates. Templates can be from families or from file
 - New verb: `print_families`: print families to screen
