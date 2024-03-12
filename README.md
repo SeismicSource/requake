@@ -1,3 +1,5 @@
+<img src="imgs/Requake_logo.svg" width="400">
+
 # Requake
 
 Repeating earthquakes search and analysis.
