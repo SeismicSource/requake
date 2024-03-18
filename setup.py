@@ -19,7 +19,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     entry_points={
-        'console_scripts': ['requake = requake.requake:main']
+        'console_scripts': ['requake = requake.main:main']
         },
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
