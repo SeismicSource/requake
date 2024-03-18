@@ -7,6 +7,7 @@ Repeating earthquakes search and analysis.
 [![changelog-badge]][changelog-link]
 [![PyPI-badge]][PyPI-link]
 [![license-badge]][license-link]
+[![docs-badge]][docs-link]
 [![DOI-badge]][DOI-link]
 
 Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
@@ -174,6 +175,8 @@ You can also cite the following abstract presented at the
 [PyPI-link]: https://pypi.python.org/pypi/requake
 [license-badge]: https://img.shields.io/badge/license-GPLv3-green
 [license-link]: https://www.gnu.org/licenses/gpl-3.0.html
+[docs-badge]: https://readthedocs.org/projects/requake/badge/?version=latest
+[docs-link]: https://requake.readthedocs.io/en/latest/?badge=latest
 [changelog-badge]: https://img.shields.io/badge/Changelog-136CB6.svg
 [changelog-link]: https://github.com/SeismicSource/requake/blob/main/CHANGELOG.md
 [DOI-badge]: https://zenodo.org/badge/DOI/10.5281/zenodo.10832204.svg
