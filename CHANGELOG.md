@@ -1,6 +1,6 @@
-# Requake - Repeating earthquakes search and analysis
+# Requake Changelog
 
-(c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
+Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
 ## v0.4.1 - 2024-03-11
 
