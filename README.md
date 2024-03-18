@@ -7,6 +7,7 @@ Repeating earthquakes search and analysis.
 [![changelog-badge]][changelog-link]
 [![PyPI-badge]][PyPI-link]
 [![license-badge]][license-link]
+[![DOI-badge]][DOI-link]
 
 Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
@@ -151,6 +152,23 @@ parallelization will be implemented.
 
 - `requake build_families` is fast™.
 
+## How to Cite
+
+If you used Requake for a scientific paper, please cite it as:
+
+> Satriano, C. (2024). Requake: Repeating earthquakes search and analysis (X.Y).
+> [doi: 10.5281/ZENODO.10832204]
+
+Please replace `X.Y` with the Requake version number you used.
+
+You can also cite the following abstract presented at the
+2016 AGU Fall Meeting:
+
+> Satriano, C., Doucet, A. & Bouin, M.-P. (2021).
+> Probing the creep rate along the Lesser Antilles Subduction Zone through repeating earthquakes.
+> In AGU Fall Meeting Abstracts
+> (Vol. 2021, pp. T25A-0167), [bibcode: 2021AGUFM.T25A0167S]
+
 <!-- Badges and project links -->
 [PyPI-badge]: http://img.shields.io/pypi/v/requake.svg
 [PyPI-link]: https://pypi.python.org/pypi/requake
@@ -158,3 +176,9 @@ parallelization will be implemented.
 [license-link]: https://www.gnu.org/licenses/gpl-3.0.html
 [changelog-badge]: https://img.shields.io/badge/Changelog-136CB6.svg
 [changelog-link]: https://github.com/SeismicSource/requake/blob/main/CHANGELOG.md
+[DOI-badge]: https://zenodo.org/badge/DOI/10.5281/zenodo.10832204.svg
+[DOI-link]: https://doi.org/10.5281/zenodo.10832204
+
+<!-- References -->
+[doi: 10.5281/ZENODO.10832204]: https://doi.org/10.5281/ZENODO.10832204
+[bibcode: 2021AGUFM.T25A0167S]: https://ui.adsabs.harvard.edu/abs/2021AGUFM.T25A0167S
