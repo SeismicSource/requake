@@ -18,6 +18,14 @@ __version__ = get_versions()['version']
 project = 'Requake'
 copyright = '2021-2024, Claudio Satriano'  # pylint: disable=redefined-builtin
 author = 'Claudio Satriano'
+# The version info for the project you're documenting, acts as replacement for
+# |version| and |release|, also used in various other places throughout the
+# built documents.
+#
+# The full version, including alpha/beta/rc tags.
+release = __version__
+# The short X.Y version.
+version = release.split('-')[0]
 
 
 # -- General configuration ---------------------------------------------------
