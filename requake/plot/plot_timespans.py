@@ -12,10 +12,10 @@ Plot family timespans.
 import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 from matplotlib import cm
 from matplotlib import colors
 import numpy as np
+from .plot_utils import format_time_axis
 from ..families.families import FamilyNotFoundError, read_selected_families
 from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -36,13 +36,6 @@ def plot_timespans(config):
         logger.error(m)
         rq_exit(1)
     fig, ax = plt.subplots(figsize=(8, 8))
-    years = mdates.YearLocator()   # every year
-    months = mdates.MonthLocator()  # every month
-    yearsFmt = mdates.DateFormatter('%Y')
-    ax.xaxis.set_major_locator(years)
-    ax.xaxis.set_major_formatter(yearsFmt)
-    ax.xaxis.set_minor_locator(months)
-    ax.xaxis.grid(True)
     ax.tick_params(which='both', top=True, labeltop=True)
     ax.tick_params(axis='x', which='both', direction='in')
 
@@ -69,13 +62,6 @@ def plot_timespans(config):
             'but "distance_from_lon" and/or "distance_from_lat" '
             'are not specified')
         rq_exit(1)
-    if sort_by == 'time':
-        years = mdates.YearLocator()   # every year
-        months = mdates.MonthLocator()  # every month
-        yearsFmt = mdates.DateFormatter('%Y')
-        ax.yaxis.set_major_locator(years)
-        ax.yaxis.set_major_formatter(yearsFmt)
-        ax.yaxis.set_minor_locator(months)
     for family in families:
         fn = family.number
         label = (
@@ -105,6 +91,9 @@ def plot_timespans(config):
             times, yvals, lw=1, marker='o', color=cmap(norm(fn % 10)),
             label=label)
         lines.append(line)
+    format_time_axis(ax, which='xaxis')
+    if sort_by == 'time':
+        format_time_axis(ax, which='yaxis')
     ax.set_xlabel('Time')
     ax.set_ylabel(ylabel)
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
