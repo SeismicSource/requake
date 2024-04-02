@@ -64,10 +64,10 @@ def _get_trace_id(config, ev):
 
 def get_waveform(config, traceid, starttime, endtime):
     """Download waveform for a given traceid, start and end time."""
-    cl = config.fdsn_dataselect_client
+    client = config.dataselect_client
     net, sta, loc, chan = traceid.split('.')
     try:
-        st = cl.get_waveforms(
+        st = client.get_waveforms(
             network=net, station=sta, location=loc, channel=chan,
             starttime=starttime, endtime=endtime
         )
@@ -80,6 +80,11 @@ def get_waveform(config, traceid, starttime, endtime):
     # webservices sometimes return longer traces: trim to be sure
     st.trim(starttime=starttime, endtime=endtime)
     st.merge(fill_value='interpolate')
+    if not st:
+        raise NoWaveformError(
+            f'No waveform data for trace id: {traceid} '
+            f'between {starttime} and {endtime}'
+        )
     tr = st[0]
     tr.detrend(type='demean')
     return tr

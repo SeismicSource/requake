@@ -17,7 +17,10 @@ import logging
 import signal
 import tqdm
 from obspy import UTCDateTime
-from obspy.clients.fdsn import Client
+from obspy import read_inventory
+from obspy.clients.filesystem.sds import Client as SDSClient
+from obspy.clients.fdsn import Client as FDSNClient
+from obspy.clients.fdsn.header import FDSNNoServiceException
 from .._version import get_versions
 from .config import Config
 from .utils import (
@@ -104,14 +107,51 @@ def _setup_logging(config, progname, action_name):
     logger.debug(' '.join(sys.argv))
 
 
-def _connect_fdsn_station_dataselect(config):
-    """Connect to FDSN station and dataselect services."""
-    config.fdsn_station_client = Client(config.fdsn_station_url)
-    logger.info(f'Connected to FDSN station server: {config.fdsn_station_url}')
-    config.fdsn_dataselect_client = Client(config.fdsn_dataselect_url)
+def _connect_station_dataselect(config):
+    """
+    Connect to station and dataselect services.
+
+    Those can be either FDSN web services or local files.
+    """
+    if config.station_metadata_path is not None:
+        config.inventory = read_inventory(config.station_metadata_path)
+        config.station_client = None
+        logger.info(
+            'Reading station metadata from local file: '
+            f'{config.station_metadata_path}'
+        )
+    else:
+        config.station_client = FDSNClient(config.fdsn_station_url)
+        logger.info(
+            f'Connected to FDSN station server: {config.fdsn_station_url}'
+        )
+    if config.waveform_data_path is not None:
+        _connect_sds(config)
+    else:
+        config.dataselect_client = FDSNClient(config.fdsn_dataselect_url)
+        logger.info(
+            'Connected to FDSN dataselect server: '
+            f'{config.fdsn_dataselect_url}'
+        )
+
+
+def _connect_sds(config):
+    """
+    Connect to a local SeisComP Data Structure (SDS) archive.
+    """
+    _client = SDSClient(config.waveform_data_path)
+    all_nslc = _client.get_all_nslc()
+    if not all_nslc:
+        raise FileNotFoundError(
+            f'No SDS archive found in {config.waveform_data_path}'
+        )
+    config.dataselect_client = _client
     logger.info(
-        f'Connected to FDSN dataselect server: {config.fdsn_dataselect_url}'
+        'Reading waveform data from local SDS archive: '
+        f'{config.waveform_data_path}'
     )
+    all_nslc_str = '\n'.join('.'.join(nslc) for nslc in all_nslc)
+    logger.info(f'Found the following NSLC codes:\n{all_nslc_str}')
 
 
 def _parse_catalog_options(config):
@@ -140,7 +180,7 @@ def _connect_fdsn_catalog(config):
     """Connect to FDSN catalog services."""
     config.catalog_fdsn_event_clients = []
     for url in config.catalog_fdsn_event_urls:
-        config.catalog_fdsn_event_clients.append(Client(url))
+        config.catalog_fdsn_event_clients.append(FDSNClient(url))
         logger.info(f'Connected to FDSN event server: {url}')
 
 
@@ -205,10 +245,10 @@ def configure(args):
     )
     try:
         if args.action in actions_needing_fdsn_station_dataselect:
-            _connect_fdsn_station_dataselect(config)
+            _connect_station_dataselect(config)
         if args.action == 'read_catalog' and not args.catalog_file:
             _connect_fdsn_catalog(config)
-    except Exception as m:
+    except (FileNotFoundError, ValueError, FDSNNoServiceException) as m:
         logger.error(m)
         rq_exit(1)
     # Template times must be UTCDateTime objects

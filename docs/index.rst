@@ -15,8 +15,8 @@ Requake is a command line tool to search and analyse repeating earthquakes.
 It can either scan an existing earthquake catalog to search for similar events,
 or perform template matching on a continuous waveform stream.
 
-Catalogs and waveforms are downloaded using standard
-`FDSN web services <https://www.fdsn.org/webservices/>`_.
+Catalogs and waveforms can be read from local files or downloaded using
+standard `FDSN web services <https://www.fdsn.org/webservices/>`_.
 
 Requake is written in Python and uses `ObsPy <https://obspy.org>`_ as backend.
 

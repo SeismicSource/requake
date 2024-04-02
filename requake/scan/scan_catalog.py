@@ -16,7 +16,7 @@ from itertools import combinations
 from tqdm import tqdm
 from obspy.geodetics import gps2dist_azimuth
 from ..catalog.catalog import fix_non_locatable_events, read_stored_catalog
-from ..waveforms.station_metadata import NoMetadataError
+from ..waveforms.station_metadata import NoMetadataError, MetadataMismatchError
 from ..waveforms.waveforms import (
     get_waveform_pair, cc_waveform_pair, NoWaveformError,
 )
@@ -63,7 +63,7 @@ def _process_pairs(fp_out, nevents, catalog, config):
                     stats2.ev_depth, stats2.mag_type, stats2.mag,
                     lag, lag_sec, cc_max
                 ])
-            except NoMetadataError as m:
+            except (NoMetadataError, MetadataMismatchError) as m:
                 logger.error(m)
                 rq_exit(1)
             except NoWaveformError as m:
@@ -85,7 +85,11 @@ def scan_catalog(config):
     except (ValueError, FileNotFoundError) as m:
         logger.error(m)
         rq_exit(1)
-    fix_non_locatable_events(catalog, config)
+    try:
+        fix_non_locatable_events(catalog, config)
+    except MetadataMismatchError as m:
+        logger.error(m)
+        rq_exit(1)
     nevents = len(catalog)
     logger.info(f'{nevents} events read from catalog file')
     logger.info('Building event pairs...')

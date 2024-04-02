@@ -23,7 +23,7 @@ class MetadataMismatchError(Exception):
     """Exception raised for mismatched metadata."""
 
 
-def get_metadata(config):
+def download_metadata(config):
     """
     Download metadata for the trace_ids specified in config file.
 
@@ -34,7 +34,7 @@ def get_metadata(config):
     """
     logger.info('Downloading station metadata...')
     inv = Inventory()
-    cl = config.fdsn_station_client
+    cl = config.station_client
     start_time = min(config.catalog_start_times)
     end_time = max(config.catalog_end_times)
     if config.args.traceid is not None:
@@ -82,7 +82,7 @@ def get_traceid_coords(config, orig_time=None):
     :raises MetadataMismatchError: if coordinates are not found
     """
     if config.inventory is None:
-        get_metadata(config)
+        download_metadata(config)
     traceid_coords = {}
     for trace_id in config.catalog_trace_id:
         try:
