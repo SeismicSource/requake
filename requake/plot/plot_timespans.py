@@ -98,6 +98,7 @@ def plot_timespans(config):
     ax.set_ylabel(ylabel)
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, ticks=range(10), ax=ax)
+    cbar.ax.set_zorder(-1)
     cbar.ax.set_ylabel('mod(family number, 10)')
 
     # Empty annotation that will be updated interactively
