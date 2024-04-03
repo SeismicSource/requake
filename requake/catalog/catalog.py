@@ -182,6 +182,72 @@ class RequakeCatalog(list):
                 fp.write(ev.fdsn_text() + '\n')
 
 
+    def filter(
+            self, starttime=None, endtime=None,
+            minlatitude=None, maxlatitude=None,
+            minlongitude=None, maxlongitude=None,
+            mindepth=None, maxdepth=None,
+            minmagnitude=None, maxmagnitude=None):
+        """
+        Filter the catalog, based on the specified criteria.
+
+        Returns a new catalog.
+
+        :param starttime: start time
+        :type starttime: obspy.UTCDateTime
+        :param endtime: end time
+        :type endtime: obspy.UTCDateTime
+        :param minlatitude: minimum latitude
+        :type minlatitude: float
+        :param maxlatitude: maximum latitude
+        :type maxlatitude: float
+        :param minlongitude: minimum longitude
+        :type minlongitude: float
+        :param maxlongitude: maximum longitude
+        :type maxlongitude: float
+        :param mindepth: minimum depth (in km)
+        :type mindepth: float
+        :param maxdepth: maximum depth (in km)
+        :type maxdepth: float
+        :param minmagnitude: minimum magnitude
+        :type minmagnitude: float
+        :param maxmagnitude: maximum magnitude
+        :type maxmagnitude: float
+
+        :return: a new catalog
+        :rtype: RequakeCatalog
+        """
+        outcat = RequakeCatalog()
+        for ev in self:
+            if ev.orig_time is not None:
+                if starttime is not None and ev.orig_time < starttime:
+                    continue
+                if endtime is not None and ev.orig_time > endtime:
+                    continue
+            if ev.lat is not None:
+                if minlatitude is not None and ev.lat < minlatitude:
+                    continue
+                if maxlatitude is not None and ev.lat > maxlatitude:
+                    continue
+            if ev.lon is not None:
+                if minlongitude is not None and ev.lon < minlongitude:
+                    continue
+                if maxlongitude is not None and ev.lon > maxlongitude:
+                    continue
+            if ev.depth is not None:
+                if mindepth is not None and ev.depth < mindepth:
+                    continue
+                if maxdepth is not None and ev.depth > maxdepth:
+                    continue
+            if ev.mag is not None:
+                if minmagnitude is not None and ev.mag < minmagnitude:
+                    continue
+                if maxmagnitude is not None and ev.mag > maxmagnitude:
+                    continue
+            outcat.append(ev)
+        return outcat
+
+
 def read_stored_catalog(config):
     """
     Read the catalog stored in the output directory.

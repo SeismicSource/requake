@@ -8,6 +8,7 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
   read station metadata and waveform data from files. Supports any metadata
   format supported by ObsPy and SDS (SeisComp Data Structure) waveform
   archives.
+- Filter catalog files on reading using the criteria in the config file
 - Improved time axes in `plot_timespans` and `plot_slip` for short time
   intervals
 
