@@ -9,6 +9,7 @@ Read an event catalog from web services or from a file.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
+import os
 import logging
 import contextlib
 from ..catalog.catalog import RequakeCatalog
@@ -34,8 +35,11 @@ def _read_catalog_from_file(config):
     :raises ValueError: if the file format is not supported
     """
     catalog_file = config.args.catalog_file
+    # return ValueError if the file is empty
+    if os.stat(catalog_file).st_size == 0:
+        raise ValueError('Empty file')
     # try to read the catalog as a QuakeML file
-    with contextlib.suppress(TypeError):
+    with contextlib.suppress(TypeError, IndexError, ValueError):
         return read_catalog_from_quakeml(catalog_file)
     # try to read the catalog as a FDSN text file
     with contextlib.suppress(ValueError):
