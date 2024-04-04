@@ -12,6 +12,8 @@ Utility functions for Requake.
 import os
 import sys
 import locale
+import traceback
+from .. import __version__
 from .configobj import ConfigObj
 from .configobj.validate import Validator
 locale.setlocale(locale.LC_ALL, '')
@@ -129,3 +131,41 @@ def validate_config(config_obj):
         sys.exit(1)
     if not test:
         err_exit('No configuration value present!')
+
+
+def manage_uncaught_exception(exception):
+    """
+    Manage an uncaught exception.
+
+    :param exception: Exception object.
+    :type exception: Exception
+    """
+    sys.stderr.write("""
+# BEGIN TRACEBACK #############################################################
+""")
+    sys.stderr.write('\n')
+    traceback.print_exc()
+    sys.stderr.write("""
+# END TRACEBACK ###############################################################
+""")
+    sys.stderr.write("""
+
+Congratulations, you've found a bug in Requake! 🐞
+
+Please report it on https://github.com/SeismicSource/requake/issues
+or by email to satriano@ipgp.fr.
+
+Include the following information in your report:
+
+""")
+    sys.stderr.write(f'  Requake version: {__version__}\n')
+    sys.stderr.write(f'  Python version: {sys.version}\n')
+    sys.stderr.write(f'  Platform: {sys.platform}\n')
+    sys.stderr.write(f'  Command line: {" ".join(sys.argv)}\n')
+    sys.stderr.write(f'  Error message: {str(exception)}\n')
+    sys.stderr.write('\n')
+    sys.stderr.write(
+        'Also, please copy and paste the traceback above in your '
+        'report.\n\n')
+    sys.stderr.write('Thank you for your help!\n\n')
+    sys.exit(1)
