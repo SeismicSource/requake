@@ -38,6 +38,9 @@ def _read_catalog_from_file(config):
     # return ValueError if the file is empty
     if os.stat(catalog_file).st_size == 0:
         raise ValueError('Empty file')
+    # return ValueError if the file is a directory
+    if os.path.isdir(catalog_file):
+        raise ValueError('Is a directory')
     # try to read the catalog as a QuakeML file
     with contextlib.suppress(TypeError, IndexError, ValueError):
         return read_catalog_from_quakeml(catalog_file)
