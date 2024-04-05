@@ -183,7 +183,17 @@ def read_catalog_from_csv(filename):
                     year=year, month=month, day=day,
                     hour=hour, minute=minute, second=0) + seconds
             else:
-                orig_time = UTCDateTime(row[fields['orig_time']])
+                try:
+                    orig_time = UTCDateTime(row[fields['orig_time']])
+                except ValueError:
+                    # one last try: check if the time is in the format
+                    # YYYYMMDD.hhmmss.
+                    # Replace the dot with a space, pad with zeros
+                    # and try again
+                    orig_time = UTCDateTime(
+                        row[fields['orig_time']]
+                        .replace('.', ' ').ljust(15, '0')
+                    )
             row[None] = None
             ev = RequakeEvent()
             ev.orig_time = orig_time
