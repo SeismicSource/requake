@@ -33,6 +33,19 @@ def print_families(config):
         logger.error(msg)
         rq_exit(1)
 
+    # determine duration units
+    average_duration = np.mean([f.duration for f in families])
+    avg_duration_in_days = average_duration * 365
+    if 30 < avg_duration_in_days < 365:
+        duration_multiplier = 12
+        duration_units = 'm'
+    elif 1 < avg_duration_in_days < 30:
+        duration_multiplier = 365
+        duration_units = 'd'
+    elif avg_duration_in_days < 1:
+        duration_multiplier = 365 * 24
+        duration_units = 'h'
+
     headers = [
         'family',
         'nevents',
@@ -41,7 +54,7 @@ def print_families(config):
         'depth (km)',
         'start time',
         'end time',
-        'duration (y)',
+        f'duration ({duration_units})',
         'slip rate (cm/y)'
     ]
     table = []
@@ -58,7 +71,7 @@ def print_families(config):
             family.depth,
             family.starttime,
             family.endtime,
-            family.duration
+            family.duration*duration_multiplier
         ]
         slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
         cum_slip = np.cumsum(slip)
