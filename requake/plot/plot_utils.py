@@ -42,6 +42,31 @@ def format_time_axis(ax, which='both'):
         axis.grid(True, which='minor', linestyle=':', color='0.8')
 
 
+def plot_title(
+        ax, nfamilies, trace_ids=None, vertical_position=1, fontsize=10):
+    """
+    Set the title of a plot.
+
+    :param ax: Matplotlib axis
+    :type ax: matplotlib.axes.Axes
+    :param nfamilies: Number of families
+    :type nfamilies: int
+    :param trace_ids: List of trace IDs
+    :type trace_ids: list
+    :param vertical_position: Vertical position of the title
+    :type vertical_position: float
+    :param fontsize: Font size
+    :type fontsize: int
+    """
+    if trace_ids is not None:
+        title_left = '|'.join(trace_ids)
+        ax.set_title(
+            title_left, loc='left', y=vertical_position, fontsize=fontsize)
+    title_right = f'{nfamilies} families'
+    ax.set_title(
+        title_right, loc='right', y=vertical_position, fontsize=fontsize)
+
+
 def hover_annotation(event):
     """
     Show annotation on hover.

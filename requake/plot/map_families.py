@@ -17,7 +17,7 @@ from matplotlib import colors
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from obspy.geodetics import gps2dist_azimuth
-from .plot_utils import hover_annotation, duration_string
+from .plot_utils import plot_title, hover_annotation, duration_string
 from .cached_tiler import CachedTiler
 from .map_tiles import (
     EsriHillshade,
@@ -113,7 +113,10 @@ def map_families(config):
     trans = ccrs.PlateCarree()
     cmap = mpl.colormaps['tab10']
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
+    trace_ids = []
     for family in families:
+        if family.trace_id not in trace_ids and family.trace_id is not None:
+            trace_ids.append(family.trace_id)
         fn = family.number
         nevents = len(family)
         duration_str = duration_string(family)
@@ -130,6 +133,8 @@ def map_families(config):
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, ticks=range(10), pad=0.1, ax=ax)
     cbar.ax.set_ylabel('mod(family number, 10)')
+    plot_title(
+        ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
 
     # Empty annotation that will be updated interactively
     annot = ax.annotate(

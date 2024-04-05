@@ -38,6 +38,7 @@ class Family(list):
         self.duration = None  # years
         self.number = number
         self.valid = True
+        self.trace_id = None
 
     def __str__(self):
         return (
@@ -56,8 +57,14 @@ class Family(list):
         :param ev: Event to append.
         :type ev: RequakeEvent
         """
+        if not isinstance(ev, RequakeEvent):
+            raise TypeError('Event must be a RequakeEvent')
         if ev in self:
             return
+        if self.trace_id is None:
+            self.trace_id = ev.trace_id
+        elif ev.trace_id != self.trace_id:
+            raise ValueError('Event trace_id does not match family trace_id')
         super().append(ev)
         self.sort()
         self.lon = np.mean([e.lon for e in self])

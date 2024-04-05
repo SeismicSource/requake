@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
 import numpy as np
-from .plot_utils import format_time_axis, hover_annotation, duration_string
+from .plot_utils import (
+    format_time_axis, plot_title, hover_annotation, duration_string)
 from ..families.families import FamilyNotFoundError, read_selected_families
 from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -24,6 +25,44 @@ mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 # Make text editable in Illustrator
 mpl.rcParams['pdf.fonttype'] = 42
+
+
+ylabels = {
+    'depth': 'Depth (km)',
+    'distance_from': 'Distance from',
+    'family_number': 'Family Number',
+    'latitude': 'Latitude (°N)',
+    'longitude': 'Longitude (°E)',
+    'time': 'Family Start Time',
+}
+
+
+def _plot_family_timespans(family, ax, sort_by, lon0, lat0, color):
+    """
+    Plot the timespan of a single family.
+    """
+    fn = family.number
+    nevents = len(family)
+    duration_str = duration_string(family)
+    label = (
+        f'Family {fn}\n{family.lon:.1f}°E {family.lat:.1f}°N '
+        f'{family.depth:.1f} km'
+        f'\n{nevents} evts {duration_str}'
+    )
+    times = [ev.orig_time.matplotlib_date for ev in family]
+    if sort_by == 'depth':
+        yvals = np.ones(len(times)) * family.depth
+    elif sort_by == 'distance_from':
+        yvals = np.ones(len(times)) * family.distance_from(lon0, lat0)
+    elif sort_by == 'family_number':
+        yvals = np.ones(len(times)) * fn
+    elif sort_by == 'latitude':
+        yvals = np.ones(len(times)) * family.lat
+    elif sort_by == 'longitude':
+        yvals = np.ones(len(times)) * family.lon
+    elif sort_by == 'time':
+        yvals = np.ones(len(times)) * family.starttime.matplotlib_date
+    ax.plot(times, yvals, lw=1, marker='o', color=color, label=label)
 
 
 def plot_timespans(config):
@@ -38,9 +77,9 @@ def plot_timespans(config):
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.tick_params(which='both', top=True, labeltop=True)
     ax.tick_params(axis='x', which='both', direction='in')
-
     cmap = mpl.colormaps['tab10']
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
+
     if config.args.sortby is not None:
         sort_by = config.args.sortby
         valid_sort_by = (
@@ -61,43 +100,19 @@ def plot_timespans(config):
             'but "distance_from_lon" and/or "distance_from_lat" '
             'are not specified')
         rq_exit(1)
+    trace_ids = []
     for family in families:
-        fn = family.number
-        nevents = len(family)
-        duration_str = duration_string(family)
-        label = (
-            f'Family {fn}\n{family.lon:.1f}°E {family.lat:.1f}°N '
-            f'{family.depth:.1f} km'
-            f'\n{nevents} evts {duration_str}'
-        )
-        times = [ev.orig_time.matplotlib_date for ev in family]
-        if sort_by == 'depth':
-            yvals = np.ones(len(times)) * family.depth
-            ylabel = 'Depth (km)'
-        elif sort_by == 'distance_from':
-            yvals = np.ones(len(times)) * family.distance_from(lon0, lat0)
-            ylabel = f'Distance from {lon0:.1f}°E, {lat0:.1f}°N (km)'
-        elif sort_by == 'family_number':
-            yvals = np.ones(len(times)) * fn
-            ylabel = 'Family Number'
-        elif sort_by == 'latitude':
-            yvals = np.ones(len(times)) * family.lat
-            ylabel = 'Latitude (°N)'
-        elif sort_by == 'longitude':
-            yvals = np.ones(len(times)) * family.lon
-            ylabel = 'Longitude (°E)'
-        elif sort_by == 'time':
-            yvals = np.ones(len(times)) * family.starttime.matplotlib_date
-            ylabel = 'Family Start Time'
-        ax.plot(
-            times, yvals, lw=1, marker='o', color=cmap(norm(fn % 10)),
-            label=label
-        )
+        if family.trace_id not in trace_ids and family.trace_id is not None:
+            trace_ids.append(family.trace_id)
+        color = cmap(norm(family.number % 10))
+        _plot_family_timespans(family, ax, sort_by, lon0, lat0, color)
     format_time_axis(ax, which='xaxis')
     if sort_by == 'time':
         format_time_axis(ax, which='yaxis')
     ax.set_xlabel('Time')
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(ylabels[sort_by])
+    plot_title(
+        ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
     ax.hover_annotation_element = 'lines'
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, ticks=range(10), ax=ax)

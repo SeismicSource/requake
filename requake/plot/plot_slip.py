@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
 import numpy as np
-from .plot_utils import format_time_axis, hover_annotation, duration_string
+from .plot_utils import (
+    format_time_axis, plot_title, hover_annotation, duration_string)
 from ..families.families import FamilyNotFoundError, read_selected_families
 from ..formulas.slip import mag_to_slip_in_cm
 from ..config.rq_setup import rq_exit
@@ -42,7 +43,10 @@ def plot_slip(config):
 
     cmap = mpl.colormaps['tab10']
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
+    trace_ids = []
     for family in families:
+        if family.trace_id not in trace_ids and family.trace_id is not None:
+            trace_ids.append(family.trace_id)
         fn = family.number
         nevents = len(family)
         duration_str = duration_string(family)
@@ -80,6 +84,8 @@ def plot_slip(config):
     ax.set_ylim(ylim)
     ax.set_xlabel('Time')
     ax.set_ylabel('Cumulative Slip (cm)')
+    plot_title(
+        ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
     ax.hover_annotation_element = 'lines'
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, ticks=range(10), ax=ax)
