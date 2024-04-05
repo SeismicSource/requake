@@ -132,7 +132,7 @@ def map_families(config):
         marker.to_annotate = True
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, ticks=range(10), pad=0.1, ax=ax)
-    cbar.ax.set_ylabel('mod(family number, 10)')
+    cbar.ax.set_ylabel('family number (last digit)')
     plot_title(
         ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
 

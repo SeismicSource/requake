@@ -90,7 +90,7 @@ def plot_slip(config):
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, ticks=range(10), ax=ax)
     cbar.ax.set_zorder(-1)
-    cbar.ax.set_ylabel('mod(family number, 10)')
+    cbar.ax.set_ylabel('family number (last digit)')
 
     # Empty annotation that will be updated interactively
     annot = ax.annotate(
