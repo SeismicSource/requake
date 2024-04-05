@@ -40,3 +40,55 @@ def format_time_axis(ax, which='both'):
         axis.set_minor_locator(_minor_locator)
         axis.grid(True, which='major', linestyle='--', color='0.5')
         axis.grid(True, which='minor', linestyle=':', color='0.8')
+
+
+def hover_annotation(event):
+    """
+    Show annotation on hover.
+
+    This function is called when the mouse hovers over a line or a marker.
+
+    :param event: Matplotlib event
+    :type event: matplotlib.backend_bases.MouseEvent
+    """
+    ax = event.inaxes
+    if ax is None:
+        return
+    hover_on = getattr(ax, 'hover_annotation_element', None)
+    if hover_on is None:
+        return
+    fig = ax.get_figure()
+    try:
+        annot = [
+            child for child in ax.get_children()
+            if getattr(child, 'hover_annotation', False)
+        ][0]
+    except IndexError:
+        return
+    vis = annot.get_visible()
+    if hover_on == 'lines':
+        elements = ax.get_lines()
+    elif hover_on == 'markers':
+        elements = [
+            el for el in ax.collections if getattr(el, 'to_annotate', False)]
+    else:
+        return
+    for element in elements:
+        cont, _ind = element.contains(event)
+        if cont:
+            if hover_on == 'lines':
+                color = element.get_color()
+            else:
+                color = element.get_facecolor()[0]
+            element.set_linewidth(3)
+            annot.xy = (event.xdata, event.ydata)
+            annot.set_text(element.get_label())
+            annot.get_bbox_patch().set_facecolor(color)
+            annot.get_bbox_patch().set_alpha(0.8)
+            annot.set_visible(True)
+            fig.canvas.draw_idle()
+            break
+        element.set_linewidth(1)
+        if vis:
+            annot.set_visible(False)
+            fig.canvas.draw_idle()

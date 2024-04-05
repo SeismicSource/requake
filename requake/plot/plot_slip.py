@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
 import numpy as np
-from .plot_utils import format_time_axis
+from .plot_utils import format_time_axis, hover_annotation
 from ..families.families import FamilyNotFoundError, read_selected_families
 from ..formulas.slip import mag_to_slip_in_cm
 from ..config.rq_setup import rq_exit
@@ -42,7 +42,6 @@ def plot_slip(config):
 
     cmap = mpl.colormaps['tab10']
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
-    lines = []
     for family in families:
         fn = family.number
         label = (
@@ -52,11 +51,11 @@ def plot_slip(config):
         times = [ev.orig_time.matplotlib_date for ev in family]
         slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
         cum_slip = np.cumsum(slip)
-        line, = ax.step(
+        ax.step(
             times, cum_slip, where='post',
             lw=1, marker='o', color=cmap(norm(fn % 10)),
-            label=label)
-        lines.append(line)
+            label=label
+        )
     # time axis formatting must be done here, before setting limits below
     format_time_axis(ax, which='xaxis')
     # get limits, that we will re-apply later
@@ -78,6 +77,7 @@ def plot_slip(config):
     ax.set_ylim(ylim)
     ax.set_xlabel('Time')
     ax.set_ylabel('Cumulative Slip (cm)')
+    ax.hover_annotation_element = 'lines'
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, ticks=range(10), ax=ax)
     cbar.ax.set_zorder(-1)
@@ -91,27 +91,6 @@ def plot_slip(config):
         zorder=20
     )
     annot.set_visible(False)
-
-    def hover(event):
-        vis = annot.get_visible()
-        if event.inaxes == ax:
-            for line in lines:
-                cont, _ind = line.contains(event)
-                if cont:
-                    color = line.get_color()
-                    line.set_linewidth(3)
-                    annot.xy = (event.xdata, event.ydata)
-                    annot.set_text(line.get_label())
-                    annot.get_bbox_patch().set_facecolor(color)
-                    annot.get_bbox_patch().set_alpha(0.8)
-                    annot.set_visible(True)
-                    fig.canvas.draw_idle()
-                    break
-                line.set_linewidth(1)
-                if vis:
-                    annot.set_visible(False)
-                    fig.canvas.draw_idle()
-
-    fig.canvas.mpl_connect('motion_notify_event', hover)
-
+    annot.hover_annotation = True
+    fig.canvas.mpl_connect('motion_notify_event', hover_annotation)
     plt.show()

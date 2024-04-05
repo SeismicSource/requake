@@ -17,6 +17,7 @@ from matplotlib import colors
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from obspy.geodetics import gps2dist_azimuth
+from .plot_utils import hover_annotation
 from .cached_tiler import CachedTiler
 from .map_tiles import (
     EsriHillshade,
@@ -95,6 +96,7 @@ def _make_basemap(config):
     else:
         ax.attribution_text = 'Map powered by Natural Earth'
     ax.gridlines(draw_labels=True, color='#777777', linestyle='--')
+    ax.hover_annotation_element = 'markers'
     return fig, ax
 
 
@@ -111,7 +113,6 @@ def map_families(config):
     trans = ccrs.PlateCarree()
     cmap = mpl.colormaps['tab10']
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
-    markers = []
     for family in families:
         fn = family.number
         nevents = len(family)
@@ -125,7 +126,7 @@ def map_families(config):
             marker='o', s=100,
             color=cmap(norm(fn % 10)), edgecolor='k',
             transform=trans, label=label, zorder=10)
-        markers.append(marker)
+        marker.to_annotate = True
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, ticks=range(10), pad=0.1, ax=ax)
     cbar.ax.set_ylabel('mod(family number, 10)')
@@ -138,27 +139,6 @@ def map_families(config):
         zorder=20
     )
     annot.set_visible(False)
-
-    def hover(event):
-        vis = annot.get_visible()
-        if event.inaxes == ax:
-            for marker in markers:
-                cont, _ind = marker.contains(event)
-                if cont:
-                    color = marker.get_facecolor()[0]
-                    marker.set_linewidth(3)
-                    annot.xy = (event.xdata, event.ydata)
-                    annot.set_text(marker.get_label())
-                    annot.get_bbox_patch().set_facecolor(color)
-                    annot.get_bbox_patch().set_alpha(0.8)
-                    annot.set_visible(True)
-                    fig.canvas.draw_idle()
-                    break
-                marker.set_linewidth(1)
-                if vis:
-                    annot.set_visible(False)
-                    fig.canvas.draw_idle()
-
-    fig.canvas.mpl_connect('motion_notify_event', hover)
-
+    annot.hover_annotation = True
+    fig.canvas.mpl_connect('motion_notify_event', hover_annotation)
     plt.show()
