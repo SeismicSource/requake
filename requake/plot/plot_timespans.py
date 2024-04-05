@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
 import numpy as np
-from .plot_utils import format_time_axis, hover_annotation
+from .plot_utils import format_time_axis, hover_annotation, duration_string
 from ..families.families import FamilyNotFoundError, read_selected_families
 from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -63,9 +63,12 @@ def plot_timespans(config):
         rq_exit(1)
     for family in families:
         fn = family.number
+        nevents = len(family)
+        duration_str = duration_string(family)
         label = (
             f'Family {fn}\n{family.lon:.1f}°E {family.lat:.1f}°N '
             f'{family.depth:.1f} km'
+            f'\n{nevents} evts {duration_str}'
         )
         times = [ev.orig_time.matplotlib_date for ev in family]
         if sort_by == 'depth':

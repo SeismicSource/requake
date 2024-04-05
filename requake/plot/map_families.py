@@ -17,7 +17,7 @@ from matplotlib import colors
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from obspy.geodetics import gps2dist_azimuth
-from .plot_utils import hover_annotation
+from .plot_utils import hover_annotation, duration_string
 from .cached_tiler import CachedTiler
 from .map_tiles import (
     EsriHillshade,
@@ -116,9 +116,9 @@ def map_families(config):
     for family in families:
         fn = family.number
         nevents = len(family)
-        duration = (family.endtime - family.starttime)/(365*24*60*60)
+        duration_str = duration_string(family)
         label = (
-            f'Family {fn}\n{nevents} evts\n{duration:.1f} yrs\n'
+            f'Family {fn}\n{nevents} evts\n{duration_str}\n'
             f'Z {family.depth:.1f} km'
         )
         marker = ax.scatter(

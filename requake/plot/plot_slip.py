@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
 import numpy as np
-from .plot_utils import format_time_axis, hover_annotation
+from .plot_utils import format_time_axis, hover_annotation, duration_string
 from ..families.families import FamilyNotFoundError, read_selected_families
 from ..formulas.slip import mag_to_slip_in_cm
 from ..config.rq_setup import rq_exit
@@ -44,9 +44,12 @@ def plot_slip(config):
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
     for family in families:
         fn = family.number
+        nevents = len(family)
+        duration_str = duration_string(family)
         label = (
             f'Family {fn}\n{family.lon:.1f}°E {family.lat:.1f}°N '
             f'{family.depth:.1f} km'
+            f'\n{nevents} evts {duration_str}'
         )
         times = [ev.orig_time.matplotlib_date for ev in family]
         slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]

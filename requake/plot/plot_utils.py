@@ -92,3 +92,32 @@ def hover_annotation(event):
         if vis:
             annot.set_visible(False)
             fig.canvas.draw_idle()
+
+
+def duration_string(family):
+    """
+    Return a string representing the duration of a family.
+
+    :param family: Family object
+    :type family: Family
+    :return: Duration string
+    :rtype: str
+    """
+    duration = (family.endtime - family.starttime)/(365*24*60*60)
+    duration_str = f'{duration:.1f} yrs'
+    if duration < 1:
+        duration *= 12
+        duration_str = f'{duration:.1f} mos'
+    if duration < 1:
+        duration *= 30
+        duration_str = f'{duration:.1f} days'
+    if duration < 1:
+        duration *= 24
+        duration_str = f'{duration:.1f} hrs'
+    if duration < 1:
+        duration *= 60
+        duration_str = f'{duration:.1f} mins'
+    if duration < 1:
+        duration *= 60
+        duration_str = f'{duration:.1f} secs'
+    return duration_str
