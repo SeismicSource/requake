@@ -68,16 +68,7 @@ def plot_timespans(config):
             f'{family.depth:.1f} km'
         )
         times = [ev.orig_time.matplotlib_date for ev in family]
-        if sort_by == 'time':
-            yvals = np.ones(len(times)) * family.starttime.matplotlib_date
-            ylabel = 'Family Start Time'
-        if sort_by == 'latitude':
-            yvals = np.ones(len(times)) * family.lat
-            ylabel = 'Latitude (°N)'
-        elif sort_by == 'longitude':
-            yvals = np.ones(len(times)) * family.lon
-            ylabel = 'Longitude (°E)'
-        elif sort_by == 'depth':
+        if sort_by == 'depth':
             yvals = np.ones(len(times)) * family.depth
             ylabel = 'Depth (km)'
         elif sort_by == 'distance_from':
@@ -86,6 +77,15 @@ def plot_timespans(config):
         elif sort_by == 'family_number':
             yvals = np.ones(len(times)) * fn
             ylabel = 'Family Number'
+        elif sort_by == 'latitude':
+            yvals = np.ones(len(times)) * family.lat
+            ylabel = 'Latitude (°N)'
+        elif sort_by == 'longitude':
+            yvals = np.ones(len(times)) * family.lon
+            ylabel = 'Longitude (°E)'
+        elif sort_by == 'time':
+            yvals = np.ones(len(times)) * family.starttime.matplotlib_date
+            ylabel = 'Family Start Time'
         ax.plot(
             times, yvals, lw=1, marker='o', color=cmap(norm(fn % 10)),
             label=label
