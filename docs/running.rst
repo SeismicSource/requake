@@ -16,7 +16,7 @@ To get help, use:
 The different running modes are specified as "verbs" (positional arguments).
 Currently supported verbs are:
 
-.. code-block::
+.. code-block:: text
 
    sample_config       write sample config file to current directory and exit
    read_catalog        read an event catalog from web services or from a file

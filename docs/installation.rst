@@ -31,7 +31,7 @@ Using pip
 The easiest way to install the most recent development snapshot is to download
 and install it through ``pip``\ , using its builtin ``git`` client:
 
-.. code-block::
+.. code-block:: text
 
    pip install git+https://github.com/SeismicSource/requake.git
 
@@ -45,14 +45,14 @@ Cloning the Requake GitHub repository
 If you want to take a look at the source code (and possibly modify it 😉),
 clone the project using ``git``\ :
 
-.. code-block::
+.. code-block:: text
 
    git clone https://github.com/SeismicSource/requake.git
 
 
 or, using SSH:
 
-.. code-block::
+.. code-block:: text
 
    git clone git@github.com:SeismicSource/requake.git
 
@@ -63,7 +63,7 @@ version number is lost).
 Then, go into the ``requake`` main directory and install the code in "editable
 mode" by running:
 
-.. code-block::
+.. code-block:: text
 
    pip install -e .
 
