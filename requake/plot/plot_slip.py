@@ -67,7 +67,8 @@ def _format_axes(ax, times, cumslips):
     max_cumslip = max(max(slip) for slip in cumslips)
     cumslipspan = max_cumslip - min_cumslip
     padding = cumslipspan * 0.05
-    ax.set_ylim(min_cumslip-padding, max_cumslip+padding)
+    min_cumslip = max(min_cumslip - padding, 0)
+    ax.set_ylim(min_cumslip, max_cumslip+padding)
     ax.set_xlabel('Time')
     ax.set_ylabel('Cumulative Slip (cm)')
 
@@ -89,7 +90,7 @@ def plot_slip(config):
     for family, time, cumslip, label in zip(families, times, cumslips, labels):
         # add an extra point at the beginning and at the end to make the step
         time = [time[0], ] + time + [time[-1]*2, ]
-        cumslip = [0, ] + list(cumslip) + [cumslip[-1], ]
+        cumslip = [-1, ] + list(cumslip) + [cumslip[-1], ]
         ax.step(
             time, cumslip, where='post',
             lw=1, marker='o', color=cmap(norm(family.number % 10)),
