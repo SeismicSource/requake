@@ -132,7 +132,7 @@ def parse_arguments(progname='requake'):
         '-l', '--longerthan', type=str, default=0, metavar='DURATION',
         help='only use families lasting longer than this value. '
              'You can specify DURATION in days (e.g., 100d) '
-             'or in years (e.g., 2.5y).'
+             'or in years (e.g., 2.5y)'
     )
     # ---
     # --- minevents
@@ -141,7 +141,7 @@ def parse_arguments(progname='requake'):
     minevents = argparse.ArgumentParser(add_help=False)
     minevents.add_argument(
         '-m', '--minevents', type=int, default=0, metavar='NEVENTS',
-        help='only use families with at least NEVENTS events.'
+        help='only use families with at least NEVENTS events'
     )
     # ---
     # --- familynumbers
@@ -153,7 +153,7 @@ def parse_arguments(progname='requake'):
         help='family numbers to use. It can be a single number, '
              'a comma-separated list (ex.: 1,4,8), '
              'a hyphen-separated number range (ex.: 2-12), or "all" '
-             '(default: "all"). '
+             '(default: %(default)s)'
     )
     # ---
     # --- traceid
@@ -162,7 +162,7 @@ def parse_arguments(progname='requake'):
     traceid = argparse.ArgumentParser(add_help=False)
     traceid.add_argument(
         '-t', '--traceid', type=str, default=None,
-        help='use this traceid instead of the default one for the family.'
+        help='use this traceid instead of the default one for the family'
     )
     # ---
     # --- print_families
@@ -173,8 +173,8 @@ def parse_arguments(progname='requake'):
     )
     printfamilies.add_argument(
         '-f', '--format', type=str, default='simple',
-        help='format for the output table.'
-             'Choose between "simple", "markdown" and "csv"'
+        choices=['simple', 'markdown', 'csv'],
+        help='format for the output table (default: %(default)s)'
     )
     # ---
     # --- plot_families
@@ -185,11 +185,11 @@ def parse_arguments(progname='requake'):
     )
     plotfamilies.add_argument(
         '-s', '--starttime', type=float, default=None,
-        help='start time, in seconds relative to trace start, for the plot.'
+        help='start time, in seconds relative to trace start, for the plot'
     )
     plotfamilies.add_argument(
         '-e', '--endtime', type=float, default=None,
-        help='end time, in seconds relative to trace start, for the plot.'
+        help='end time, in seconds relative to trace start, for the plot'
     )
     # ---
     # --- plot_timespans
@@ -204,7 +204,7 @@ def parse_arguments(progname='requake'):
             'time', 'latitude', 'longitude', 'depth', 'distance_from',
             'family_number'
         ],
-        help='quantity to sort families by on y-axis. (default: %(default)s)'
+        help='quantity to sort families by on y-axis (default: %(default)s)'
     )
     # ---
     # --- plot_slip
@@ -226,19 +226,17 @@ def parse_arguments(progname='requake'):
             'stamen_terrain', 'satellite', 'street', 'hillshade',
             'hillshade_dark', 'ocean'
         ],
-        help='style of map to plot. Possible values are: '
-             'stamen_terrain, satellite, street, hillshade, hillshade_dark, '
-             'ocean'
+        help='style of map to plot (default: %(default)s)'
     )
     mapfamilies.add_argument(
         '-k', '--apikey', type=str, default=None,
-        help='API key for Stamen Terrain map tiles (default: None). '
+        help='API key for Stamen Terrain map tiles (default: %(default)s). '
              'You can get a free API key at https://stadiamaps.com/'
     )
     mapfamilies.add_argument(
         '-z', '--zoom', type=int, default=None,
         help='zoom level for the map tiles (default: None). Note that '
-             'certain map tiles might not be available at all zoom levels.'
+             'certain map tiles might not be available at all zoom levels'
     )
     # ---
     # --- flag_family
@@ -251,7 +249,7 @@ def parse_arguments(progname='requake'):
     flagfamily.add_argument(
         'is_valid',
         help='"true" (or "t") to flag family as valid, '
-             '"false" (or "f") to flag family as not valid.'
+             '"false" (or "f") to flag family as not valid'
     )
     # ---
     # --- build_templates
