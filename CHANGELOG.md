@@ -12,6 +12,7 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 - Improved time axes in `plot_timespans` and `plot_slip` for short time
   intervals
 - `print_families`: autoset duration units based on the average duration
+- `plot_timespans`: default sorting changed to `family_number`
 
 ## v0.4.1 - 2024-03-11
 

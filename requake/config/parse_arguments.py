@@ -199,15 +199,12 @@ def parse_arguments(progname='requake'):
         help='plot family timespans'
     )
     timespans.add_argument(
-        '-s', '--sortby', type=str, default=None,
+        '-s', '--sortby', type=str, default='family_number',
         choices=[
             'time', 'latitude', 'longitude', 'depth', 'distance_from',
             'family_number'
         ],
-        help='quantity to sort families by on y-axis. '
-             'Possible values are: time, latitude, longitude, depth, '
-             'distance_from, family_number. If not specified, the config '
-             'value "sort_families_by" will be used.'
+        help='quantity to sort families by on y-axis. (default: %(default)s)'
     )
     # ---
     # --- plot_slip
