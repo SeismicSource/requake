@@ -27,14 +27,17 @@ def format_time_axis(ax, which='xaxis'):
     for axis in axes:
         dmin, dmax = axis.get_view_interval()
         timespan = dmax-dmin
-        if timespan > 365:
+        if timespan > 2*365:
             _major_locator = mdates.YearLocator()   # every year
             _major_fmt = mdates.DateFormatter('%Y')
             _minor_locator = mdates.MonthLocator()  # every month
         else:
             _major_locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
             _major_fmt = mdates.ConciseDateFormatter(_major_locator)
-            _minor_locator = mdates.DayLocator()  # every day
+            if timespan > 365/2:
+                _minor_locator = mdates.MonthLocator()  # every month
+            else:
+                _minor_locator = mdates.DayLocator()  # every day
         axis.set_major_locator(_major_locator)
         axis.set_major_formatter(_major_fmt)
         axis.set_minor_locator(_minor_locator)
