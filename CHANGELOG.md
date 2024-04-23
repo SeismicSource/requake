@@ -2,7 +2,7 @@
 
 Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
-## unreleased
+## v0.5 - 2024-04-23
 
 - New config options: `station_metadata_path` and `waveform_data_path` to
   read station metadata and waveform data from files. Supports any metadata
