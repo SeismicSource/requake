@@ -4,9 +4,14 @@
 from setuptools import setup, find_packages
 import versioneer
 
-
+revision = versioneer.get_versions()['full-revisionid']
+cdn_baseurl = 'https://cdn.jsdelivr.net/gh/SeismicSource/requake@{}'\
+    .format(revision)
 with open('README.md', 'rb') as f:
-    long_descr = f.read().decode('utf-8')
+    long_descr = f.read().decode('utf-8').replace(
+        'imgs/Requake_logo.svg',
+        '{}/imgs/Requake_logo.svg'.format(cdn_baseurl)
+    )
 
 project_urls = {
     'Homepage': 'https://requake.seismicsource.org',
