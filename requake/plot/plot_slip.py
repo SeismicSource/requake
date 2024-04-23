@@ -28,6 +28,50 @@ mpl_logger.setLevel(logging.WARNING)
 mpl.rcParams['pdf.fonttype'] = 42
 
 
+def _get_arrays(config, families):
+    """
+    Get arrays of times, cumulative slips, and labels for families.
+    """
+    times = [
+        [ev.orig_time.matplotlib_date for ev in family]
+        for family in families
+    ]
+    cumslips = [
+        np.cumsum([mag_to_slip_in_cm(config, ev.mag) for ev in family])
+        for family in families
+    ]
+    labels = [
+        (
+            f'Family {family.number}\n{family.lon:.1f}°E {family.lat:.1f}°N '
+            f'{family.depth:.1f} km'
+            f'\n{len(family)} evts {duration_string(family)}'
+        )
+        for family in families
+    ]
+    return times, cumslips, labels
+
+
+def _format_axes(ax, times, cumslips):
+    """
+    Format axes for slip plot.
+    """
+    ax.tick_params(which='both', top=True, labeltop=True)
+    ax.tick_params(axis='x', which='both', direction='in')
+    format_time_axis(ax, which='xaxis')
+    min_time = min(min(times) for times in times)
+    max_time = max(max(times) for times in times)
+    timespan = max_time - min_time
+    padding = timespan * 0.05
+    ax.set_xlim(min_time-padding, max_time+padding)
+    min_cumslip = min(min(slip) for slip in cumslips)
+    max_cumslip = max(max(slip) for slip in cumslips)
+    cumslipspan = max_cumslip - min_cumslip
+    padding = cumslipspan * 0.05
+    ax.set_ylim(min_cumslip-padding, max_cumslip+padding)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Cumulative Slip (cm)')
+
+
 def plot_slip(config):
     """
     Plot cumulative slip for one or more families.
@@ -38,52 +82,22 @@ def plot_slip(config):
         logger.error(m)
         rq_exit(1)
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.tick_params(which='both', top=True, labeltop=True)
-    ax.tick_params(axis='x', which='both', direction='in')
 
     cmap = mpl.colormaps['tab10']
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
-    trace_ids = []
-    for family in families:
-        if family.trace_id not in trace_ids and family.trace_id is not None:
-            trace_ids.append(family.trace_id)
-        fn = family.number
-        nevents = len(family)
-        duration_str = duration_string(family)
-        label = (
-            f'Family {fn}\n{family.lon:.1f}°E {family.lat:.1f}°N '
-            f'{family.depth:.1f} km'
-            f'\n{nevents} evts {duration_str}'
-        )
-        times = [ev.orig_time.matplotlib_date for ev in family]
-        slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
-        cum_slip = np.cumsum(slip)
+    times, cumslips, labels = _get_arrays(config, families)
+    for family, time, cumslip, label in zip(families, times, cumslips, labels):
+        # add an extra point at the beginning and at the end to make the step
+        time = [time[0], ] + time + [time[-1]*2, ]
+        cumslip = [0, ] + list(cumslip) + [cumslip[-1], ]
         ax.step(
-            times, cum_slip, where='post',
-            lw=1, marker='o', color=cmap(norm(fn % 10)),
+            time, cumslip, where='post',
+            lw=1, marker='o', color=cmap(norm(family.number % 10)),
             label=label
         )
-    # time axis formatting must be done here, before setting limits below
-    format_time_axis(ax, which='xaxis')
-    # get limits, that we will re-apply later
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
-    # now extend lines to zero slip at beginning and to final slip at the end
-    for family in families:
-        fn = family.number
-        times = [ev.orig_time.matplotlib_date for ev in family]
-        times = [times[0], ] + times + [times[-1]*2, ]
-        slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
-        slip = [0, ] + slip + [0, ]
-        cum_slip = np.cumsum(slip)
-        ax.step(
-            times, cum_slip, where='post',
-            lw=1, marker='o', color=cmap(norm(fn % 10))
-        )
-    ax.set_xlim(xlim)
-    ax.set_ylim(ylim)
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Cumulative Slip (cm)')
+
+    _format_axes(ax, times, cumslips)
+    trace_ids = {family.trace_id for family in families if family.trace_id}
     plot_title(
         ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
     ax.hover_annotation_element = 'lines'
