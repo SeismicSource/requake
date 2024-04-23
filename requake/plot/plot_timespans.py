@@ -106,9 +106,10 @@ def plot_timespans(config):
             trace_ids.append(family.trace_id)
         color = cmap(norm(family.number % 10))
         _plot_family_timespans(family, ax, sort_by, lon0, lat0, color)
-    format_time_axis(ax, which='xaxis')
+    ax.callbacks.connect('xlim_changed', format_time_axis)
     if sort_by == 'time':
-        format_time_axis(ax, which='yaxis')
+        ax.callbacks.connect(
+            'ylim_changed', lambda ax: format_time_axis(ax, which='yaxis'))
     ax.set_xlabel('Time')
     ax.set_ylabel(ylabels[sort_by])
     plot_title(

@@ -12,7 +12,7 @@ Plot utils.
 import matplotlib.dates as mdates
 
 
-def format_time_axis(ax, which='both'):
+def format_time_axis(ax, which='xaxis'):
     """
     Format the time axis of a Matplotlib plot.
     """
@@ -25,7 +25,7 @@ def format_time_axis(ax, which='both'):
     else:
         raise ValueError(f'Invalid value for "which": {which}')
     for axis in axes:
-        dmin, dmax = axis.get_data_interval()
+        dmin, dmax = axis.get_view_interval()
         timespan = dmax-dmin
         if timespan > 365:
             _major_locator = mdates.YearLocator()   # every year
@@ -40,6 +40,7 @@ def format_time_axis(ax, which='both'):
         axis.set_minor_locator(_minor_locator)
         axis.grid(True, which='major', linestyle='--', color='0.5')
         axis.grid(True, which='minor', linestyle=':', color='0.8')
+    ax.figure.canvas.draw()
 
 
 def plot_title(

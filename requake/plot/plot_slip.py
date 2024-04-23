@@ -57,7 +57,7 @@ def _format_axes(ax, times, cumslips):
     """
     ax.tick_params(which='both', top=True, labeltop=True)
     ax.tick_params(axis='x', which='both', direction='in')
-    format_time_axis(ax, which='xaxis')
+    ax.callbacks.connect('xlim_changed', format_time_axis)
     min_time = min(min(times) for times in times)
     max_time = max(max(times) for times in times)
     timespan = max_time - min_time
