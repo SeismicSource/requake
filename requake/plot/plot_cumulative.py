@@ -93,6 +93,12 @@ def _format_axes(config, ax, times, cumuls):
         ax.set_ylabel('Cumulative Slip (cm)')
     elif config.args.quantity == 'moment':
         ax.set_ylabel('Cumulative Moment (N.m)')
+        # move and resize the scientific notation exponent, so that it does
+        # not overlap with the top y-axis label
+        t = ax.yaxis.get_offset_text()
+        t.set_x(-0.03)
+        t.set_fontsize(8)
+        t.set_horizontalalignment('right')
     elif config.args.quantity == 'number':
         ax.set_ylabel('Cumulative Number of Events')
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
