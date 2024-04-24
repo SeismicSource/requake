@@ -27,7 +27,7 @@ Currently supported verbs are:
    print_families      print families to screen
    plot_families       plot traces for one ore more event families
    plot_timespans      plot family timespans
-   plot_slip           plot cumulative slip for one or more families
+   plot_cumulative     cumulative plot for one or more families
    map_families        plot families on a map
    flag_family         flag a family of repeating earthquakes as valid or not
                        valid. Note that all families are valid by default

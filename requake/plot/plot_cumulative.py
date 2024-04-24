@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Plot cumulative slip for one or more families.
+Cumulative plot for one or more families.
 
 :copyright:
     2021-2024 Claudio Satriano <satriano@ipgp.fr>
@@ -73,9 +73,9 @@ def _format_axes(ax, times, cumslips):
     ax.set_ylabel('Cumulative Slip (cm)')
 
 
-def plot_slip(config):
+def plot_cumulative(config):
     """
-    Plot cumulative slip for one or more families.
+    Cumulative plot for one or more families.
     """
     try:
         families = read_selected_families(config)

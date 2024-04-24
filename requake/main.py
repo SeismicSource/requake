@@ -44,9 +44,9 @@ def run():
     if config.args.action == 'plot_timespans':
         from .plot import plot_timespans
         plot_timespans(config)
-    if config.args.action == 'plot_slip':
-        from .plot import plot_slip
-        plot_slip(config)
+    if config.args.action == 'plot_cumulative':
+        from .plot import plot_cumulative
+        plot_cumulative(config)
     if config.args.action == 'map_families':
         from .plot import map_families
         map_families(config)

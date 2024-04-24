@@ -207,11 +207,11 @@ def parse_arguments(progname='requake'):
         help='quantity to sort families by on y-axis (default: %(default)s)'
     )
     # ---
-    # --- plot_slip
+    # --- plot_cumulative
     subparser.add_parser(
-        'plot_slip',
+        'plot_cumulative',
         parents=[longerthan, minevents, familynumbers],
-        help='plot cumulative slip for one or more families'
+        help='cumulative plot for one or more families'
     )
     # ---
     # --- map_families

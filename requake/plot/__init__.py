@@ -12,5 +12,5 @@ Plotting functions for Requake.
 from .plot_pair import plot_pair  # noqa
 from .plot_families import plot_families  # noqa
 from .plot_timespans import plot_timespans  # noqa
-from .plot_slip import plot_slip  # noqa
+from .plot_cumulative import plot_cumulative  # noqa
 from .map_families import map_families  # noqa

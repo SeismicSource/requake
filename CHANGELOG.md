@@ -2,6 +2,10 @@
 
 Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
+## unreleased
+
+- Verb `plot_slip` renamed to `plot_cumulative`
+
 ## v0.5 - 2024-04-23
 
 - New config options: `station_metadata_path` and `waveform_data_path` to
