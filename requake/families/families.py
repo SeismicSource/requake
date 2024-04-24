@@ -136,7 +136,8 @@ def read_families(config):
             family.append(ev)
             family.valid = row['valid'] in ['True', 'true']
         # append last family
-        families.append(family)
+        if family is not None:
+            families.append(family)
     return families
 
 
