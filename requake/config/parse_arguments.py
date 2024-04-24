@@ -208,10 +208,19 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- plot_cumulative
-    subparser.add_parser(
+    plotcumulative = subparser.add_parser(
         'plot_cumulative',
         parents=[longerthan, minevents, familynumbers],
         help='cumulative plot for one or more families'
+    )
+    plotcumulative.add_argument(
+        '-q', '--quantity', type=str, default='slip',
+        choices=['slip', 'moment', 'number'],
+        help='cumulative quantity to plot on y-axis (default: %(default)s)'
+    )
+    plotcumulative.add_argument(
+        '-L', '--logscale', action='store_true',
+        help='use log scale for y-axis'
     )
     # ---
     # --- map_families

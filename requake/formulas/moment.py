@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Functions to compute slip for repeaters.
+Functions to compute seismic moment.
 
 :copyright:
     2021-2024 Claudio Satriano <satriano@ipgp.fr>
@@ -10,24 +10,26 @@ Functions to compute slip for repeaters.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
-from .moment import mag_to_moment
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
-def mag_to_slip_in_cm(_config, magnitude):
+def mag_to_moment(magnitude, unit='N.m'):
     """
-    Convert magnitude to slip in cm.
+    Convert magnitude to seismic moment.
 
-    :param config: requake configuration object
-    :config type: config.Config
     :param magnitude: earthquake magnitude
     :type magnitude: float
-    :returns: slip in cm
+    :param unit: unit of the seismic moment, either 'N.m' or 'dyne.cm'
+    :type unit: str
+    :returns: seismic moment
     :rtype: float
     """
     if magnitude is None:
         return 0
-    moment = mag_to_moment(magnitude, unit='dyne.cm')
-    # TODO: add other laws via config parameter
-    # Nadeau and Johnson (1998)
-    return (10**(-2.36))*(moment**(0.17))
+    if unit == 'N.m':
+        moment = 10**(3/2*(magnitude+6.07))
+    elif unit == 'dyne.cm':
+        moment = 10**(3/2*(magnitude+10.7))
+    else:
+        raise ValueError(f'Wrong unit for seismic moment: {unit}')
+    return moment

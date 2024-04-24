@@ -4,7 +4,9 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 
-- Verb `plot_slip` renamed to `plot_cumulative`
+- Verb `plot_slip` renamed to `plot_cumulative`. This new verb has new options
+  to plot cumulative slip, cumulative moment, and cumulative number of events,
+  and to make the plot logarithmic.
 
 ## v0.5 - 2024-04-23
 

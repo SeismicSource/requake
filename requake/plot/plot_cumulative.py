@@ -10,15 +10,16 @@ Cumulative plot for one or more families.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
+import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
-import numpy as np
+from matplotlib.ticker import MaxNLocator
 from .plot_utils import (
     format_time_axis, plot_title, hover_annotation, duration_string)
 from ..families.families import FamilyNotFoundError, read_selected_families
-from ..formulas.slip import mag_to_slip_in_cm
+from ..formulas import mag_to_slip_in_cm, mag_to_moment
 from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
@@ -30,16 +31,29 @@ mpl.rcParams['pdf.fonttype'] = 42
 
 def _get_arrays(config, families):
     """
-    Get arrays of times, cumulative slips, and labels for families.
+    Get arrays of times, cumulative quantities, and labels for families.
     """
     times = [
         [ev.orig_time.matplotlib_date for ev in family]
         for family in families
     ]
-    cumslips = [
-        np.cumsum([mag_to_slip_in_cm(config, ev.mag) for ev in family])
-        for family in families
-    ]
+    if config.args.quantity == 'slip':
+        cumuls = [
+            np.cumsum([mag_to_slip_in_cm(config, ev.mag) for ev in family])
+            for family in families
+        ]
+    elif config.args.quantity == 'moment':
+        cumuls = [
+            np.cumsum([mag_to_moment(ev.mag) for ev in family])
+            for family in families
+        ]
+    elif config.args.quantity == 'number':
+        cumuls = [
+            np.arange(1, len(family)+1)
+            for family in families
+        ]
+    else:
+        raise ValueError(f'Unknown quantity: {config.args.quantity}')
     labels = [
         (
             f'Family {family.number}\n{family.lon:.1f}°E {family.lat:.1f}°N '
@@ -48,12 +62,12 @@ def _get_arrays(config, families):
         )
         for family in families
     ]
-    return times, cumslips, labels
+    return times, cumuls, labels
 
 
-def _format_axes(ax, times, cumslips):
+def _format_axes(config, ax, times, cumuls):
     """
-    Format axes for slip plot.
+    Format axes for cumulative plot.
     """
     ax.tick_params(which='both', top=True, labeltop=True)
     ax.tick_params(axis='x', which='both', direction='in')
@@ -63,14 +77,27 @@ def _format_axes(ax, times, cumslips):
     timespan = max_time - min_time
     padding = timespan * 0.05
     ax.set_xlim(min_time-padding, max_time+padding)
-    min_cumslip = min(min(slip) for slip in cumslips)
-    max_cumslip = max(max(slip) for slip in cumslips)
-    cumslipspan = max_cumslip - min_cumslip
-    padding = cumslipspan * 0.05
-    min_cumslip = max(min_cumslip - padding, 0)
-    ax.set_ylim(min_cumslip, max_cumslip+padding)
+    min_cumul = min(min(c) for c in cumuls)
+    max_cumul = max(max(c) for c in cumuls)
+    cumulspan = max_cumul - min_cumul
+    if not config.args.logscale:
+        padding = cumulspan * 0.05
+        min_cumul = max(min_cumul - padding, 0)
+        max_cumul += padding
+    else:
+        min_cumul /= 10
+        max_cumul *= 10
+    ax.set_ylim(min_cumul, max_cumul)
     ax.set_xlabel('Time')
-    ax.set_ylabel('Cumulative Slip (cm)')
+    if config.args.quantity == 'slip':
+        ax.set_ylabel('Cumulative Slip (cm)')
+    elif config.args.quantity == 'moment':
+        ax.set_ylabel('Cumulative Moment (N.m)')
+    elif config.args.quantity == 'number':
+        ax.set_ylabel('Cumulative Number of Events')
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    else:
+        raise ValueError(f'Unknown quantity: {config.args.quantity}')
 
 
 def plot_cumulative(config):
@@ -83,21 +110,33 @@ def plot_cumulative(config):
         logger.error(m)
         rq_exit(1)
     fig, ax = plt.subplots(figsize=(8, 4))
+    if config.args.logscale:
+        ax.set_yscale('log')
 
     cmap = mpl.colormaps['tab10']
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
-    times, cumslips, labels = _get_arrays(config, families)
-    for family, time, cumslip, label in zip(families, times, cumslips, labels):
+    times, cumuls, labels = _get_arrays(config, families)
+    maxtime = max(max(time) for time in times)
+    mintime = min(min(time) for time in times)
+    maxtime += (maxtime - mintime) * 0.1
+    mincumul = min(min(cumul) for cumul in cumuls)
+    maxcumul = max(max(cumul) for cumul in cumuls)
+    mincumul = max(mincumul - (maxcumul - mincumul) * 0.1, 0)
+    for family, time, cumul, label in zip(families, times, cumuls, labels):
+        # fist plot just the markers
+        ax.scatter(
+            time, cumul, marker='o', color=cmap(norm(family.number % 10)),
+            label=label
+        )
         # add an extra point at the beginning and at the end to make the step
-        time = [time[0], ] + time + [time[-1]*2, ]
-        cumslip = [-1, ] + list(cumslip) + [cumslip[-1], ]
+        time = [time[0], ] + time + [maxtime, ]
+        cumul = [mincumul, ] + list(cumul) + [cumul[-1], ]
         ax.step(
-            time, cumslip, where='post',
-            lw=1, marker='o', color=cmap(norm(family.number % 10)),
+            time, cumul, where='post',
+            lw=1, marker='', color=cmap(norm(family.number % 10)),
             label=label
         )
 
-    _format_axes(ax, times, cumslips)
     trace_ids = {family.trace_id for family in families if family.trace_id}
     plot_title(
         ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
@@ -106,6 +145,8 @@ def plot_cumulative(config):
     cbar = fig.colorbar(sm, ticks=range(10), ax=ax)
     cbar.ax.set_zorder(-1)
     cbar.ax.set_ylabel('family number (last digit)')
+    # format axes after adding colorbar to avoid a visual glitch
+    _format_axes(config, ax, times, cumuls)
 
     # Empty annotation that will be updated interactively
     annot = ax.annotate(
