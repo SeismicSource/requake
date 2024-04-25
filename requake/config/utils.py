@@ -12,8 +12,6 @@ Utility functions for Requake.
 import os
 import sys
 import locale
-import traceback
-from .. import __version__
 from .configobj import ConfigObj
 from .configobj.validate import Validator
 locale.setlocale(locale.LC_ALL, '')
@@ -140,6 +138,13 @@ def manage_uncaught_exception(exception):
     :param exception: Exception object.
     :type exception: Exception
     """
+    # pylint: disable=import-outside-toplevel
+    from .. import __version__
+    import traceback
+    import numpy as np
+    import scipy as sp
+    import obspy
+    import matplotlib
     sys.stderr.write("""
 # BEGIN TRACEBACK #############################################################
 """)
@@ -160,6 +165,10 @@ Include the following information in your report:
 """)
     sys.stderr.write(f'  Requake version: {__version__}\n')
     sys.stderr.write(f'  Python version: {sys.version}\n')
+    sys.stderr.write(f'  NumPy version: {np.__version__}\n')
+    sys.stderr.write(f'  SciPy version: {sp.__version__}\n')
+    sys.stderr.write(f'  ObsPy version: {obspy.__version__}\n')
+    sys.stderr.write(f'  Matplotlib version: {matplotlib.__version__}\n')
     sys.stderr.write(f'  Platform: {sys.platform}\n')
     sys.stderr.write(f'  Command line: {" ".join(sys.argv)}\n')
     sys.stderr.write(f'  Error message: {str(exception)}\n')
