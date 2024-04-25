@@ -261,8 +261,9 @@ def rq_exit(retval=0, abort=False, progname='requake'):
     """Exit as gracefully as possible."""
     if abort:
         print('\nAborting.')
-        logger.debug(f'{progname} ABORTED\n\n')
-    else:
+        if logger is not None:
+            logger.debug(f'{progname} ABORTED\n\n')
+    elif logger is not None:
         logger.debug(f'{progname} END\n\n')
     logging.shutdown()
     sys.exit(retval)
