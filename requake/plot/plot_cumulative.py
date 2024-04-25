@@ -85,6 +85,9 @@ def _format_axes(config, ax, times, cumuls):
         min_cumul = max(min_cumul - padding, 0)
         max_cumul += padding
     else:
+        if min_cumul == 0:
+            # use second smallest value to avoid log(0)
+            min_cumul = sorted({min(c) for c in cumuls})[1]
         min_cumul /= 10
         max_cumul *= 10
     ax.set_ylim(min_cumul, max_cumul)
