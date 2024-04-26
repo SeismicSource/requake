@@ -76,7 +76,7 @@ def print_families(config):
         slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
         cum_slip = np.cumsum(slip)
         d_slip = cum_slip[-1] - cum_slip[0]
-        slip_rate = d_slip/family.duration
+        slip_rate = np.inf if family.duration == 0 else d_slip/family.duration
         row.append(slip_rate)
         table.append(row)
     if tablefmt == 'csv':
