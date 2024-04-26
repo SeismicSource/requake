@@ -50,6 +50,20 @@ def _check_library_versions():
     OBSPY_VERSION_STR = obspy.__version__
 
 
+def _make_outdir(outdir):
+    """Create the output directory if it doesn't exist."""
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+    readme = os.path.join(outdir, 'README.txt')
+    if not os.path.exists(readme):
+        with open(readme, 'w', encoding='utf8') as fp:
+            fp.write('This is the Requake output directory.\n\n')
+            fp.write('''\
+Do not manually edit the files in this directory, unless you know what you
+are doing.
+''')
+
+
 def _setup_logging(config, progname, action_name):
     """Set up the logging infrastructure."""
     global logger
@@ -68,8 +82,7 @@ def _setup_logging(config, progname, action_name):
         'build_families'
     ]
     if action_name in logging_actions:
-        if not os.path.exists(config.args.outdir):
-            os.makedirs(config.args.outdir)
+        _make_outdir(config.args.outdir)
         logfile = os.path.join(
             config.args.outdir, f'{progname}.{action_name}.log')
         filehand = logging.FileHandler(filename=logfile, mode='a')
