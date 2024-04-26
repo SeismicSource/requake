@@ -10,3 +10,4 @@ Functions and data structures for managing earthquake catalogs.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 from .read_catalog import read_catalog  # noqa
+from .print_catalog import print_catalog  # noqa

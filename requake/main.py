@@ -23,6 +23,9 @@ def run():
     if config.args.action == 'read_catalog':
         from .catalog import read_catalog
         read_catalog(config)
+    if config.args.action == 'print_catalog':
+        from .catalog import print_catalog
+        print_catalog(config)
     if config.args.action == 'scan_catalog':
         from .scan import scan_catalog
         scan_catalog(config)

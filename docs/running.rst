@@ -20,6 +20,7 @@ Currently supported verbs are:
 
    sample_config       write sample config file to current directory and exit
    read_catalog        read an event catalog from web services or from a file
+   print_catalog       print the event catalog to screen
    scan_catalog        scan an existing catalog for earthquake pairs
    plot_pair           plot traces for a given event pair
    build_families      build families of repeating earthquakes from a catalog

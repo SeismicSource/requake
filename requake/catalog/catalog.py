@@ -264,10 +264,13 @@ def read_stored_catalog(config):
     try:
         cat = RequakeCatalog()
         cat.read(config.scan_catalog_file)
+        cat.sort()
+        if not cat:
+            raise ValueError('Empty catalog')
         return cat
     except ValueError as m:
         raise ValueError(
-            f'Error reading catalog file {config.scan_catalog_file}'
+            f'Error reading catalog file {config.scan_catalog_file}: {m}'
         ) from m
     except FileNotFoundError as m:
         raise FileNotFoundError(

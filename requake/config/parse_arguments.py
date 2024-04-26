@@ -103,6 +103,23 @@ def parse_arguments(progname='requake'):
         '-a', '--append', action='store_true',
         help='append events to existing catalog'
     )
+    # --- printformat
+    #     a parent parser for the "format" option,
+    #     used by the "print" subparsers
+    printformat = argparse.ArgumentParser(add_help=False)
+    printformat.add_argument(
+        '-f', '--format', type=str, default='simple',
+        choices=['simple', 'markdown', 'csv'],
+        help='format for the output table (default: %(default)s)'
+    )
+    # ---
+    # --- print_catalog
+    subparser.add_parser(
+        'print_catalog',
+        parents=[printformat],
+        help='print the event catalog to screen',
+        formatter_class=NewlineHelpFormatter
+    )
     # ---
     # --- scan_catalog
     subparser.add_parser(
@@ -166,15 +183,10 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- print_families
-    printfamilies = subparser.add_parser(
+    subparser.add_parser(
         'print_families',
-        parents=[longerthan, minevents, familynumbers],
+        parents=[longerthan, minevents, familynumbers, printformat],
         help='print families to screen'
-    )
-    printfamilies.add_argument(
-        '-f', '--format', type=str, default='simple',
-        choices=['simple', 'markdown', 'csv'],
-        help='format for the output table (default: %(default)s)'
     )
     # ---
     # --- plot_families
