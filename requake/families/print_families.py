@@ -55,7 +55,9 @@ def print_families(config):
         'start time',
         'end time',
         f'duration ({duration_units})',
-        'slip rate (cm/y)'
+        'slip rate (cm/y)',
+        'mag min',
+        'mag max',
     ]
     table = []
     tablefmt = config.args.format
@@ -71,13 +73,13 @@ def print_families(config):
             family.depth,
             family.starttime,
             family.endtime,
-            family.duration*duration_multiplier
+            family.duration*duration_multiplier,
         ]
         slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
         cum_slip = np.cumsum(slip)
         d_slip = cum_slip[-1] - cum_slip[0]
         slip_rate = np.inf if family.duration == 0 else d_slip/family.duration
-        row.append(slip_rate)
+        row += [slip_rate, family.magmin, family.magmax]
         table.append(row)
     if tablefmt == 'csv':
         writer.writerows(table)
@@ -96,6 +98,8 @@ def print_families(config):
             None,
             None,
             '.2f',
+            '.1f',
+            '.1f',
             '.1f'
         ]
         print(

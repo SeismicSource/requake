@@ -8,6 +8,7 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
   to plot cumulative slip, cumulative moment, and cumulative number of events,
   and to make the plot logarithmic.
 - New verb `print_catalog`: print the event catalog to screen
+- `print_families`: also print minimum and maximum family magnitudes
 
 ## v0.5 - 2024-04-23
 

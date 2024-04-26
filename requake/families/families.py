@@ -36,6 +36,8 @@ class Family(list):
         self.starttime = None
         self.endtime = None
         self.duration = None  # years
+        self.magmin = None
+        self.magmax = None
         self.number = number
         self.valid = True
         self.trace_id = None
@@ -45,6 +47,7 @@ class Family(list):
             f'{self.number:2d} {len(self):2d} '
             f'{self.lon:8.4f} {self.lat:8.4f} {self.depth:7.3f} '
             f'{self.starttime} {self.endtime} {self.duration:4.1f} '
+            f'{self.magmin:3.1f} {self.magmax:3.1f} '
             f'{self.valid}'
         )
 
@@ -70,10 +73,14 @@ class Family(list):
         self.lon = np.mean([e.lon for e in self])
         self.lat = np.mean([e.lat for e in self])
         self.depth = np.mean([e.depth for e in self])
-        self.starttime = np.min([e.orig_time for e in self])
-        self.endtime = np.max([e.orig_time for e in self])
+        self.starttime = min(ev.orig_time, self.starttime)\
+            if self.starttime else ev.orig_time
+        self.endtime = max(ev.orig_time, self.endtime)\
+            if self.endtime else ev.orig_time
         year = 365*24*60*60
         self.duration = (self.endtime - self.starttime)/year
+        self.magmin = min(ev.mag, self.magmin) if self.magmin else ev.mag
+        self.magmax = max(ev.mag, self.magmax) if self.magmax else ev.mag
 
     def extend(self, ev_list):
         """
