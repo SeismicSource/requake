@@ -79,8 +79,9 @@ class Family(list):
             if self.endtime else ev.orig_time
         year = 365*24*60*60
         self.duration = (self.endtime - self.starttime)/year
-        self.magmin = min(ev.mag, self.magmin) if self.magmin else ev.mag
-        self.magmax = max(ev.mag, self.magmax) if self.magmax else ev.mag
+        if ev.mag is not None:
+            self.magmin = min(ev.mag, self.magmin) if self.magmin else ev.mag
+            self.magmax = max(ev.mag, self.magmax) if self.magmax else ev.mag
 
     def extend(self, ev_list):
         """
