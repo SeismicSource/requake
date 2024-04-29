@@ -13,9 +13,7 @@ import logging
 import csv
 from itertools import combinations
 from scipy.cluster.hierarchy import average, fcluster
-from obspy import UTCDateTime
-from ..formulas.conversion import float_or_none
-from ..catalog.catalog import RequakeEvent
+from .pairs import read_events_from_pairs_file
 from .families import Family
 from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -37,57 +35,6 @@ def _check_options(config):
             '"sort_families_by" set to "distance_from", '
             'but "distance_from_lon" and/or "distance_from_lat" '
             'are not specified')
-
-
-def _read_events_from_pairs_file(config):
-    """
-    Read events from pairs file.
-
-    :param config: configuration object
-    :type config: config.Config
-    :return: dictionary of events
-    :rtype: dict
-
-    :raises FileNotFoundError: if the pairs file is not found
-    """
-    events = {}
-    with open(config.scan_catalog_pairs_file, 'r', encoding='utf8') as fp:
-        reader = csv.DictReader(fp)
-        for row in reader:
-            cc_max = float(row['cc_max'])
-            evid1 = row['evid1']
-            try:
-                ev1 = events[evid1]
-            except KeyError:
-                ev1 = RequakeEvent(
-                    evid=evid1,
-                    orig_time=UTCDateTime(row['orig_time1']),
-                    lon=float_or_none(row['lon1']),
-                    lat=float_or_none(row['lat1']),
-                    depth=float_or_none(row['depth_km1']),
-                    mag_type=row['mag_type1'],
-                    mag=float_or_none(row['mag1']),
-                    trace_id=row['trace_id']
-                )
-                events[evid1] = ev1
-            evid2 = row['evid2']
-            try:
-                ev2 = events[evid2]
-            except KeyError:
-                ev2 = RequakeEvent(
-                    evid=evid2,
-                    orig_time=UTCDateTime(row['orig_time2']),
-                    lon=float_or_none(row['lon2']),
-                    lat=float_or_none(row['lat2']),
-                    depth=float_or_none(row['depth_km2']),
-                    mag_type=row['mag_type2'],
-                    mag=float_or_none(row['mag2']),
-                    trace_id=row['trace_id']
-                )
-                events[evid2] = ev2
-            # Store the correlation between the two events in both events
-            ev1.correlations[ev2.evid] = ev2.correlations[ev1.evid] = cc_max
-    return events
 
 
 def _build_families_from_shared_events(events, cc_min):
@@ -214,7 +161,7 @@ def build_families(config):
         rq_exit(1)
     try:
         logger.info('Reading events from pairs file...')
-        events = _read_events_from_pairs_file(config)
+        events = read_events_from_pairs_file(config)
     except FileNotFoundError:
         logger.error(
             'Unable to find event pairs file: '
