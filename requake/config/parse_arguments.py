@@ -117,14 +117,30 @@ def parse_arguments(progname='requake'):
     subparser.add_parser(
         'print_catalog',
         parents=[printformat],
-        help='print the event catalog to screen',
-        formatter_class=NewlineHelpFormatter
+        help='print the event catalog to screen'
     )
     # ---
     # --- scan_catalog
     subparser.add_parser(
         'scan_catalog',
         help='scan an existing catalog for earthquake pairs'
+    )
+    # ---
+    # --- print_pairs
+    printpairs = subparser.add_parser(
+        'print_pairs',
+        parents=[printformat],
+        help='print pairs to screen'
+    )
+    printpairs.add_argument(
+        '-c', '--cc_min',
+        type=float, default=None,
+        help='minimum cross-correlation coefficient (default: %(default)s)'
+    )
+    printpairs.add_argument(
+        '-C', '--cc_max',
+        type=float, default=None,
+        help='maximum cross-correlation coefficient (default: %(default)s)'
     )
     # ---
     # --- plot_pair

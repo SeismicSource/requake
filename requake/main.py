@@ -29,6 +29,9 @@ def run():
     if config.args.action == 'scan_catalog':
         from .scan import scan_catalog
         scan_catalog(config)
+    if config.args.action == 'print_pairs':
+        from .families import print_pairs
+        print_pairs(config)
     if config.args.action == 'scan_templates':
         from .scan import scan_templates
         scan_templates(config)

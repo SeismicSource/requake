@@ -10,6 +10,7 @@ earthquakes.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
+from .print_pairs import print_pairs  # noqa
 from .build_families import build_families  # noqa
 from .print_families import print_families  # noqa
 from .flag_family import flag_family  # noqa
