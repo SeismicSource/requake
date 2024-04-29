@@ -23,16 +23,6 @@ def print_pairs(config):
     :param config: Configuration object.
     :type config: config.Config
     """
-    cc_min = config.args.cc_min if config.args.cc_min is not None else -1e99
-    cc_max = config.args.cc_max if config.args.cc_max is not None else 1e99
-    try:
-        pairs = [
-            pair for pair in read_pairs_file(config)
-            if cc_min <= pair.cc_max <= cc_max
-        ]
-    except FileNotFoundError as msg:
-        logger.error(msg)
-        rq_exit(1)
     headers_fmt = [
         ('evid1', None),
         ('evid2', None),
@@ -53,27 +43,37 @@ def print_pairs(config):
         ('lag\n(sec)', '.2f'),
         ('cc\nmax', '.2f')
     ]
-    rows = [
-        [
-            pair.event1.evid,
-            pair.event2.evid,
-            pair.trace_id,
-            pair.event1.orig_time,
-            pair.event1.lon,
-            pair.event1.lat,
-            pair.event1.depth,
-            pair.event1.mag_type,
-            pair.event1.mag,
-            pair.event2.orig_time,
-            pair.event2.lon,
-            pair.event2.lat,
-            pair.event2.depth,
-            pair.event2.mag_type,
-            pair.event2.mag,
-            pair.lag_samples,
-            pair.lag_sec,
-            pair.cc_max
-        ]
-        for pair in pairs
-    ]
-    generic_printer(config, rows, headers_fmt)
+    cc_min = config.args.cc_min if config.args.cc_min is not None else -1e99
+    cc_max = config.args.cc_max if config.args.cc_max is not None else 1e99
+    try:
+        print_headers = True
+        for pair in read_pairs_file(config):
+            if not cc_min <= pair.cc_max <= cc_max:
+                continue
+            rows = [
+                [
+                    pair.event1.evid,
+                    pair.event2.evid,
+                    pair.trace_id,
+                    pair.event1.orig_time,
+                    pair.event1.lon,
+                    pair.event1.lat,
+                    pair.event1.depth,
+                    pair.event1.mag_type,
+                    pair.event1.mag,
+                    pair.event2.orig_time,
+                    pair.event2.lon,
+                    pair.event2.lat,
+                    pair.event2.depth,
+                    pair.event2.mag_type,
+                    pair.event2.mag,
+                    pair.lag_samples,
+                    pair.lag_sec,
+                    pair.cc_max
+                ]
+            ]
+            generic_printer(config, rows, headers_fmt, print_headers)
+            print_headers = False
+    except FileNotFoundError as msg:
+        logger.error(msg)
+        rq_exit(1)

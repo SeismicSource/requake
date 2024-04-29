@@ -18,7 +18,7 @@ from tabulate import tabulate
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
-def generic_printer(config, rows, headers_fmt):
+def generic_printer(config, rows, headers_fmt, print_headers=True):
     """
     A generic printer function for Requake.
 
@@ -34,9 +34,10 @@ def generic_printer(config, rows, headers_fmt):
     tablefmt = config.args.format
     if tablefmt == 'csv':
         writer = csv.writer(sys.stdout)
-        # replace newlines with spaces in headers
-        headers = [h.replace('\n', ' ') for h in headers]
-        writer.writerow(headers)
+        if print_headers:
+            # replace newlines with spaces in headers
+            headers = [h.replace('\n', ' ') for h in headers]
+            writer.writerow(headers)
     elif tablefmt == 'markdown':
         headers = [h.replace('\n', '<br>') for h in headers]
     if tablefmt == 'csv':
@@ -54,9 +55,12 @@ def generic_printer(config, rows, headers_fmt):
         }
         tablefmt = format_dict[config.args.format]
         with contextlib.suppress(BrokenPipeError):
-            print(
-                tabulate(
-                    rows, headers=headers,
-                    floatfmt=floatfmt, tablefmt=tablefmt
-                )
-            )
+            kwargs = {
+                'headers': headers,
+                'floatfmt': floatfmt,
+                'tablefmt': tablefmt
+            }
+            line = tabulate(rows, **kwargs)
+            if not print_headers:
+                line = line.rsplit('\n', maxsplit=1)[-1]
+            print(line)
