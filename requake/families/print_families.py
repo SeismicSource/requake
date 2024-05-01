@@ -69,7 +69,11 @@ def print_families(config):
             family.endtime,
             family.duration*duration_multiplier,
         ]
-        slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
+        try:
+            slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
+        except ValueError as msg:
+            logger.error(msg)
+            rq_exit(1)
         cum_slip = np.cumsum(slip)
         d_slip = cum_slip[-1] - cum_slip[0]
         slip_rate = np.inf if family.duration == 0 else d_slip/family.duration

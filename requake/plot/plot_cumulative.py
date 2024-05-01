@@ -124,7 +124,11 @@ def plot_cumulative(config):
 
     cmap = mpl.colormaps['tab10']
     norm = colors.Normalize(vmin=-0.5, vmax=9.5)
-    times, cumuls, labels = _get_arrays(config, families)
+    try:
+        times, cumuls, labels = _get_arrays(config, families)
+    except ValueError as m:
+        logger.error(m)
+        rq_exit(1)
     maxtime = max(max(time) for time in times)
     mintime = min(min(time) for time in times)
     maxtime += (maxtime - mintime) * 0.1

@@ -10,6 +10,9 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 - New verb `print_catalog`: print the event catalog to screen
 - New verb `print_pairs`: print the event pairs to screen
 - `print_families`: also print minimum and maximum family magnitudes
+- Additional models to convert magnitude to slip. Currently supported models
+  are: Nadeau and Johnson (1998), Beeler et al. (2001), Eshelby (1957).
+  Model selection is done using the `mag_to_slip_model` config parameter.
 
 ## v0.5 - 2024-04-23
 
