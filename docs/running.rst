@@ -56,15 +56,16 @@ or ``.zshrc``\ :
 Typical workflow
 ^^^^^^^^^^^^^^^^
 
-The first thing you will want to do is to generate a sample config file:
+The first thing you will want to do is to generate a sample
+:ref:`configuration_file`:
 
 .. code-block::
 
    requake sample_config
 
 
-Edit the config file according to your needs, then read or download the event
-catalog:
+Edit the :ref:`configuration_file` according to your needs, then read or
+download the event catalog:
 
 .. code-block::
 

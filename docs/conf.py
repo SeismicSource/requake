@@ -3,6 +3,8 @@
 # pylint: disable=wrong-import-position,invalid-name
 import sys
 import os
+sys.path.insert(0, os.path.abspath('.'))
+from write_configfile import write_configfile  # noqa
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -68,3 +70,8 @@ html_logo = '../imgs/Requake_logo_white.svg'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 html_css_files = ['custom.css']
+
+
+def setup(app):
+    """Add custom functions to Sphinx."""
+    app.connect('builder-inited', write_configfile)
