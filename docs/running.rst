@@ -22,7 +22,7 @@ Currently supported verbs are:
    read_catalog        read an event catalog from web services or from a file
    print_catalog       print the event catalog to screen
    scan_catalog        scan an existing catalog for earthquake pairs
-   print_pairs         print pairs to screen 
+   print_pairs         print pairs to screen
    plot_pair           plot traces for a given event pair
    build_families      build families of repeating earthquakes from a catalog
                        of pairs
@@ -40,13 +40,13 @@ Currently supported verbs are:
                        templates
 
 
-Certain running modes (e.g., ``plot_pair``\ ) require further arguments (use, e.g.,
-``requake plot_pair -h`` to get help).
+Certain running modes (e.g., ``plot_pair``\ ) require further arguments
+(use, e.g., ``requake plot_pair -h`` to get help).
 
 Requake supports command line tab completion for arguments, thanks to
 `argcomplete <https://kislyuk.github.io/argcomplete/>`_.
-To enable command line tab completion, add the following line to your ``.bashrc``
-or ``.zshrc``\ :
+To enable command line tab completion, add the following line to your
+``.bashrc`` or ``.zshrc``:
 
 .. code-block::
 
@@ -86,8 +86,8 @@ Now, build the catalog of event pairs with:
    requake scan_catalog
 
 
-Once done (\ `it will take time! <performances.html#performances>`_\ ), you are ready to build
-repeating earthquake families:
+Once done (\ `it will take time! <performances.html#performances>`_\ ),
+you are ready to build repeating earthquake families:
 
 .. code-block::
 

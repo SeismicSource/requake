@@ -67,8 +67,8 @@ Their model for fault slip :math:`d` (in :math:`\cm`) is the following:
        \right]
 
 where :math:`\Delta\sigma` is the static stress drop (in :math:`\MPa`),
-:math:`\mu` is the rigidity (in :math:`\MPa`), :math:`M_0` is the seismic moment
-(in :math:`\Nm`), and :math:`C` is the strain hardening coefficient
+:math:`\mu` is the rigidity (in :math:`\MPa`), :math:`M_0` is the seismic
+moment (in :math:`\Nm`), and :math:`C` is the strain hardening coefficient
 (in :math:`\MPacm`).
 
 This formula is selected by setting the ``mag_to_slip_model`` parameter to
