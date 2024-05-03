@@ -13,8 +13,7 @@ To get help, use:
    requake -h
 
 
-The different running modes are specified as "verbs" (positional arguments).
-Currently supported verbs are:
+Different commands are available:
 
 .. code-block:: text
 
@@ -33,19 +32,18 @@ Currently supported verbs are:
    plot_cumulative     cumulative plot for one or more families
    map_families        plot families on a map
    flag_family         flag a family of repeating earthquakes as valid or not
-                       valid. Note that all families are valid by default
-                       when first created
+                       valid.
    build_templates     build waveform templates for one or more event
                        families
    scan_templates      scan a continuous waveform stream using one or more
                        templates
 
 
-Certain running modes (e.g., ``plot_pair``\ ) require further arguments
+Certain commands (e.g., ``plot_pair``\ ) require further arguments
 (use, e.g., ``requake plot_pair -h`` to get help).
 
-Requake supports command line tab completion for arguments, thanks to
-`argcomplete <https://kislyuk.github.io/argcomplete/>`_.
+Requake supports command line tab completion for commands and arguments, thanks
+to `argcomplete <https://kislyuk.github.io/argcomplete/>`_.
 To enable command line tab completion, add the following line to your
 ``.bashrc`` or ``.zshrc``:
 

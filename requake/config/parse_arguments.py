@@ -46,7 +46,7 @@ def parse_arguments(progname='requake'):
     parser = argparse.ArgumentParser(
         description=f'{progname}: Repeating earthquakes search and analysis.'
     )
-    subparser = parser.add_subparsers(dest='action')
+    subparser = parser.add_subparsers(dest='action', title='commands')
     parser.add_argument(
         '-c',
         '--configfile',
@@ -289,8 +289,7 @@ def parse_arguments(progname='requake'):
     # --- flag_family
     flagfamily = subparser.add_parser(
         'flag_family',
-        help='flag a family of repeating earthquakes as valid or not valid. '
-             'Note that all families are valid by default when first created'
+        help='flag a family of repeating earthquakes as valid or not valid'
     )
     flagfamily.add_argument('family_number')
     flagfamily.add_argument(
