@@ -25,7 +25,7 @@ from .._version import get_versions
 from .config import Config
 from .utils import (
     parse_configspec, read_config, validate_config, write_sample_config,
-    write_ok
+    update_config_file, write_ok
 )
 # pylint: disable=global-statement,import-outside-toplevel
 
@@ -202,6 +202,9 @@ def configure(args):
     configspec = parse_configspec()
     if args.action == 'sample_config':
         write_sample_config(configspec, 'requake')
+        sys.exit(0)
+    if args.action == 'update_config':
+        update_config_file(args.configfile, configspec)
         sys.exit(0)
     config_obj = read_config(args.configfile, configspec)
     # Set to None all the 'None' strings

@@ -91,6 +91,7 @@ The different running modes are specified as "verbs" (positional arguments).
 Currently supported verbs are:
 
     sample_config       write sample config file to current directory and exit
+    update_config       update an existing config file to the latest version
     read_catalog        read an event catalog from web services or from a file
     print_catalog       print the event catalog to screen
     scan_catalog        scan an existing catalog for earthquake pairs

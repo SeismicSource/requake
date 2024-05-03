@@ -73,6 +73,16 @@ def parse_arguments(progname='requake'):
         help='write sample config file to current directory and exit'
     )
     # ---
+    # --- update_config
+    updateconfig = subparser.add_parser(
+        'update_config',
+        help='update an existing config file to the latest version'
+    )
+    updateconfig.add_argument(
+        'config_file', default='requake.conf', nargs='?',
+        help='config file to be updated (default: %(default)s)'
+    )
+    # ---
     # --- read catalog
     readcatalog = subparser.add_parser(
         'read_catalog',

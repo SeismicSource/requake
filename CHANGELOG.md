@@ -4,6 +4,9 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 
+Note: you might want to run `requake update_config` to update your config file
+to the latest version.
+
 - Verb `plot_slip` renamed to `plot_cumulative`. This new verb has new options
   to plot cumulative slip, cumulative moment, and cumulative number of events,
   and to make the plot logarithmic.
@@ -13,6 +16,8 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 - Additional models to convert magnitude to slip. Currently supported models
   are: Nadeau and Johnson (1998), Beeler et al. (2001), Eshelby (1957).
   Model selection is done using the `mag_to_slip_model` config parameter.
+- New verb `update_config`: update an existing config file to the latest
+  version
 
 ## v0.5 - 2024-04-23
 

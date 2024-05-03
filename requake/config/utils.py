@@ -12,6 +12,8 @@ Utility functions for Requake.
 import os
 import sys
 import locale
+import shutil
+from datetime import datetime
 from .configobj import ConfigObj
 from .configobj.validate import Validator
 locale.setlocale(locale.LC_ALL, '')
@@ -129,6 +131,53 @@ def validate_config(config_obj):
         sys.exit(1)
     if not test:
         err_exit('No configuration value present!')
+
+
+def update_config_file(config_file, configspec):
+    """
+    Update a configuration file to the latest version.
+
+    :param config_file: Configuration file.
+    :type config_file: str
+    :param configspec: Configuration specification file.
+    :type configspec: str
+    """
+    config_obj = read_config(config_file, configspec)
+    val = Validator()
+    config_obj.validate(val)
+    mod_time = datetime.fromtimestamp(os.path.getmtime(config_file))
+    mod_time_str = mod_time.strftime('%Y%m%d_%H%M%S')
+    config_file_old = f'{config_file}.{mod_time_str}'
+    ans = input(
+        f'Ok to update {config_file}? [y/N]\n'
+        f'(Old file will be saved as {config_file_old}) '
+    )
+    if ans not in ['y', 'Y']:
+        sys.exit(0)
+    config_new = ConfigObj(configspec=configspec, default_encoding='utf8')
+    config_new = read_config(None, configspec)
+    config_new.validate(val)
+    config_new.defaults = []
+    config_new.comments = configspec.comments
+    config_new.initial_comment = config_obj.initial_comment
+    config_new.final_comment = configspec.final_comment
+    for k, v in config_obj.items():
+        if k not in config_new:
+            continue
+        # Fix for force_list(default=None)
+        if v == ['None', ]:
+            v = None
+        config_new[k] = v
+    migrate_options = {
+        # 'old_option': 'new_option'
+    }
+    for old_opt, new_opt in migrate_options.items():
+        if old_opt in config_obj and config_obj[old_opt] != 'None':
+            config_new[new_opt] = config_obj[old_opt]
+    shutil.copyfile(config_file, config_file_old)
+    with open(config_file, 'wb') as fp:
+        config_new.write(fp)
+        print(f'{config_file}: updated')
 
 
 def manage_uncaught_exception(exception):
