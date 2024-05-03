@@ -63,7 +63,9 @@ def _eshelby_1957(moment, stress_drop, rigidity):
     :rtype: float
     """
     rigidity *= 1e3  # Convert GPa to MPa
+    # radius in cm (since stress_drop is in MPa)
     radius = (7/16 * moment/stress_drop)**(1/3)
+    # slip in cm (since rigidity is in MPa and radius is in cm)
     return moment/(np.pi*rigidity*radius**2)
 
 

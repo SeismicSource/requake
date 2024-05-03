@@ -1,5 +1,6 @@
 docutils>=0.19
 sphinx-favicon
 sphinxcontrib-bibtex
+sphinxcontrib-katex
 sphinx-mdinclude
 sphinx_rtd_theme>1

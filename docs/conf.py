@@ -3,6 +3,7 @@
 # pylint: disable=wrong-import-position,invalid-name
 import sys
 import os
+import sphinxcontrib.katex as katex
 sys.path.insert(0, os.path.abspath('.'))
 from write_configfile import write_configfile  # noqa
 
@@ -41,15 +42,33 @@ extensions = [
     'sphinx.ext.doctest',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
-    'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinx.ext.autosectionlabel',
     'sphinx.ext.intersphinx',
     'sphinx_favicon',
     'sphinx_rtd_theme',
-    # 'sphinxcontrib.bibtex',
+    'sphinxcontrib.bibtex',
+    'sphinxcontrib.katex',
     'sphinx_mdinclude',
 ]
+bibtex_bibfiles = ['refs.bib']
+bibtex_reference_style = 'author_year'
+bibtex_default_style = 'unsrt'
+
+latex_macros = r"""
+    \def \Nm                {\mathrm{N}\cdot\mathrm{m}}
+    \def \dynecm            {\mathrm{dyne}\cdot\mathrm{cm}}
+    \def \cm                {\mathrm{cm}}
+    \def \MPa               {\mathrm{MPa}}
+    \def \MPacm             {\mathrm{MPa/cm}}
+"""
+
+# Translate LaTeX macros to KaTeX and add to options for HTML builder
+katex_macros = katex.latex_defs_to_katex_macros(latex_macros)
+katex_options = 'macros: {' + katex_macros + '}'
+
+# Add LaTeX macros for LATEX builder
+# latex_elements = {'preamble': latex_macros}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
