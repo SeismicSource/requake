@@ -18,8 +18,18 @@ or (seismic moment :math:`M_0` in :math:`\dynecm`):
 
    M_0 = 10^{1.5(M_w + 10.7)}
 
-Then, slip is estimated using one of the following models, selectable using
-the ``mag_to_slip_model`` parameter in the :ref:`configuration_file`.
+Then, slip is estimated using one of the three models discussed below,
+selectable using the ``mag_to_slip_model`` parameter in the
+:ref:`configuration_file`.
+See **Figure 1** for a comparison of the three models.
+
+.. figure:: imgs/Uchida2019_fig9.svg
+  :alt: slip vs magnitude for three models
+  :width: 500
+  :align: center
+
+  **Figure 1** Relationship between magnitude (or seismic moment) and slip for
+  three models. Figure from :cite:t:`Uchida2019`.
 
 
 Nadeau and Johnson (1998)
@@ -66,8 +76,8 @@ This formula is selected by setting the ``mag_to_slip_model`` parameter to
 coefficient must be set in the :ref:`configuration_file`.
 
 
-Eshelby (1957)
-^^^^^^^^^^^^^^
+Eshelby (1957) circular crack model
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A somehow simpler approach is to assume that the fault creep around the
 repeater asperity is equal to the slip released by the repeater rupture.
@@ -90,3 +100,7 @@ formula:
    a = \left( \frac{7}{16} \frac{M_0}{\Delta \sigma} \right)^{\frac{1}{3}}
 
 Where :math:`\Delta \sigma` is the static stress drop (in :math:`\MPa`).
+
+This formula is selected by setting the ``mag_to_slip_model`` parameter to
+``E1957``. The value for static stress drop must be set in the
+:ref:`configuration_file`.
