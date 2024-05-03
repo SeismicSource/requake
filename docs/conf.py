@@ -94,3 +94,4 @@ html_css_files = ['custom.css']
 def setup(app):
     """Add custom functions to Sphinx."""
     app.connect('builder-inited', write_configfile)
+    app.add_js_file('version-alert.js')
