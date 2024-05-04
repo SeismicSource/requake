@@ -2,7 +2,7 @@
 
 Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
-## unreleased
+## v0.6 - 2024-05-04
 
 Note: you might want to run `requake update_config` to update your config file
 to the latest version.
