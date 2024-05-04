@@ -216,6 +216,14 @@ def plot_families(config):
     except (FileNotFoundError, FamilyNotFoundError) as m:
         logger.error(m)
         rq_exit(1)
+    if len(families) > 20:
+        logger.warning(
+            f'Too many families selected: {len(families)}. '
+            'Plotting only the first 20.')
+        logger.info(
+            'See "requake plot_families -h" for information on '
+            'how to select specific families.')
+        families = families[:20]
     for family in families:
         _plot_family(config, family)
     print('''
