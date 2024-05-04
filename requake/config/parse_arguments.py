@@ -34,6 +34,22 @@ class NewlineHelpFormatter(argparse.HelpFormatter):
         return lines
 
 
+class SubcommandHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """
+    Custom help formatter that removes the list of subcommands from the help
+    message.
+
+    See: https://stackoverflow.com/a/13429281/2021880
+    """
+    def _format_action(self, action):
+        parts = super(
+            argparse.RawDescriptionHelpFormatter, self
+        )._format_action(action)
+        if action.nargs == argparse.PARSER:
+            parts = '\n'.join(parts.split('\n')[1:])
+        return parts
+
+
 def parse_arguments(progname='requake'):
     """
     Parse command line arguments.
@@ -44,9 +60,14 @@ def parse_arguments(progname='requake'):
     :rtype: argparse.Namespace
     """
     parser = argparse.ArgumentParser(
-        description=f'{progname}: Repeating earthquakes search and analysis.'
+        description=f'{progname}: Repeating earthquakes search and analysis.',
+        epilog='Use "%(prog)s <command> -h" for help on a specific command\n'
+               '(example: "%(prog)s read_catalog -h").\n'
+               '\nFull documentation at https://requake.readthedocs.io',
+        formatter_class=SubcommandHelpFormatter
     )
     subparser = parser.add_subparsers(dest='action', title='commands')
+    subparser.metavar = '<command> [options]'
     parser.add_argument(
         '-c',
         '--configfile',
