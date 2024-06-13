@@ -102,6 +102,18 @@ def _guess_field_names(input_fields):
                 output_fields[field_name] = in_field
     if all(v is None for v in output_fields.values()):
         raise ValueError('Unable to identify any field')
+    # make a list of duplicated fields, which have been matched more than once
+    duplicated_fields = [
+        (key, value, output_field_scores[key])
+        for key, value in output_fields.items() if
+        value is not None and
+        list(output_fields.values()).count(value) > 1
+    ]
+    # if there are duplicated fields, keep the one with the highest score
+    for _key, value, score in duplicated_fields:
+        for key2, value2 in output_fields.items():
+            if value2 == value and score > output_field_scores[key2]:
+                output_fields[key2] = None
     print('Columns identified ("column name" --> "identified name"):')
     for in_field, matched_field in output_fields.items():
         if in_field is None:
