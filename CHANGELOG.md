@@ -2,6 +2,11 @@
 
 Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
+## unreleased
+
+- Improved readng of CSV catalog files: avoid duplicated column guessing, warn
+  if an invalid time format is found
+
 ## v0.6 - 2024-05-04
 
 Note: you might want to run `requake update_config` to update your config file
