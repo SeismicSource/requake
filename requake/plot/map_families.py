@@ -25,6 +25,7 @@ from .map_tiles import (
     EsriOcean,
     EsriImagery,
     StamenTerrain,
+    WorldStreetMap
 )
 from ..families.families import FamilyNotFoundError, read_selected_families
 from ..config.rq_setup import rq_exit
@@ -40,6 +41,7 @@ TILER = {
     'ocean': EsriOcean,
     'satellite': EsriImagery,
     'stamen_terrain': StamenTerrain,
+    'street': WorldStreetMap,
 }
 
 
@@ -91,6 +93,8 @@ def _make_basemap(config):
         _add_tiles(config, ax, tiler)
     if map_style in {'hillshade', 'hillshade_dark', 'ocean', 'satellite'}:
         ax.attribution_text = 'Map powered by Esri and Natural Earth'
+    elif map_style == 'street':
+        ax.attribution_text = 'Map powered by Esri and OpenStreetMap'
     elif map_style == 'stamen_terrain':
         ax.attribution_text = 'Map powered by Stamen Design and Natural Earth'
     else:

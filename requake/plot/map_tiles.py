@@ -126,3 +126,21 @@ class EsriImagery(GoogleWTS):
             'https://server.arcgisonline.com/ArcGIS/rest/services/'
             f'World_Imagery/MapServer/tile/{z}/{y}/{x}.jpg'
         )
+
+
+class WorldStreetMap(GoogleWTS):
+    """
+    Retrieves World Street Map tiles from argisonline.com.
+    """
+    def __init__(self,
+                 apikey=None,
+                 cache=False):
+        super().__init__(cache=cache, desired_tile_form="RGBA")
+        self.apikey = apikey
+
+    def _image_url(self, tile):
+        x, y, z = tile
+        return (
+            'https://server.arcgisonline.com/ArcGIS/rest/services/'
+            f'World_Street_Map/MapServer/tile/{z}/{y}/{x}.jpg'
+        )
