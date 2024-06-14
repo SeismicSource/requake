@@ -4,8 +4,10 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 
-- Improved readng of CSV catalog files: avoid duplicated column guessing, warn
-  if an invalid time format is found
+- Improved reading of CSV catalog files:
+  - avoid duplicated column guessing
+  - ensure that prefectly matching column field names are correctly guessed
+  - warn if an invalid time format is found
 
 ## v0.6 - 2024-05-04
 

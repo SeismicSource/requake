@@ -32,10 +32,13 @@ def _field_match_score(field, field_list):
         the field names in field_list
     :rtype: int
     """
+    # return a very high score for a perfect match
+    if field.lower().strip() in field_list:
+        return 999
     scores = [
         len(guess)
         for guess in field_list
-        if guess in field.lower()
+        if guess in field.lower().strip()
     ]
     try:
         return max(scores)
