@@ -19,9 +19,10 @@ from obspy.taup import TauPyModel
 from obspy.signal.cross_correlation import correlate, xcorr_max
 from obspy.clients.fdsn.header import FDSNNoDataException
 from scipy.stats import median_abs_deviation
+from ..config.rq_setup import config
+from ..config.rq_setup import rq_exit
 from .station_metadata import get_traceid_coords
 from .arrivals import get_arrivals
-from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 model = TauPyModel(model='ak135')
 
@@ -30,15 +31,13 @@ class NoWaveformError(Exception):
     """Exception raised for missing waveform data."""
 
 
-def _get_trace_id(config, ev):
+def _get_trace_id(ev):
     """
     Get trace id to use with the given event.
 
     If there is only one trace_id in the config file, return it.
     If there are multiple trace_ids, return the one closest to the event.
 
-    :param config: a Config object
-    :type config: config.Config
     :param ev: an event
     :type ev: RequakeEvent
     :return: the trace_id to use
@@ -50,7 +49,7 @@ def _get_trace_id(config, ev):
     ev_lat = ev.lat
     ev_lon = ev.lon
     orig_time = ev.orig_time
-    traceid_coords = get_traceid_coords(config, orig_time)
+    traceid_coords = get_traceid_coords(orig_time)
     distances = {}
     for trace_id, coords in traceid_coords.items():
         trace_lat = coords['latitude']
@@ -62,7 +61,7 @@ def _get_trace_id(config, ev):
     return min(distances, key=distances.get)
 
 
-def get_waveform(config, traceid, starttime, endtime):
+def get_waveform(traceid, starttime, endtime):
     """Download waveform for a given traceid, start and end time."""
     client = config.dataselect_client
     net, sta, loc, chan = traceid.split('.')
@@ -90,7 +89,7 @@ def get_waveform(config, traceid, starttime, endtime):
     return tr
 
 
-def get_event_waveform(config, ev):
+def get_event_waveform(ev):
     """Download waveform for a given event at a given trace_id."""
     evid = ev.evid
     ev_lat = ev.lat
@@ -102,7 +101,7 @@ def get_event_waveform(config, ev):
     mag_type = ev.mag_type
     traceid = ev.trace_id if config.args.traceid is None\
         else config.args.traceid
-    traceid_coords = get_traceid_coords(config, orig_time)
+    traceid_coords = get_traceid_coords(orig_time)
     trace_lat = traceid_coords[traceid]['latitude']
     trace_lon = traceid_coords[traceid]['longitude']
     p_arrival, s_arrival, distance, dist_deg = get_arrivals(
@@ -113,7 +112,7 @@ def get_event_waveform(config, ev):
     trace_length = config.cc_trace_length
     t0 = p_arrival_time - pre_p
     t1 = t0 + trace_length
-    tr = get_waveform(config, traceid, t0, t1)
+    tr = get_waveform(traceid, t0, t1)
     tr.stats.evid = evid
     tr.stats.ev_lat = ev_lat
     tr.stats.ev_lon = ev_lon
@@ -129,7 +128,7 @@ def get_event_waveform(config, ev):
     return tr
 
 
-def process_waveforms(config, st):
+def process_waveforms(st):
     """Demean and filter a waveform trace or stream."""
     st = st.copy()
     st.detrend(type='demean')
@@ -146,19 +145,17 @@ tr_cache = {}
 old_cache_key = None
 
 
-def get_waveform_pair(config, pair):
+def get_waveform_pair(pair):
     """
     Download traces for a given pair.
 
-    :param config: requake config object
-    :type config: config.Config
     :param pair: pair of events
     :type pair: tuple of RequakeEvent
     :return: stream containing the two traces
     :rtype: obspy.Stream
     """
     ev1, ev2 = pair
-    ev1.trace_id = ev2.trace_id = _get_trace_id(config, ev1)
+    ev1.trace_id = ev2.trace_id = _get_trace_id(ev1)
     st = Stream()
     global skipped_evids
     global tr_cache
@@ -178,7 +175,7 @@ def get_waveform_pair(config, pair):
             st.append(tr_cache[cache_key])
             continue
         try:
-            tr = get_event_waveform(config, ev)
+            tr = get_event_waveform(ev)
             tr_cache[cache_key] = tr
             st.append(tr)
         except NoWaveformError as m:
@@ -193,7 +190,7 @@ def get_waveform_pair(config, pair):
     return st
 
 
-def cc_waveform_pair(config, tr1, tr2, mode='events'):
+def cc_waveform_pair(tr1, tr2, mode='events'):
     """Perform cross-correlation."""
     dt1 = tr1.stats.delta
     dt2 = tr2.stats.delta
@@ -210,8 +207,8 @@ def cc_waveform_pair(config, tr1, tr2, mode='events'):
             logger.error(
                 'The two traces have a different sampling interval.')
             rq_exit(1)
-    tr1 = process_waveforms(config, tr1)
-    tr2 = process_waveforms(config, tr2)
+    tr1 = process_waveforms(tr1)
+    tr2 = process_waveforms(tr2)
     shift = int(config.cc_max_shift/dt1)
     cc = correlate(tr1, tr2, shift)
     abs_max = bool(config.cc_allow_negative)
@@ -224,9 +221,9 @@ def cc_waveform_pair(config, tr1, tr2, mode='events'):
     return lag, lag_sec, cc_max, cc_mad
 
 
-def align_pair(config, tr1, tr2):
+def align_pair(tr1, tr2):
     """Align tr2 respect to tr1 using cross-correlation."""
-    lag, lag_sec, cc_max = cc_waveform_pair(config, tr1, tr2)
+    lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
     # apply lag to trace #2
     # if lag is positive, trace #2 is delayed
     if lag > 0:
@@ -244,13 +241,13 @@ def align_pair(config, tr1, tr2):
     return lag, lag_sec, cc_max
 
 
-def align_traces(config, st):
+def align_traces(st):
     """Align traces in stream using cross-correlation."""
     for tr in st:
         tr.stats.cc_mean = 0
         tr.stats.cc_npairs = 0
     for tr1, tr2 in combinations(st, 2):
-        _, _, cc_max = align_pair(config, tr1, tr2)
+        _, _, cc_max = align_pair(tr1, tr2)
         tr1.stats.cc_mean += cc_max
         tr1.stats.cc_npairs += 1
         tr2.stats.cc_mean += cc_max
@@ -259,7 +256,7 @@ def align_traces(config, st):
         tr.stats.cc_mean /= tr.stats.cc_npairs
 
 
-def build_template(config, st, family):
+def build_template(st, family):
     """
     Build template by averaging traces.
 

@@ -14,6 +14,7 @@ import csv
 import numpy as np
 from obspy import UTCDateTime, Stream
 from obspy.geodetics import gps2dist_azimuth
+from ..config.rq_setup import config
 from ..formulas.conversion import float_or_none
 from ..catalog.catalog import RequakeEvent
 from ..waveforms.waveforms import (
@@ -31,14 +32,12 @@ class Family(list):
     """
     A list of events belonging to the same family.
     """
-    def __init__(self, number=-1, config=None):
+    def __init__(self, number=-1):
         """
         Initialize a family.
 
         :param number: Family number.
         :type number: int
-        :param config: requake configuration object
-        :type config: config.Config
         """
         self.lon = None
         self.lat = None
@@ -54,7 +53,6 @@ class Family(list):
         self.number = number
         self.valid = True
         self.trace_id = None
-        self.config = config
 
     def __str__(self):
         return (
@@ -107,10 +105,10 @@ class Family(list):
         self.magmax = max(ev.mag, self.magmax) if self.magmax else ev.mag
         if self.cumul_slip is None:
             self.cumul_slip = 0
-        ev_slip = mag_to_slip_in_cm(self.config, ev.mag)
+        ev_slip = mag_to_slip_in_cm(ev.mag)
         self.cumul_slip += ev_slip
         ev_first = sorted(self)[0]
-        ev_first_slip = mag_to_slip_in_cm(self.config, ev_first.mag)
+        ev_first_slip = mag_to_slip_in_cm(ev_first.mag)
         d_slip = self.cumul_slip - ev_first_slip
         self.slip_rate = np.inf if self.duration == 0 else d_slip/self.duration
         if self.cumul_moment is None:
@@ -144,12 +142,10 @@ class Family(list):
         return distance/1e3
 
 
-def read_families(config):
+def read_families():
     """
     Read a list of families from file.
 
-    :param config: requake configuration object
-    :type config: config.Config
     :return: List of families.
     :rtype: list of Family
     """
@@ -172,7 +168,7 @@ def read_families(config):
             if family_number != old_family_number:
                 if family is not None:
                     families.append(family)
-                family = Family(config=config)
+                family = Family()
                 family.number = family_number
                 old_family_number = family_number
             family.append(ev)
@@ -183,20 +179,18 @@ def read_families(config):
     return families
 
 
-def read_selected_families(config):
+def read_selected_families():
     """
     Read and select families based on family number, validity, length
     and number of events.
 
-    :param config: requake configuration object
-    :type config: config.Config
     :return: List of families.
     :rtype: list of Family
 
     :raises FamilyNotFoundError: if no family is found
     """
-    family_numbers = _build_family_number_list(config)
-    families = read_families(config)
+    family_numbers = _build_family_number_list()
+    families = read_families()
     families_selected = []
     for family in families:
         if family.number not in family_numbers:
@@ -219,12 +213,10 @@ def read_selected_families(config):
     return families_selected
 
 
-def get_family(config, families, family_number):
+def get_family(families, family_number):
     """
     Get a given family from a list of families.
 
-    :param config: requake configuration object
-    :type config: config.Config
     :param families: List of families.
     :type families: list of Family
     :param family_number: Family number.
@@ -246,12 +238,10 @@ def get_family(config, families, family_number):
     raise Exception(msg)
 
 
-def get_family_waveforms(config, family):
+def get_family_waveforms(family):
     """
     Get waveforms for a given family.
 
-    :param config: requake configuration object
-    :type config: config.Config
     :param family: The family.
     :type family: Family
     :return: The waveforms.
@@ -260,7 +250,7 @@ def get_family_waveforms(config, family):
     st = Stream()
     for ev in family:
         try:
-            st += get_event_waveform(config, ev)
+            st += get_event_waveform(ev)
         except Exception as m:
             logger.error(str(m))
     if not st:
@@ -269,24 +259,22 @@ def get_family_waveforms(config, family):
     return st
 
 
-def get_family_aligned_waveforms_and_template(config, family):
+def get_family_aligned_waveforms_and_template(family):
     """
     Get aligned waveforms and template for a given family.
 
-    :param config: requake configuration object
-    :type config: config.Config
     :param family: The family.
     :type family: Family
     :return: An obspy stream containing the aligned waveforms and the template.
     :rtype: obspy.Stream
     """
-    st = get_family_waveforms(config, family)
-    align_traces(config, st)
-    build_template(config, st, family)
+    st = get_family_waveforms(family)
+    align_traces(st)
+    build_template(st, family)
     return st
 
 
-def _build_family_number_list(config):
+def _build_family_number_list():
     """Build a list of family numbers from config option."""
     family_numbers = config.args.family_numbers
     if family_numbers == 'all':

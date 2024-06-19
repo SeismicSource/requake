@@ -14,6 +14,7 @@ import contextlib
 import urllib.request
 from obspy import UTCDateTime
 from obspy.clients.fdsn.header import URL_MAPPINGS
+from ..config.rq_setup import config
 from ..catalog.catalog import RequakeCatalog, RequakeEvent
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -100,12 +101,10 @@ def _get_events_from_fdsnws(
     return cat
 
 
-def read_catalog_from_fdsnws(config):
+def read_catalog_from_fdsnws():
     """
     Read an event catalog from FDSN web services.
 
-    :param config: Configuration object.
-    :type config: requake.rq_setup.RequakeConfig
     :return: Event catalog.
     :rtype: requake.catalog.RequakeCatalog
     """

@@ -16,6 +16,8 @@ import matplotlib.patheffects as patheffects
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from obspy.geodetics import gps2dist_azimuth
+from ..config.rq_setup import config
+from ..config.rq_setup import rq_exit
 from .plot_utils import (
     plot_title, hover_annotation, duration_string, family_colors, plot_colorbar
 )
@@ -29,7 +31,6 @@ from .map_tiles import (
     WorldStreetMap
 )
 from ..families.families import FamilyNotFoundError, read_selected_families
-from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
@@ -46,7 +47,7 @@ TILER = {
 }
 
 
-def _add_tiles(config, ax, tiler, alpha=1):
+def _add_tiles(ax, tiler, alpha=1):
     """Add map tiles to basemap."""
     if config.args.zoom is not None:
         tile_zoom_level = config.args.zoom
@@ -56,7 +57,7 @@ def _add_tiles(config, ax, tiler, alpha=1):
     ax.add_image(tiler, tile_zoom_level, alpha=alpha)
 
 
-def _make_basemap(config):
+def _make_basemap():
     lonmin = config.catalog_lon_min
     lonmax = config.catalog_lon_max
     latmin = config.catalog_lat_min
@@ -91,7 +92,7 @@ def _make_basemap(config):
     diagonal, _, _ = gps2dist_azimuth(latmin, lonmin, latmax, lonmax)
     ax.maxdiagonal = diagonal / 1e3
     if map_style != 'no_basemap':
-        _add_tiles(config, ax, tiler)
+        _add_tiles(ax, tiler)
     if map_style in {'hillshade', 'hillshade_dark', 'ocean', 'satellite'}:
         ax.attribution_text = 'Map powered by Esri and Natural Earth'
     elif map_style == 'street':
@@ -105,19 +106,19 @@ def _make_basemap(config):
     return fig, ax
 
 
-def map_families(config):
+def map_families():
     """
     Plot families on a map.
     """
     try:
-        families = read_selected_families(config)
+        families = read_selected_families()
     except (FileNotFoundError, FamilyNotFoundError) as m:
         logger.error(m)
         rq_exit(1)
-    fig, ax = _make_basemap(config)
+    fig, ax = _make_basemap()
     trans = ccrs.PlateCarree()
     try:
-        fcolors, norm, cmap = family_colors(config, families)
+        fcolors, norm, cmap = family_colors(families)
     except ValueError as e:
         logger.error(e)
         rq_exit(1)
@@ -141,7 +142,7 @@ def map_families(config):
             linewidths=1, facecolor=color, edgecolor='w', path_effects=pe,
             transform=trans, label=label, zorder=10)
         marker.to_annotate = True
-    plot_colorbar(config, fig, ax, cmap, norm)
+    plot_colorbar(fig, ax, cmap, norm)
     plot_title(
         ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
 

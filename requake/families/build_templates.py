@@ -11,17 +11,18 @@ Build waveform templates for one or more event families.
 """
 import logging
 import os
+from ..config.rq_setup import config
+from ..config.rq_setup import rq_exit
 from .families import (
     FamilyNotFoundError,
     read_selected_families,
     get_family_aligned_waveforms_and_template)
-from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
-def _build_template(config, family):
+def _build_template(family):
     try:
-        st = get_family_aligned_waveforms_and_template(config, family)
+        st = get_family_aligned_waveforms_and_template(family)
     except Exception as m:
         logger.error(str(m))
         return
@@ -47,21 +48,18 @@ def _build_template(config, family):
         f'Template for family {family.number} saved as {template_file}')
 
 
-def build_templates(config):
+def build_templates():
     """
     Build waveform templates for one or more event families.
-
-    :param config: requake configuration object
-    :type config: config.Config
     """
     try:
-        families = read_selected_families(config)
+        families = read_selected_families()
     except FamilyNotFoundError as m:
         logger.error(str(m))
         rq_exit(1)
     for family in families:
         try:
-            _build_template(config, family)
+            _build_template(family)
         except Exception as m:
             logger.error(str(m))
             continue

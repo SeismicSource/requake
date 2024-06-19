@@ -15,15 +15,14 @@ import csv
 import contextlib
 import logging
 from tabulate import tabulate
+from ..config.rq_setup import config
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
-def generic_printer(config, rows, headers_fmt, print_headers=True):
+def generic_printer(rows, headers_fmt, print_headers=True):
     """
     A generic printer function for Requake.
 
-    :param config: Configuration object.
-    :type config: config.Config
     :param rows: Rows to print.
     :type rows: list of rows
     :param headers_fmt: Headers and format strings.

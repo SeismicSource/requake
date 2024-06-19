@@ -12,22 +12,21 @@ Read an event catalog from web services or from a file.
 import os
 import logging
 import contextlib
-from ..catalog.catalog import RequakeCatalog
+from ..config.rq_setup import config
 from ..config.rq_setup import rq_exit
+from ..catalog.catalog import RequakeCatalog
 from .read_catalog_from_fdsnws import read_catalog_from_fdsnws
 from .read_catalog_from_quakeml import read_catalog_from_quakeml
 from .read_catalog_from_csv import read_catalog_from_csv
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
-def _read_catalog_from_file(config):
+def _read_catalog_from_file():
     """
     Read an event catalog from a file.
 
     Supported formats are QuakeML, FDSN text and CSV.
 
-    :param config: Configuration object.
-    :type config: requake.rq_setup.RequakeConfig
     :return: Event catalog.
     :rtype: requake.catalog.RequakeCatalog
 
@@ -54,15 +53,13 @@ def _read_catalog_from_file(config):
     return read_catalog_from_csv(catalog_file)
 
 
-def _filter_catalog(catalog, config):
+def _filter_catalog(catalog):
     """
     Filter an event catalog, based on the criteria specified
     in the configuration.
 
     :param catalog: Event catalog.
     :type catalog: requake.catalog.RequakeCatalog
-    :param config: Configuration object.
-    :type config: requake.rq_setup.RequakeConfig
     :return: Filtered event catalog.
     :rtype: requake.catalog.RequakeCatalog
     """
@@ -93,14 +90,12 @@ def _filter_catalog(catalog, config):
     return outcat
 
 
-def read_catalog(config):
+def read_catalog():
     """
     Read an event catalog from web services or from a file.
 
     Write the catalog to the output directory.
 
-    :param config: Configuration object.
-    :type config: requake.rq_setup.RequakeConfig
     :return: Event catalog.
     :rtype: requake.catalog.RequakeCatalog
     """
@@ -117,9 +112,9 @@ def read_catalog(config):
     input_cat_file = config.args.catalog_file
     if input_cat_file is not None:
         try:
-            catalog += _read_catalog_from_file(config)
+            catalog += _read_catalog_from_file()
             # Filter catalog based on configuration
-            catalog = _filter_catalog(catalog, config)
+            catalog = _filter_catalog(catalog)
         except FileNotFoundError:
             logger.error(f'File "{input_cat_file}" not found')
             rq_exit(1)
@@ -127,7 +122,7 @@ def read_catalog(config):
             logger.error(f'Error reading catalog file "{input_cat_file}": {m}')
             rq_exit(1)
     else:
-        catalog += read_catalog_from_fdsnws(config)
+        catalog += read_catalog_from_fdsnws()
     if not catalog:
         logger.error('No event read')
         rq_exit(1)

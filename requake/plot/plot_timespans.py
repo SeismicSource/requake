@@ -13,6 +13,7 @@ import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from ..config.rq_setup import config
 from .plot_utils import (
     format_time_axis, plot_title, hover_annotation, duration_string,
     family_colors, plot_colorbar
@@ -70,12 +71,12 @@ def _plot_family_timespans(family, ax, sort_by, lon0, lat0, color):
     )
 
 
-def plot_timespans(config):
+def plot_timespans():
     """
     Plot family timespans.
     """
     try:
-        families = read_selected_families(config)
+        families = read_selected_families()
     except (FileNotFoundError, FamilyNotFoundError) as m:
         logger.error(m)
         rq_exit(1)
@@ -104,7 +105,7 @@ def plot_timespans(config):
             'are not specified')
         rq_exit(1)
     try:
-        fcolors, norm, cmap = family_colors(config, families)
+        fcolors, norm, cmap = family_colors(families)
     except ValueError as e:
         logger.error(e)
         rq_exit(1)
@@ -126,7 +127,7 @@ def plot_timespans(config):
     plot_title(
         ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
     ax.hover_annotation_element = 'lines'
-    plot_colorbar(config, fig, ax, cmap, norm)
+    plot_colorbar(fig, ax, cmap, norm)
 
     # Empty annotation that will be updated interactively
     annot = ax.annotate(

@@ -17,15 +17,12 @@ from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
-def print_families(config):
+def print_families():
     """
     Print families to screen.
-
-    :param config: Configuration object.
-    :type config: config.Config
     """
     try:
-        families = read_selected_families(config)
+        families = read_selected_families()
     except (FileNotFoundError, FamilyNotFoundError) as msg:
         logger.error(msg)
         rq_exit(1)
@@ -75,4 +72,4 @@ def print_families(config):
             family.magmax
         ]
         rows.append(row)
-    generic_printer(config, rows, headers_fmt)
+    generic_printer(rows, headers_fmt)

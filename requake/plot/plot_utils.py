@@ -13,6 +13,7 @@ import contextlib
 import matplotlib.dates as mdates
 import numpy as np
 from matplotlib import cm, colors
+from ..config.rq_setup import config
 from .colormaps import cmaps
 
 
@@ -187,12 +188,10 @@ def duration_string(family):
     return f'{duration:.1f} {_short_units[units]}'
 
 
-def family_colors(config, families):
+def family_colors(families):
     """
     Return the family colors, according to the colorby parameter.
 
-    :param config: Configuration object
-    :type config: Config
     :param families: List of families
     :type families: list
     :return: List of colors, normalization object, colormap
@@ -287,12 +286,10 @@ def _family_colors_duration(families, cmap):
     return fcolors, norm, cmap
 
 
-def plot_colorbar(config, fig, ax, cmap, norm):
+def plot_colorbar(fig, ax, cmap, norm):
     """
     Add a colorbar to a plot.
 
-    :param config: Configuration object
-    :type config: Config
     :param fig: Matplotlib figure
     :type fig: matplotlib.figure.Figure
     :param ax: Matplotlib axis

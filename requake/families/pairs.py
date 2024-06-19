@@ -12,6 +12,7 @@ Build families of repeating earthquakes from a catalog of pairs.
 import logging
 import csv
 from obspy import UTCDateTime
+from ..config.rq_setup import config
 from ..formulas.conversion import float_or_none
 from ..catalog.catalog import RequakeEvent
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -72,12 +73,10 @@ class RequakeEventPair:
         )
 
 
-def read_pairs_file(config):
+def read_pairs_file():
     """
     Read pairs file. Generate a RequakeEventPair object for each row.
 
-    :param config: configuration object
-    :type config: config.Config
     :return: generator of RequakeEventPair objects
     :rtype: generator
 
@@ -116,19 +115,17 @@ def read_pairs_file(config):
                 ev1, ev2, trace_id, lag_samples, lag_sec, cc_max)
 
 
-def read_events_from_pairs_file(config):
+def read_events_from_pairs_file():
     """
     Read events from pairs file.
 
-    :param config: configuration object
-    :type config: config.Config
     :return: dictionary of events
     :rtype: dict
 
     :raises FileNotFoundError: if the pairs file is not found
     """
     events = {}
-    for pair in read_pairs_file(config):
+    for pair in read_pairs_file():
         evid1 = pair.event1.evid
         try:
             ev1 = events[evid1]

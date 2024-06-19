@@ -9,8 +9,9 @@ Functions to compute slip for repeaters.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
-import numpy as np
 import logging
+import numpy as np
+from ..config.rq_setup import config
 from .moment import mag_to_moment
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -69,12 +70,10 @@ def _eshelby_1957(moment, stress_drop, rigidity):
     return moment/(np.pi*rigidity*radius**2)
 
 
-def mag_to_slip_in_cm(config, magnitude):
+def mag_to_slip_in_cm(magnitude):
     """
     Convert magnitude to slip in cm.
 
-    :param config: requake configuration object
-    :config type: config.Config
     :param magnitude: earthquake magnitude
     :type magnitude: float
     :returns: slip in cm

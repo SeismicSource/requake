@@ -13,13 +13,14 @@ import logging
 import os
 import sys
 from obspy import read
+from ..config.rq_setup import config
+from ..config.rq_setup import rq_exit
 from ..families.families import (
     FamilyNotFoundError, read_families, read_selected_families)
 from ..waveforms.waveforms import get_waveform, cc_waveform_pair
 from ..waveforms.arrivals import get_arrivals
 from ..catalog.catalog import RequakeEvent, generate_evid
 from .._version import get_versions
-from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 trace_cache = {}
 
@@ -49,7 +50,7 @@ def _build_event(tr, template, p_arrival_absolute_time):
     return ev
 
 
-def _cc_detection(config, tr, template, lag_sec):
+def _cc_detection(tr, template, lag_sec):
     """Compute cross-correlation between detected event and template."""
     # shorter trace is zero-padded on both sides
     #   --aaaa--
@@ -61,11 +62,11 @@ def _cc_detection(config, tr, template, lag_sec):
     t0 = p_arrival_absolute_time - config.cc_pre_P
     t1 = t0 + config.cc_trace_length
     tr2 = tr.copy().trim(t0, t1)
-    _, _, cc_max = cc_waveform_pair(config, tr2, template)
+    _, _, cc_max = cc_waveform_pair(tr2, template)
     return cc_max, p_arrival_absolute_time
 
 
-def _scan_family_template(config, template, catalog_file, t0, t1):
+def _scan_family_template(template, catalog_file, t0, t1):
     global trace_cache
     trace_id = template.id
     key = f'{t0}_{trace_id}'
@@ -73,27 +74,25 @@ def _scan_family_template(config, template, catalog_file, t0, t1):
         tr = trace_cache[key]
     except KeyError:
         try:
-            tr = get_waveform(config, trace_id, t0, t1)
+            tr = get_waveform(trace_id, t0, t1)
             trace_cache[key] = tr
         except Exception as m:
             raise Exception(f'No data for {trace_id} : {t0} - {t1}') from m
     sys.stdout.write(str(tr) + '\r')
     # We use the time_chunk length as max shift
     config.cc_max_shift = config.time_chunk
-    _lag, lag_sec, cc_max, cc_mad = cc_waveform_pair(
-        config, tr, template, mode='scan')
+    _lag, lag_sec, cc_max, cc_mad = cc_waveform_pair(tr, template, mode='scan')
     cc_peak = cc_max/cc_mad
     if cc_peak > config.min_cc_mad_ratio:
-        cc_max, p_arrival_absolute_time = _cc_detection(
-            config, tr, template, lag_sec)
+        cc_max, p_arrival_absolute_time = _cc_detection(tr, template, lag_sec)
         ev = _build_event(tr, template, p_arrival_absolute_time)
         catalog_file.write(f'{ev.fdsn_text()}|{cc_max:.2f}\n')
         catalog_file.flush()
 
 
-def _read_template_from_file(config):
+def _read_template_from_file():
     try:
-        families = read_families(config)
+        families = read_families()
         family_number = sorted(f.number for f in families)[-1] + 1
     except Exception:
         family_number = 0
@@ -107,11 +106,11 @@ def _read_template_from_file(config):
     return templates
 
 
-def _read_templates(config):
+def _read_templates():
     if config.args.template_file is not None:
-        return _read_template_from_file(config)
+        return _read_template_from_file()
     try:
-        families = read_selected_families(config)
+        families = read_selected_families()
     except FamilyNotFoundError as m:
         raise FamilyNotFoundError(m) from m
     templates = []
@@ -128,7 +127,7 @@ def _read_templates(config):
     return templates
 
 
-def _template_catalog_files(config, templates):
+def _template_catalog_files(templates):
     catalog_files = {}
     for template in templates:
         template_catalog_dir = os.path.join(
@@ -146,20 +145,17 @@ def _template_catalog_files(config, templates):
     return catalog_files
 
 
-def scan_templates(config):
+def scan_templates():
     """
     Scan a continuous waveform stream using one or more templates.
-
-    :param config: Configuration object.
-    :type config: config.Config
     """
     try:
-        templates = _read_templates(config)
+        templates = _read_templates()
     except (FileNotFoundError, FamilyNotFoundError) as m:
         logger.error(m)
         rq_exit(1)
     try:
-        catalog_files = _template_catalog_files(config, templates)
+        catalog_files = _template_catalog_files(templates)
     except Exception as m:
         logger.error(str(m))
         rq_exit(1)
@@ -175,7 +171,7 @@ def scan_templates(config):
             try:
                 t0 = time
                 t1 = time + time_chunk + overlap
-                _scan_family_template(config, template, catalog_file, t0, t1)
+                _scan_family_template(template, catalog_file, t0, t1)
             except Exception as msg:
                 logger.warning(msg)
                 continue

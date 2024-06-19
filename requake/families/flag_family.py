@@ -13,15 +13,13 @@ import logging
 import csv
 import shutil
 from tempfile import NamedTemporaryFile
+from ..config.rq_setup import config
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
-def flag_family(config):
+def flag_family():
     """
     Flag a family of repeating earthquakes as valid or not valid.
-
-    :param config: Configuration object.
-    :type config: config.Config
     """
     family_number = config.args.family_number
     true_words = ['True', 'true', 'True', 't', 'T']

@@ -13,18 +13,16 @@ import logging
 import csv
 from itertools import combinations
 from scipy.cluster.hierarchy import average, fcluster
+from ..config.rq_setup import config
+from ..config.rq_setup import rq_exit
 from .pairs import read_events_from_pairs_file
 from .families import Family
-from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
-def _check_options(config):
+def _check_options():
     """
     Check the consistency of the configuration options.
-
-    :param config: configuration object
-    :type config: config.Config
 
     :raises ValueError: if the configuration options are inconsistent
     """
@@ -112,12 +110,10 @@ def _build_families_from_upgma(events, cc_min):
     return families
 
 
-def _write_families(config, families):
+def _write_families(families):
     """
     Write families to file.
 
-    :param config: configuration object
-    :type config: config.Config
     :param families: list of families
     :type families: list
     """
@@ -147,21 +143,18 @@ def _write_families(config, families):
                 ])
 
 
-def build_families(config):
+def build_families():
     """
     Build families of repeating earthquakes from a catalog of pairs.
-
-    :param config: configuration object
-    :type config: config.Config
     """
     try:
-        _check_options(config)
+        _check_options()
     except ValueError as e:
         logger.error(e)
         rq_exit(1)
     try:
         logger.info('Reading events from pairs file...')
-        events = read_events_from_pairs_file(config)
+        events = read_events_from_pairs_file()
     except FileNotFoundError:
         logger.error(
             'Unable to find event pairs file: '
@@ -174,5 +167,5 @@ def build_families(config):
     elif config.clustering_algorithm == 'UPGMA':
         logger.info('Building families using UPGMA...')
         families = _build_families_from_upgma(events, config.cc_min)
-    _write_families(config, families)
+    _write_families(families)
     logger.info(f'Done! Output written to: {config.build_families_outfile}')

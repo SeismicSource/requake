@@ -14,13 +14,14 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
+from ..config.rq_setup import config
+from ..config.rq_setup import rq_exit
 from .plot_utils import (
     format_time_axis, plot_title, hover_annotation, duration_string,
     family_colors, plot_colorbar
 )
 from ..families.families import FamilyNotFoundError, read_selected_families
 from ..formulas import mag_to_slip_in_cm, mag_to_moment
-from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
@@ -29,7 +30,7 @@ mpl_logger.setLevel(logging.WARNING)
 mpl.rcParams['pdf.fonttype'] = 42
 
 
-def _get_arrays(config, families):
+def _get_arrays(families):
     """
     Get arrays of times, cumulative quantities, and labels for families.
     """
@@ -39,7 +40,7 @@ def _get_arrays(config, families):
     ]
     if config.args.quantity == 'slip':
         cumuls = [
-            np.cumsum([mag_to_slip_in_cm(config, ev.mag) for ev in family])
+            np.cumsum([mag_to_slip_in_cm(ev.mag) for ev in family])
             for family in families
         ]
     elif config.args.quantity == 'moment':
@@ -65,7 +66,7 @@ def _get_arrays(config, families):
     return times, cumuls, labels
 
 
-def _format_axes(config, ax, times, cumuls):
+def _format_axes(ax, times, cumuls):
     """
     Format axes for cumulative plot.
     """
@@ -109,12 +110,12 @@ def _format_axes(config, ax, times, cumuls):
         raise ValueError(f'Unknown quantity: {config.args.quantity}')
 
 
-def plot_cumulative(config):
+def plot_cumulative():
     """
     Cumulative plot for one or more families.
     """
     try:
-        families = read_selected_families(config)
+        families = read_selected_families()
     except (FileNotFoundError, FamilyNotFoundError) as m:
         logger.error(m)
         rq_exit(1)
@@ -123,8 +124,8 @@ def plot_cumulative(config):
         ax.set_yscale('log')
 
     try:
-        fcolors, norm, cmap = family_colors(config, families)
-        times, cumuls, labels = _get_arrays(config, families)
+        fcolors, norm, cmap = family_colors(families)
+        times, cumuls, labels = _get_arrays(families)
     except ValueError as m:
         logger.error(m)
         rq_exit(1)
@@ -160,9 +161,9 @@ def plot_cumulative(config):
     plot_title(
         ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
     ax.hover_annotation_element = 'lines'
-    plot_colorbar(config, fig, ax, cmap, norm)
+    plot_colorbar(fig, ax, cmap, norm)
     # format axes after adding colorbar to avoid a visual glitch
-    _format_axes(config, ax, times, cumuls)
+    _format_axes(ax, times, cumuls)
 
     # Empty annotation that will be updated interactively
     annot = ax.annotate(

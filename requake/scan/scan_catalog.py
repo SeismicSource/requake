@@ -15,6 +15,7 @@ from math import factorial
 from itertools import combinations
 from tqdm import tqdm
 from obspy.geodetics import gps2dist_azimuth
+from ..config.rq_setup import config
 from ..catalog.catalog import fix_non_locatable_events, read_stored_catalog
 from ..waveforms.station_metadata import NoMetadataError, MetadataMismatchError
 from ..waveforms.waveforms import (
@@ -32,7 +33,7 @@ def _pair_ok(config, pair):
     return distance <= config.catalog_search_range
 
 
-def _process_pairs(fp_out, nevents, catalog, config):
+def _process_pairs(fp_out, nevents, catalog):
     """Process event pairs."""
     fieldnames = [
         'evid1', 'evid2', 'trace_id',
@@ -50,9 +51,9 @@ def _process_pairs(fp_out, nevents, catalog, config):
             if not _pair_ok(config, pair):
                 continue
             try:
-                pair_st = get_waveform_pair(config, pair)
+                pair_st = get_waveform_pair(pair)
                 tr1, tr2 = pair_st.traces
-                lag, lag_sec, cc_max = cc_waveform_pair(config, tr1, tr2)
+                lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
                 stats1 = tr1.stats
                 stats2 = tr2.stats
                 writer.writerow([
@@ -73,20 +74,17 @@ def _process_pairs(fp_out, nevents, catalog, config):
     return npairs
 
 
-def scan_catalog(config):
+def scan_catalog():
     """
     Perform cross-correlation on catalog events.
-
-    :param config: Configuration object.
-    :type config: config.Config
     """
     try:
-        catalog = read_stored_catalog(config)
+        catalog = read_stored_catalog()
     except (ValueError, FileNotFoundError) as m:
         logger.error(m)
         rq_exit(1)
     try:
-        fix_non_locatable_events(catalog, config)
+        fix_non_locatable_events(catalog)
     except MetadataMismatchError as m:
         logger.error(m)
         rq_exit(1)
@@ -95,6 +93,6 @@ def scan_catalog(config):
     logger.info('Building event pairs...')
     logger.info('Computing waveform cross-correlation...')
     with open(config.scan_catalog_pairs_file, 'w', encoding='utf-8') as fp_out:
-        npairs = _process_pairs(fp_out, nevents, catalog, config)
+        npairs = _process_pairs(fp_out, nevents, catalog)
     logger.info(f'Processed {npairs:n} event pairs')
     logger.info(f'Done! Output written to {config.scan_catalog_pairs_file}')

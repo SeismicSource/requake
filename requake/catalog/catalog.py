@@ -11,6 +11,7 @@ Classes and functions for downloading, reading and writing catalogs.
 """
 import numpy as np
 from obspy import UTCDateTime
+from ..config.rq_setup import config
 from ..formulas.conversion import float_or_none
 from ..waveforms.station_metadata import get_traceid_coords
 
@@ -248,12 +249,9 @@ class RequakeCatalog(list):
         return outcat
 
 
-def read_stored_catalog(config):
+def read_stored_catalog():
     """
     Read the catalog stored in the output directory.
-
-    :param config: Configuration object.
-    :type config: config.Config
 
     :return: Catalog object.
     :rtype: RequakeCatalog
@@ -278,14 +276,12 @@ def read_stored_catalog(config):
         ) from m
 
 
-def fix_non_locatable_events(catalog, config):
+def fix_non_locatable_events(catalog):
     """
     Fix non-locatable events in catalog.
 
     :param catalog: a RequakeCatalog object
     :type catalog: RequakeCatalog
-    :param config: a Config object
-    :type config: config.Config
     """
     if not any(ev.lat is None or ev.lon is None for ev in catalog):
         return

@@ -16,12 +16,13 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as PathEffects
 from obspy.signal.filter import envelope
 from obspy.signal.util import smooth
+from ..config.rq_setup import config
+from ..config.rq_setup import rq_exit
 from ..families.families import (
     FamilyNotFoundError,
     read_selected_families,
     get_family_aligned_waveforms_and_template)
 from ..waveforms.waveforms import process_waveforms
-from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
@@ -36,10 +37,10 @@ with contextlib.suppress(KeyError):
     mpl.rcParams['keymap.all_axes'].remove('a')
 
 
-def _plot_family(config, family):
+def _plot_family(family):
     try:
-        st = get_family_aligned_waveforms_and_template(config, family)
-        st = process_waveforms(config, st)
+        st = get_family_aligned_waveforms_and_template(family)
+        st = process_waveforms(st)
     except Exception as m:
         logger.error(str(m))
         return
@@ -207,12 +208,12 @@ def _plot_family(config, family):
     fig.canvas.mpl_connect('key_press_event', _keypress)
 
 
-def plot_families(config):
+def plot_families():
     """"
     Plot traces for one or more event families.
     """
     try:
-        families = read_selected_families(config)
+        families = read_selected_families()
     except (FileNotFoundError, FamilyNotFoundError) as m:
         logger.error(m)
         rq_exit(1)
@@ -225,7 +226,7 @@ def plot_families(config):
             'how to select specific families.')
         families = families[:20]
     for family in families:
-        _plot_family(config, family)
+        _plot_family(family)
     print('''
     Use left/right arrow keys to scroll backwards/forward in time.
     Use shift+left/shift+right to increase/decrease the time window.

@@ -12,6 +12,7 @@ Functions for downloading station metadata.
 import logging
 from obspy import Inventory
 from obspy.clients.fdsn.header import FDSNNoDataException
+from ..config.rq_setup import config
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
@@ -23,14 +24,11 @@ class MetadataMismatchError(Exception):
     """Exception raised for mismatched metadata."""
 
 
-def download_metadata(config):
+def download_metadata():
     """
     Download metadata for the trace_ids specified in config file.
 
     The metadata is stored in the config object.
-
-    :param config: a Config object
-    :type config: config.Config
     """
     logger.info('Downloading station metadata...')
     inv = Inventory()
@@ -68,12 +66,10 @@ def download_metadata(config):
     )
 
 
-def get_traceid_coords(config, orig_time=None):
+def get_traceid_coords(orig_time=None):
     """
     Get coordinates for the trace_ids specified in config file.
 
-    :param config: a Config object
-    :type config: config.Config
     :param orig_time: origin time
     :type orig_time: obspy.UTCDateTime
     :return: a dictionary with trace_id as key and coordinates as value
@@ -82,7 +78,7 @@ def get_traceid_coords(config, orig_time=None):
     :raises MetadataMismatchError: if coordinates are not found
     """
     if config.inventory is None:
-        download_metadata(config)
+        download_metadata()
     traceid_coords = {}
     for trace_id in config.catalog_trace_id:
         try:

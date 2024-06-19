@@ -12,6 +12,7 @@ Download and plot traces for an event pair.
 import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from ..config.rq_setup import config
 from ..config.rq_setup import rq_exit
 from ..catalog.catalog import fix_non_locatable_events, read_stored_catalog
 from ..waveforms.waveforms import (
@@ -24,12 +25,10 @@ mpl_logger.setLevel(logging.WARNING)
 mpl.rcParams['pdf.fonttype'] = 42
 
 
-def _get_pair(config):
+def _get_pair():
     """
     Get a pair of events, whose evid is defined in the arguments.
 
-    :param config: Configuration object.
-    :type config: requake.configobj.ConfigObj
     :return: A pair of events.
     :rtype: list
 
@@ -37,8 +36,8 @@ def _get_pair(config):
     :raises ValueError: If an error occurs while reading the catalog.
     :raises FileNotFoundError: If the catalog file is not found.
     """
-    catalog = read_stored_catalog(config)
-    fix_non_locatable_events(catalog, config)
+    catalog = read_stored_catalog()
+    fix_non_locatable_events(catalog)
     evid1 = config.args.evid1
     evid2 = config.args.evid2
     pair = []
@@ -50,18 +49,15 @@ def _get_pair(config):
     return pair
 
 
-def plot_pair(config):
+def plot_pair():
     """
     Download and plot traces for an event pair.
-
-    :param config: Configuration object.
-    :type config: requake.configobj.ConfigObj
     """
     try:
-        pair = _get_pair(config)
-        st = get_waveform_pair(config, pair)
-        lag, lag_sec, cc_max = align_pair(config, st[0], st[1])
-        st = process_waveforms(config, st)
+        pair = _get_pair()
+        st = get_waveform_pair(pair)
+        lag, lag_sec, cc_max = align_pair(st[0], st[1])
+        st = process_waveforms(st)
     except Exception as m:
         logger.error(m)
         rq_exit(1)

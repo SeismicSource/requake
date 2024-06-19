@@ -29,6 +29,7 @@ from .utils import (
 )
 # pylint: disable=global-statement,import-outside-toplevel
 
+config = None  # pylint: disable=invalid-name
 logger = None  # pylint: disable=invalid-name
 PYTHON_VERSION_STR = None
 NUMPY_VERSION_STR = None
@@ -64,7 +65,7 @@ are doing.
 ''')
 
 
-def _setup_logging(config, progname, action_name):
+def _setup_logging(progname, action_name):
     """Set up the logging infrastructure."""
     global logger
 
@@ -120,7 +121,7 @@ def _setup_logging(config, progname, action_name):
     logger.debug(' '.join(sys.argv))
 
 
-def _connect_station_dataselect(config):
+def _connect_station_dataselect():
     """
     Connect to station and dataselect services.
 
@@ -139,7 +140,7 @@ def _connect_station_dataselect(config):
             f'Connected to FDSN station server: {config.fdsn_station_url}'
         )
     if config.waveform_data_path is not None:
-        _connect_sds(config)
+        _connect_sds()
     else:
         config.dataselect_client = FDSNClient(config.fdsn_dataselect_url)
         logger.info(
@@ -148,7 +149,7 @@ def _connect_station_dataselect(config):
         )
 
 
-def _connect_sds(config):
+def _connect_sds():
     """
     Connect to a local SeisComP Data Structure (SDS) archive.
     """
@@ -167,7 +168,7 @@ def _connect_sds(config):
     logger.info(f'Found the following NSLC codes:\n{all_nslc_str}')
 
 
-def _parse_catalog_options(config):
+def _parse_catalog_options():
     """Parse catalog options into lists."""
     config.catalog_start_times = []
     config.catalog_end_times = []
@@ -189,7 +190,7 @@ def _parse_catalog_options(config):
         config.catalog_end_times.append(UTCDateTime(end_time))
 
 
-def _connect_fdsn_catalog(config):
+def _connect_fdsn_catalog():
     """Connect to FDSN catalog services."""
     config.catalog_fdsn_event_clients = []
     for url in config.catalog_fdsn_event_urls:
@@ -198,7 +199,18 @@ def _connect_fdsn_catalog(config):
 
 
 def configure(args):
-    """Read command line arguments. Read config file. Set up logging."""
+    """
+    Configure Requake.
+
+    This function is called by the main script to set up the configuration
+    object and the logging infrastructure.
+
+    :param args: The parsed command-line arguments.
+    :type args: argparse.Namespace
+    """
+    global config
+    if config is not None:
+        return
     configspec = parse_configspec()
     if args.action == 'sample_config':
         write_sample_config(configspec, 'requake')
@@ -251,26 +263,25 @@ def configure(args):
     # Check library versions
     _check_library_versions()
     # Set up logging
-    _setup_logging(config, 'requake', args.action)
+    _setup_logging('requake', args.action)
     # save config to output dir
     shutil.copy(args.configfile, args.outdir)
-    _parse_catalog_options(config)
+    _parse_catalog_options()
     actions_needing_fdsn_station_dataselect = (
         'scan_catalog', 'plot_pair', 'plot_families', 'build_templates',
         'scan_templates'
     )
     try:
         if args.action in actions_needing_fdsn_station_dataselect:
-            _connect_station_dataselect(config)
+            _connect_station_dataselect()
         if args.action == 'read_catalog' and not args.catalog_file:
-            _connect_fdsn_catalog(config)
+            _connect_fdsn_catalog()
     except (FileNotFoundError, ValueError, FDSNNoServiceException) as m:
         logger.error(m)
         rq_exit(1)
     # Template times must be UTCDateTime objects
     config.template_start_time = UTCDateTime(config.template_start_time)
     config.template_end_time = UTCDateTime(config.template_end_time)
-    return config
 
 
 def rq_exit(retval=0, abort=False, progname='requake'):
