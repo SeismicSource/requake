@@ -18,6 +18,8 @@ from ..formulas.conversion import float_or_none
 from ..catalog.catalog import RequakeEvent
 from ..waveforms.waveforms import (
     get_event_waveform, align_traces, build_template)
+from ..formulas.slip import mag_to_slip_in_cm
+from ..formulas.moment import mag_to_moment
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
@@ -29,18 +31,30 @@ class Family(list):
     """
     A list of events belonging to the same family.
     """
-    def __init__(self, number=-1):
+    def __init__(self, number=-1, config=None):
+        """
+        Initialize a family.
+
+        :param number: Family number.
+        :type number: int
+        :param config: requake configuration object
+        :type config: config.Config
+        """
         self.lon = None
         self.lat = None
         self.depth = None  # km
         self.starttime = None
         self.endtime = None
         self.duration = None  # years
+        self.cumul_slip = None  # cm
+        self.slip_rate = None  # cm/year
+        self.cumul_moment = None  # N.m
         self.magmin = None
         self.magmax = None
         self.number = number
         self.valid = True
         self.trace_id = None
+        self.config = config
 
     def __str__(self):
         return (
@@ -80,8 +94,28 @@ class Family(list):
         year = 365*24*60*60
         self.duration = (self.endtime - self.starttime)/year
         if ev.mag is not None:
-            self.magmin = min(ev.mag, self.magmin) if self.magmin else ev.mag
-            self.magmax = max(ev.mag, self.magmax) if self.magmax else ev.mag
+            self._mag_quantities(ev)
+
+    def _mag_quantities(self, ev):
+        """
+        Update magnitude-related quantities.
+
+        :param ev: Event to process.
+        :type ev: RequakeEvent
+        """
+        self.magmin = min(ev.mag, self.magmin) if self.magmin else ev.mag
+        self.magmax = max(ev.mag, self.magmax) if self.magmax else ev.mag
+        if self.cumul_slip is None:
+            self.cumul_slip = 0
+        ev_slip = mag_to_slip_in_cm(self.config, ev.mag)
+        self.cumul_slip += ev_slip
+        ev_first = sorted(self)[0]
+        ev_first_slip = mag_to_slip_in_cm(self.config, ev_first.mag)
+        d_slip = self.cumul_slip - ev_first_slip
+        self.slip_rate = np.inf if self.duration == 0 else d_slip/self.duration
+        if self.cumul_moment is None:
+            self.cumul_moment = 0
+        self.cumul_moment += mag_to_moment(ev.mag)
 
     def extend(self, ev_list):
         """
@@ -138,7 +172,7 @@ def read_families(config):
             if family_number != old_family_number:
                 if family is not None:
                     families.append(family)
-                family = Family()
+                family = Family(config=config)
                 family.number = family_number
                 old_family_number = family_number
             family.append(ev)

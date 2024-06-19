@@ -13,11 +13,11 @@ import logging
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib import colors
 from matplotlib.ticker import MaxNLocator
 from .plot_utils import (
-    format_time_axis, plot_title, hover_annotation, duration_string)
+    format_time_axis, plot_title, hover_annotation, duration_string,
+    family_colors, plot_colorbar
+)
 from ..families.families import FamilyNotFoundError, read_selected_families
 from ..formulas import mag_to_slip_in_cm, mag_to_moment
 from ..config.rq_setup import rq_exit
@@ -95,7 +95,7 @@ def _format_axes(config, ax, times, cumuls):
     if config.args.quantity == 'slip':
         ax.set_ylabel('Cumulative Slip (cm)')
     elif config.args.quantity == 'moment':
-        ax.set_ylabel('Cumulative Moment (N.m)')
+        ax.set_ylabel('Cumulative Moment (N·m)')
         # move and resize the scientific notation exponent, so that it does
         # not overlap with the top y-axis label
         t = ax.yaxis.get_offset_text()
@@ -122,9 +122,8 @@ def plot_cumulative(config):
     if config.args.logscale:
         ax.set_yscale('log')
 
-    cmap = mpl.colormaps['tab10']
-    norm = colors.Normalize(vmin=-0.5, vmax=9.5)
     try:
+        fcolors, norm, cmap = family_colors(config, families)
         times, cumuls, labels = _get_arrays(config, families)
     except ValueError as m:
         logger.error(m)
@@ -135,29 +134,33 @@ def plot_cumulative(config):
     mincumul = min(min(cumul) for cumul in cumuls)
     maxcumul = max(max(cumul) for cumul in cumuls)
     mincumul = max(mincumul - (maxcumul - mincumul) * 0.1, 0)
-    for family, time, cumul, label in zip(families, times, cumuls, labels):
+    for time, cumul, label, color in zip(times, cumuls, labels, fcolors):
+        brightness = 0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2]
+        linecolor = (0, 0, 0) if brightness > 0.8 else color
         # fist plot just the markers
         ax.scatter(
-            time, cumul, marker='o', color=cmap(norm(family.number % 10)),
-            label=label
+            time, cumul, marker='o',
+            color=color, edgecolor=linecolor, label=label, zorder=20
         )
         # add an extra point at the beginning and at the end to make the step
         time = [time[0], ] + time + [maxtime, ]
         cumul = [mincumul, ] + list(cumul) + [cumul[-1], ]
+        pe = []
+        if linecolor != color:
+            # add a patheffect to the line to give it a contrasting border
+            pe.append(
+                mpl.patheffects.withStroke(linewidth=2, foreground=linecolor)
+            )
         ax.step(
-            time, cumul, where='post',
-            lw=1, marker='', color=cmap(norm(family.number % 10)),
-            label=label
+            time, cumul, where='post', lw=1, marker='', color=color,
+            path_effects=pe, label=label, zorder=10
         )
 
     trace_ids = {family.trace_id for family in families if family.trace_id}
     plot_title(
         ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
     ax.hover_annotation_element = 'lines'
-    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, ticks=range(10), ax=ax)
-    cbar.ax.set_zorder(-1)
-    cbar.ax.set_ylabel('family number (last digit)')
+    plot_colorbar(config, fig, ax, cmap, norm)
     # format axes after adding colorbar to avoid a visual glitch
     _format_axes(config, ax, times, cumuls)
 

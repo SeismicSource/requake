@@ -14,7 +14,6 @@ import numpy as np
 from .families import FamilyNotFoundError, read_selected_families
 from ..config.generic_printer import generic_printer
 from ..config.rq_setup import rq_exit
-from ..formulas.slip import mag_to_slip_in_cm
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
@@ -40,9 +39,12 @@ def print_families(config):
     elif 1 < avg_duration_in_days < 30:
         duration_multiplier = 365
         duration_units = 'days'
-    elif avg_duration_in_days < 1:
+    elif 1/24 < avg_duration_in_days < 1:
         duration_multiplier = 365 * 24
         duration_units = 'hours'
+    else:
+        duration_multiplier = 365 * 24 * 60
+        duration_units = 'mins'
 
     headers_fmt = [
         ('family', None),
@@ -68,15 +70,9 @@ def print_families(config):
             family.starttime,
             family.endtime,
             family.duration*duration_multiplier,
+            family.slip_rate,
+            family.magmin,
+            family.magmax
         ]
-        try:
-            slip = [mag_to_slip_in_cm(config, ev.mag) for ev in family]
-        except ValueError as msg:
-            logger.error(msg)
-            rq_exit(1)
-        cum_slip = np.cumsum(slip)
-        d_slip = cum_slip[-1] - cum_slip[0]
-        slip_rate = np.inf if family.duration == 0 else d_slip/family.duration
-        row += [slip_rate, family.magmin, family.magmax]
         rows.append(row)
     generic_printer(config, rows, headers_fmt)

@@ -12,11 +12,11 @@ Plot family timespans.
 import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib import colors
 import numpy as np
 from .plot_utils import (
-    format_time_axis, plot_title, hover_annotation, duration_string)
+    format_time_axis, plot_title, hover_annotation, duration_string,
+    family_colors, plot_colorbar
+)
 from ..families.families import FamilyNotFoundError, read_selected_families
 from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -62,7 +62,12 @@ def _plot_family_timespans(family, ax, sort_by, lon0, lat0, color):
         yvals = np.ones(len(times)) * family.lon
     elif sort_by == 'time':
         yvals = np.ones(len(times)) * family.starttime.matplotlib_date
-    ax.plot(times, yvals, lw=1, marker='o', color=color, label=label)
+    brightness = 0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2]
+    linecolor = (0, 0, 0) if brightness > 0.8 else color
+    ax.plot(
+        times, yvals, lw=1, marker='o',
+        color=linecolor, mfc=color, mec=linecolor, label=label
+    )
 
 
 def plot_timespans(config):
@@ -77,8 +82,6 @@ def plot_timespans(config):
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.tick_params(which='both', top=True, labeltop=True)
     ax.tick_params(axis='x', which='both', direction='in')
-    cmap = mpl.colormaps['tab10']
-    norm = colors.Normalize(vmin=-0.5, vmax=9.5)
 
     if config.args.sortby is not None:
         sort_by = config.args.sortby
@@ -100,25 +103,30 @@ def plot_timespans(config):
             'but "distance_from_lon" and/or "distance_from_lat" '
             'are not specified')
         rq_exit(1)
+    try:
+        fcolors, norm, cmap = family_colors(config, families)
+    except ValueError as e:
+        logger.error(e)
+        rq_exit(1)
     trace_ids = []
-    for family in families:
+    for family, color in zip(families, fcolors):
         if family.trace_id not in trace_ids and family.trace_id is not None:
             trace_ids.append(family.trace_id)
-        color = cmap(norm(family.number % 10))
         _plot_family_timespans(family, ax, sort_by, lon0, lat0, color)
     ax.callbacks.connect('xlim_changed', format_time_axis)
     if sort_by == 'time':
         ax.callbacks.connect(
             'ylim_changed', lambda ax: format_time_axis(ax, which='yaxis'))
     ax.set_xlabel('Time')
-    ax.set_ylabel(ylabels[sort_by])
+    if sort_by == 'distance_from':
+        ylabel = f'{ylabels[sort_by]} ({lat0:.1f}°N,{lon0:.1f}°E) (km)'
+    else:
+        ylabel = ylabels[sort_by]
+    ax.set_ylabel(ylabel)
     plot_title(
         ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
     ax.hover_annotation_element = 'lines'
-    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, ticks=range(10), ax=ax)
-    cbar.ax.set_zorder(-1)
-    cbar.ax.set_ylabel('family number (last digit)')
+    plot_colorbar(config, fig, ax, cmap, norm)
 
     # Empty annotation that will be updated interactively
     annot = ax.annotate(

@@ -220,6 +220,21 @@ def parse_arguments(progname='requake'):
              '(default: %(default)s)'
     )
     # ---
+    # --- colorby
+    #     a parent parser for the "colorby" option,
+    #     used by plotting subparsers
+    colorby = argparse.ArgumentParser(add_help=False)
+    colorby.add_argument(
+        '-c', '--colorby', type=str, default='family_number',
+        metavar='QUANTITY',
+        choices=[
+            'time', 'latitude', 'longitude', 'depth', 'distance_from',
+            'family_number', 'cumul_slip', 'cumul_moment', 'number_of_events',
+            'duration', 'slip_rate'
+        ],
+        help='quantity to color families by. Choose among {%(choices)s} '
+             '(default: %(default)s)'
+    )
     # --- traceid
     #     a parent parser for the "traceid" option,
     #     used by several subparsers
@@ -254,28 +269,32 @@ def parse_arguments(progname='requake'):
     # --- plot_timespans
     timespans = subparser.add_parser(
         'plot_timespans',
-        parents=[longerthan, minevents, familynumbers],
+        parents=[longerthan, minevents, familynumbers, colorby],
         help='plot family timespans'
     )
     timespans.add_argument(
         '-s', '--sortby', type=str, default='family_number',
+        metavar='QUANTITY',
         choices=[
             'time', 'latitude', 'longitude', 'depth', 'distance_from',
             'family_number'
         ],
-        help='quantity to sort families by on y-axis (default: %(default)s)'
+        help='quantity to sort families by on y-axis. Choose among '
+             '{%(choices)s}. Default: %(default)s'
     )
     # ---
     # --- plot_cumulative
     plotcumulative = subparser.add_parser(
         'plot_cumulative',
-        parents=[longerthan, minevents, familynumbers],
+        parents=[longerthan, minevents, familynumbers, colorby],
         help='cumulative plot for one or more families'
     )
     plotcumulative.add_argument(
         '-q', '--quantity', type=str, default='slip',
+        metavar='QUANTITY',
         choices=['slip', 'moment', 'number'],
-        help='cumulative quantity to plot on y-axis (default: %(default)s)'
+        help='cumulative quantity to plot on y-axis. Choose among '
+             '{%(choices)s}. Default: %(default)s'
     )
     plotcumulative.add_argument(
         '-L', '--logscale', action='store_true',
@@ -285,16 +304,18 @@ def parse_arguments(progname='requake'):
     # --- map_families
     mapfamilies = subparser.add_parser(
         'map_families',
-        parents=[longerthan, minevents, familynumbers],
+        parents=[longerthan, minevents, familynumbers, colorby],
         help='plot families on a map'
     )
     mapfamilies.add_argument(
         '-M', '--mapstyle', type=str, default='satellite',
+        metavar='STYLE',
         choices=[
             'stamen_terrain', 'satellite', 'street', 'hillshade',
             'hillshade_dark', 'ocean'
         ],
-        help='style of map to plot (default: %(default)s)'
+        help='style of map to plot. Choose among {%(choices)s} '
+             '(default: %(default)s)'
     )
     mapfamilies.add_argument(
         '-k', '--apikey', type=str, default=None,

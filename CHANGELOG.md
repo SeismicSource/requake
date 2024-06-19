@@ -4,6 +4,8 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 
+- New option `--colorby` for many plot commands, to color families by a
+  specific attribute other than the family number
 - Add missing `street` map style for `map_families`
 - Improved reading of CSV catalog files:
   - avoid duplicated column guessing
