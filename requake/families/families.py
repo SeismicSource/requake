@@ -82,9 +82,12 @@ class Family(list):
             raise ValueError('Event trace_id does not match family trace_id')
         super().append(ev)
         self.sort()
-        self.lon = np.mean([e.lon for e in self])
-        self.lat = np.mean([e.lat for e in self])
-        self.depth = np.mean([e.depth for e in self])
+        if ev.lon is not None:
+            self.lon = np.mean([e.lon for e in self])
+        if ev.lat is not None:
+            self.lat = np.mean([e.lat for e in self])
+        if ev.depth is not None:
+            self.depth = np.mean([e.depth for e in self])
         self.starttime = min(ev.orig_time, self.starttime)\
             if self.starttime else ev.orig_time
         self.endtime = max(ev.orig_time, self.endtime)\

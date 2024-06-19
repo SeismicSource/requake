@@ -235,9 +235,14 @@ def family_colors(families):
     elif colorby == 'longitude':
         values = [family.lon for family in families]
     elif colorby == 'slip_rate':
-        values = [family.slip_rate if family.slip_rate is not np.inf else np.nan for family in families]
+        values = [
+            family.slip_rate if family.slip_rate is not np.inf
+            else np.nan for family in families
+        ]
     elif colorby == 'time':
         values = [family.starttime.matplotlib_date for family in families]
+    # Convert values to float numpy array. This changes None values to np.nan
+    values = np.array(values, dtype=float)
     norm = colors.Normalize(vmin=min(values), vmax=max(values))
     fcolors = [cmap(norm(value)) for value in values]
     return fcolors, norm, cmap
