@@ -14,8 +14,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-from ..config.rq_setup import config
-from ..config.rq_setup import rq_exit
+from ..config import config, rq_exit
 from .plot_utils import (
     format_time_axis, plot_title, hover_annotation, duration_string,
     family_colors, plot_colorbar

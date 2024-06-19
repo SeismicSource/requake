@@ -13,8 +13,7 @@ import logging
 import csv
 from itertools import combinations
 from scipy.cluster.hierarchy import average, fcluster
-from ..config.rq_setup import config
-from ..config.rq_setup import rq_exit
+from ..config import config, rq_exit
 from .pairs import read_events_from_pairs_file
 from .families import Family
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])

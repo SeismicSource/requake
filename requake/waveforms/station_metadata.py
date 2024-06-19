@@ -12,7 +12,7 @@ Functions for downloading station metadata.
 import logging
 from obspy import Inventory
 from obspy.clients.fdsn.header import FDSNNoDataException
-from ..config.rq_setup import config
+from ..config import config
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 

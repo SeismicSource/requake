@@ -19,8 +19,7 @@ from obspy.taup import TauPyModel
 from obspy.signal.cross_correlation import correlate, xcorr_max
 from obspy.clients.fdsn.header import FDSNNoDataException
 from scipy.stats import median_abs_deviation
-from ..config.rq_setup import config
-from ..config.rq_setup import rq_exit
+from ..config import config, rq_exit
 from .station_metadata import get_traceid_coords
 from .arrivals import get_arrivals
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])

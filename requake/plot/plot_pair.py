@@ -12,8 +12,7 @@ Download and plot traces for an event pair.
 import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from ..config.rq_setup import config
-from ..config.rq_setup import rq_exit
+from ..config import config, rq_exit
 from ..catalog.catalog import fix_non_locatable_events, read_stored_catalog
 from ..waveforms.waveforms import (
     get_waveform_pair, process_waveforms, align_pair)

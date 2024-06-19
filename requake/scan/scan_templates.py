@@ -13,8 +13,7 @@ import logging
 import os
 import sys
 from obspy import read
-from ..config.rq_setup import config
-from ..config.rq_setup import rq_exit
+from ..config import config, rq_exit
 from ..families.families import (
     FamilyNotFoundError, read_families, read_selected_families)
 from ..waveforms.waveforms import get_waveform, cc_waveform_pair

@@ -14,7 +14,7 @@ import csv
 import numpy as np
 from obspy import UTCDateTime, Stream
 from obspy.geodetics import gps2dist_azimuth
-from ..config.rq_setup import config
+from ..config import config
 from ..formulas.conversion import float_or_none
 from ..catalog.catalog import RequakeEvent
 from ..waveforms.waveforms import (

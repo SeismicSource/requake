@@ -13,7 +13,7 @@ import logging
 import numpy as np
 from .families import FamilyNotFoundError, read_selected_families
 from ..config.generic_printer import generic_printer
-from ..config.rq_setup import rq_exit
+from ..config import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 

@@ -16,8 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as PathEffects
 from obspy.signal.filter import envelope
 from obspy.signal.util import smooth
-from ..config.rq_setup import config
-from ..config.rq_setup import rq_exit
+from ..config import config, rq_exit
 from ..families.families import (
     FamilyNotFoundError,
     read_selected_families,

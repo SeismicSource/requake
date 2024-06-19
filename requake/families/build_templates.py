@@ -11,8 +11,7 @@ Build waveform templates for one or more event families.
 """
 import logging
 import os
-from ..config.rq_setup import config
-from ..config.rq_setup import rq_exit
+from ..config import config, rq_exit
 from .families import (
     FamilyNotFoundError,
     read_selected_families,

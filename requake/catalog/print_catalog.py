@@ -10,8 +10,7 @@ Print the event catalog to screen.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
-from ..config.rq_setup import config
-from ..config.rq_setup import rq_exit
+from ..config import rq_exit
 from .catalog import read_stored_catalog
 from ..config.generic_printer import generic_printer
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -48,4 +47,4 @@ def print_catalog():
         ]
         for ev in catalog
     ]
-    generic_printer(config, rows, headers_fmt)
+    generic_printer(rows, headers_fmt)

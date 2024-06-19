@@ -15,7 +15,7 @@ import csv
 import contextlib
 import logging
 from tabulate import tabulate
-from ..config.rq_setup import config
+from .config import config
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 

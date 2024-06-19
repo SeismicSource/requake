@@ -11,7 +11,7 @@ Classes and functions for downloading, reading and writing catalogs.
 """
 import numpy as np
 from obspy import UTCDateTime
-from ..config.rq_setup import config
+from ..config import config
 from ..formulas.conversion import float_or_none
 from ..waveforms.station_metadata import get_traceid_coords
 

@@ -12,8 +12,7 @@ Read an event catalog from web services or from a file.
 import os
 import logging
 import contextlib
-from ..config.rq_setup import config
-from ..config.rq_setup import rq_exit
+from ..config import config, rq_exit
 from ..catalog.catalog import RequakeCatalog
 from .read_catalog_from_fdsnws import read_catalog_from_fdsnws
 from .read_catalog_from_quakeml import read_catalog_from_quakeml

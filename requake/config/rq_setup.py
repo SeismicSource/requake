@@ -22,14 +22,13 @@ from obspy.clients.filesystem.sds import Client as SDSClient
 from obspy.clients.fdsn import Client as FDSNClient
 from obspy.clients.fdsn.header import FDSNNoServiceException
 from .._version import get_versions
-from .config import Config
+from .config import config
 from .utils import (
     parse_configspec, read_config, validate_config, write_sample_config,
     update_config_file, write_ok
 )
 # pylint: disable=global-statement,import-outside-toplevel
 
-config = None  # pylint: disable=invalid-name
 logger = None  # pylint: disable=invalid-name
 PYTHON_VERSION_STR = None
 NUMPY_VERSION_STR = None
@@ -208,9 +207,6 @@ def configure(args):
     :param args: The parsed command-line arguments.
     :type args: argparse.Namespace
     """
-    global config
-    if config is not None:
-        return
     configspec = parse_configspec()
     if args.action == 'sample_config':
         write_sample_config(configspec, 'requake')
@@ -224,8 +220,8 @@ def configure(args):
         if value == 'None':
             config_obj[key] = None
     validate_config(config_obj)
-    # Create a config class
-    config = Config(config_obj)
+    # update config with the contents of config_obj
+    config.update(config_obj)
     config.args = args
     config.scan_catalog_file = os.path.join(
         config.args.outdir, 'requake.catalog.txt'

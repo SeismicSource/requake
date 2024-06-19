@@ -13,7 +13,7 @@ import contextlib
 import matplotlib.dates as mdates
 import numpy as np
 from matplotlib import cm, colors
-from ..config.rq_setup import config
+from ..config import config
 from .colormaps import cmaps
 
 

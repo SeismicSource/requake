@@ -13,7 +13,7 @@ import logging
 import csv
 import shutil
 from tempfile import NamedTemporaryFile
-from ..config.rq_setup import config
+from ..config import config
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 

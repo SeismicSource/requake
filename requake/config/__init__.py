@@ -9,4 +9,8 @@ Configuration and initialization of the Requake package.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
-from .config import Config # noqa
+from .rq_setup import rq_exit  # noqa
+# The config object is created in config.py and needs to be populated
+# when using requake from command line, this is done by the configure()
+# function in rq_setup.py
+from .config import config  # noqa

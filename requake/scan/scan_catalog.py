@@ -15,17 +15,16 @@ from math import factorial
 from itertools import combinations
 from tqdm import tqdm
 from obspy.geodetics import gps2dist_azimuth
-from ..config.rq_setup import config
+from ..config import config, rq_exit
 from ..catalog.catalog import fix_non_locatable_events, read_stored_catalog
 from ..waveforms.station_metadata import NoMetadataError, MetadataMismatchError
 from ..waveforms.waveforms import (
     get_waveform_pair, cc_waveform_pair, NoWaveformError,
 )
-from ..config.rq_setup import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
-def _pair_ok(config, pair):
+def _pair_ok(pair):
     """Check if events in pair are close enough."""
     ev1, ev2 = pair
     distance, _, _ = gps2dist_azimuth(ev1.lat, ev1.lon, ev2.lat, ev2.lon)
@@ -48,7 +47,7 @@ def _process_pairs(fp_out, nevents, catalog):
     with tqdm(total=npairs, unit='pairs', unit_scale=True) as pbar:
         for pair in combinations(catalog, 2):
             pbar.update()
-            if not _pair_ok(config, pair):
+            if not _pair_ok(pair):
                 continue
             try:
                 pair_st = get_waveform_pair(pair)

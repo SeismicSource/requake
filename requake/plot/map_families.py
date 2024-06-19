@@ -16,8 +16,7 @@ import matplotlib.patheffects as patheffects
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from obspy.geodetics import gps2dist_azimuth
-from ..config.rq_setup import config
-from ..config.rq_setup import rq_exit
+from ..config import config, rq_exit
 from .plot_utils import (
     plot_title, hover_annotation, duration_string, family_colors, plot_colorbar
 )

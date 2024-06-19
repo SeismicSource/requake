@@ -12,7 +12,7 @@ Build families of repeating earthquakes from a catalog of pairs.
 import logging
 import csv
 from obspy import UTCDateTime
-from ..config.rq_setup import config
+from ..config import config
 from ..formulas.conversion import float_or_none
 from ..catalog.catalog import RequakeEvent
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])

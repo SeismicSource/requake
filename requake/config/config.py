@@ -27,3 +27,5 @@ class Config(dict):
             raise AttributeError(err) from err
 
     __setattr__ = __setitem__
+
+config = Config()  # noqa

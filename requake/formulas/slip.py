@@ -11,7 +11,7 @@ Functions to compute slip for repeaters.
 """
 import logging
 import numpy as np
-from ..config.rq_setup import config
+from ..config import config
 from .moment import mag_to_moment
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
