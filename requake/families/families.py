@@ -15,12 +15,9 @@ import numpy as np
 from obspy import UTCDateTime, Stream
 from obspy.geodetics import gps2dist_azimuth
 from ..config import config
-from ..formulas.conversion import float_or_none
-from ..catalog.catalog import RequakeEvent
-from ..waveforms.waveforms import (
-    get_event_waveform, align_traces, build_template)
-from ..formulas.slip import mag_to_slip_in_cm
-from ..formulas.moment import mag_to_moment
+from ..formulas import float_or_none, mag_to_slip_in_cm, mag_to_moment
+from ..catalog import RequakeEvent
+from ..waveforms import get_event_waveform, align_traces, build_template
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 

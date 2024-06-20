@@ -10,9 +10,8 @@ Print the event catalog to screen.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
-from ..config import rq_exit
+from ..config import rq_exit, generic_printer
 from .catalog import read_stored_catalog
-from ..config.generic_printer import generic_printer
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 

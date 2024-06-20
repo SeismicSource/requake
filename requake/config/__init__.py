@@ -10,6 +10,7 @@ Configuration and initialization of the Requake package.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 from .rq_setup import rq_exit  # noqa
+from .generic_printer import generic_printer  # noqa
 # The config object is created in config.py and needs to be populated
 # when using requake from command line, this is done by the configure()
 # function in rq_setup.py

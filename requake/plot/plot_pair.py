@@ -13,9 +13,8 @@ import logging
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from ..config import config, rq_exit
-from ..catalog.catalog import fix_non_locatable_events, read_stored_catalog
-from ..waveforms.waveforms import (
-    get_waveform_pair, process_waveforms, align_pair)
+from ..catalog import fix_non_locatable_events, read_stored_catalog
+from ..waveforms import get_waveform_pair, process_waveforms, align_pair
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')

@@ -14,11 +14,11 @@ import os
 import sys
 from obspy import read
 from ..config import config, rq_exit
-from ..families.families import (
-    FamilyNotFoundError, read_families, read_selected_families)
-from ..waveforms.waveforms import get_waveform, cc_waveform_pair
-from ..waveforms.arrivals import get_arrivals
-from ..catalog.catalog import RequakeEvent, generate_evid
+from ..families import (
+    FamilyNotFoundError, read_families, read_selected_families
+)
+from ..waveforms import get_waveform, cc_waveform_pair, get_arrivals
+from ..catalog import RequakeEvent, generate_evid
 from .._version import get_versions
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 trace_cache = {}

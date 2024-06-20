@@ -12,9 +12,8 @@ Read an event catalog from a CSV file.
 import logging
 import csv
 from obspy import UTCDateTime
-from ..formulas.conversion import float_or_none, int_or_none
-from ..catalog.catalog import (
-    RequakeCatalog, RequakeEvent, generate_evid)
+from ..formulas import float_or_none, int_or_none
+from ..catalog import RequakeCatalog, RequakeEvent, generate_evid
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 

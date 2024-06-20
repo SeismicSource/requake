@@ -14,11 +14,11 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from ..config import config, rq_exit
+from ..families import FamilyNotFoundError, read_selected_families
 from .plot_utils import (
     format_time_axis, plot_title, hover_annotation, duration_string,
     family_colors, plot_colorbar
 )
-from ..families.families import FamilyNotFoundError, read_selected_families
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')

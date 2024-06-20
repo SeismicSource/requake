@@ -10,8 +10,7 @@ Print pairs to screen.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
-from ..config import config, rq_exit
-from ..config.generic_printer import generic_printer
+from ..config import config, rq_exit, generic_printer
 from .pairs import read_pairs_file
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 

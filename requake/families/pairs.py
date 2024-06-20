@@ -13,8 +13,8 @@ import logging
 import csv
 from obspy import UTCDateTime
 from ..config import config
-from ..formulas.conversion import float_or_none
-from ..catalog.catalog import RequakeEvent
+from ..formulas import float_or_none
+from ..catalog import RequakeEvent
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 

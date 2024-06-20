@@ -13,7 +13,7 @@ import os
 import logging
 import contextlib
 from ..config import config, rq_exit
-from ..catalog.catalog import RequakeCatalog
+from ..catalog import RequakeCatalog
 from .read_catalog_from_fdsnws import read_catalog_from_fdsnws
 from .read_catalog_from_quakeml import read_catalog_from_quakeml
 from .read_catalog_from_csv import read_catalog_from_csv

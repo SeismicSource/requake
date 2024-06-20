@@ -11,9 +11,8 @@ Print families to screen.
 """
 import logging
 import numpy as np
+from ..config import generic_printer, rq_exit
 from .families import FamilyNotFoundError, read_selected_families
-from ..config.generic_printer import generic_printer
-from ..config import rq_exit
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 

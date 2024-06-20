@@ -10,4 +10,5 @@ Formulas for the Requake package.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 from .moment import mag_to_moment  # noqa
-from .slip import mag_to_slip_in_cm # noqa
+from .slip import mag_to_slip_in_cm  # noqa
+from .conversion import float_or_none, int_or_none  # noqa

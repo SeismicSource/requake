@@ -16,10 +16,10 @@ from itertools import combinations
 from tqdm import tqdm
 from obspy.geodetics import gps2dist_azimuth
 from ..config import config, rq_exit
-from ..catalog.catalog import fix_non_locatable_events, read_stored_catalog
-from ..waveforms.station_metadata import NoMetadataError, MetadataMismatchError
-from ..waveforms.waveforms import (
-    get_waveform_pair, cc_waveform_pair, NoWaveformError,
+from ..catalog import fix_non_locatable_events, read_stored_catalog
+from ..waveforms import (
+    get_waveform_pair, cc_waveform_pair,
+    NoWaveformError, NoMetadataError, MetadataMismatchError
 )
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 

@@ -11,7 +11,7 @@ Read an event catalog from a QuakeML file.
 """
 import logging
 from obspy import read_events
-from ..catalog.catalog import RequakeCatalog, RequakeEvent
+from ..catalog import RequakeCatalog, RequakeEvent
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
