@@ -11,6 +11,7 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
   - avoid duplicated column guessing
   - ensure that prefectly matching column field names are correctly guessed
   - warn if an invalid time format is found
+- Colored terminal output for warnings and errors
 
 ## v0.6 - 2024-05-04
 

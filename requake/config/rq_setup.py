@@ -64,6 +64,33 @@ are doing.
 ''')
 
 
+def _color_handler_emit(fn):
+    """
+    Add color-coding to the logging handler emitter.
+
+    Source: https://stackoverflow.com/a/20707569/2021880
+    """
+    def new(*args):
+        levelno = args[0].levelno
+        if levelno >= logging.CRITICAL:
+            color = '\x1b[31;1m'  # red
+        elif levelno >= logging.ERROR:
+            color = '\x1b[31;1m'  # red
+        elif levelno >= logging.WARNING:
+            color = '\x1b[33;1m'  # yellow
+        elif levelno >= logging.INFO:
+            # color = '\x1b[32;1m'  # green
+            color = '\x1b[0m'  # no color
+        elif levelno >= logging.DEBUG:
+            color = '\x1b[35;1m'  # purple
+        else:
+            color = '\x1b[0m'  # no color
+        # Color-code the message
+        args[0].msg = f'{color}{args[0].msg}\x1b[0m'
+        return fn(*args)
+    return new
+
+
 def _setup_logging(progname, action_name):
     """Set up the logging infrastructure."""
     global logger
@@ -106,6 +133,9 @@ def _setup_logging(progname, action_name):
                 self.handleError(record)
     console = TqdmLoggingHandler()
     console.setLevel(logging.INFO)
+    # Add logger color coding on all platforms but win32
+    if sys.platform != 'win32' and sys.stdout.isatty():
+        console.emit = _color_handler_emit(console.emit)
     logger_root.addHandler(console)
 
     logger = logging.getLogger(progname)
