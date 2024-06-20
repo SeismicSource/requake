@@ -9,12 +9,14 @@ Plot utils.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
+import logging
 import contextlib
 import matplotlib.dates as mdates
 import numpy as np
 from matplotlib import cm, colors
 from ..config import config
 from .colormaps import cmaps
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def format_time_axis(ax, which='xaxis', grid=True):
@@ -203,6 +205,7 @@ def family_colors(families):
     colorby = config.args.colorby
     try:
         cmap = cmaps[colorby]
+        logger.info(f'Using Matplotlib colormap "{cmap.name}"')
     except KeyError as e:
         raise ValueError(f'Invalid value for "colorby": {colorby}') from e
     # special cases
