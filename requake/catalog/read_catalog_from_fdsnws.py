@@ -85,7 +85,7 @@ def _get_events_from_fdsnws(
         baseurl = URL_MAPPINGS[baseurl]
     baseurl = f'{baseurl}/fdsnws/event/1/'
     url = baseurl + query
-    logger.info(f'Requesting {url}...')
+    logger.info(f'Requesting {url} ...')
     cat = RequakeCatalog()
     with urllib.request.urlopen(url) as f:
         content = f.read().decode('utf-8')
