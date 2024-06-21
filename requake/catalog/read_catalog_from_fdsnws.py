@@ -15,7 +15,7 @@ import urllib.request
 from obspy import UTCDateTime
 from obspy.clients.fdsn.header import URL_MAPPINGS
 from ..config import config
-from ..catalog import RequakeCatalog, RequakeEvent
+from .catalog import RequakeCatalog, RequakeEvent
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
