@@ -46,12 +46,12 @@ def download_metadata():
                 network=net, station=sta, location=loc, channel=chan,
                 starttime=start_time, endtime=end_time, level='channel'
             )
-        except FDSNNoDataException as m:
-            msg = str(m).replace('\n', ' ')
+        except FDSNNoDataException as err:
+            msg = str(err).replace('\n', ' ')
             raise NoMetadataError(
                 f'Unable to download metadata for trace id: {trace_id}.\n'
                 f'Error message: {msg}'
-            ) from m
+            ) from err
     channels = inv.get_contents()['channels']
     unique_channels = set(channels)
     channel_count = [channels.count(id) for id in unique_channels]
@@ -83,11 +83,11 @@ def get_traceid_coords(orig_time=None):
     for trace_id in config.catalog_trace_id:
         try:
             coords = config.inventory.get_coordinates(trace_id, orig_time)
-        except Exception as m:
+        except Exception as err:
             # note: get_coordinaets raises a generic Exception
             raise MetadataMismatchError(
                 f'Unable to find coordinates for trace {trace_id} '
                 f'at time {orig_time}'
-            ) from m
+            ) from err
         traceid_coords[trace_id] = coords
     return traceid_coords

@@ -148,8 +148,8 @@ def build_families():
     """
     try:
         _check_options()
-    except ValueError as e:
-        logger.error(e)
+    except ValueError as msg:
+        logger.error(msg)
         rq_exit(1)
     try:
         logger.info('Reading events from pairs file...')

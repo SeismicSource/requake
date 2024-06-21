@@ -302,8 +302,8 @@ def configure(args):
             _connect_station_dataselect()
         if args.action == 'read_catalog' and not args.catalog_file:
             _connect_fdsn_catalog()
-    except (FileNotFoundError, ValueError, FDSNNoServiceException) as m:
-        logger.error(m)
+    except (FileNotFoundError, ValueError, FDSNNoServiceException) as msg:
+        logger.error(msg)
         rq_exit(1)
     # Template times must be UTCDateTime objects
     config.template_start_time = UTCDateTime(config.template_start_time)

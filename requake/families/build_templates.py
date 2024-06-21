@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 def _build_template(family):
     try:
         st = get_family_aligned_waveforms_and_template(family)
-    except NoWaveformError as m:
-        logger.error(str(m))
+    except NoWaveformError as msg:
+        logger.error(msg)
         return
     tr_template = [tr for tr in st if 'average' in tr.stats.evid][0]
     os.makedirs(config.template_dir, exist_ok=True)
@@ -55,8 +55,8 @@ def build_templates():
     """
     try:
         families = read_selected_families()
-    except FamilyNotFoundError as m:
-        logger.error(str(m))
+    except FamilyNotFoundError as msg:
+        logger.error(msg)
         rq_exit(1)
     for family in families:
         _build_template(family)

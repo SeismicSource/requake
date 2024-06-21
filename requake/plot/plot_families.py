@@ -40,8 +40,8 @@ with contextlib.suppress(KeyError):
 def _plot_family(family):
     try:
         st = get_family_aligned_waveforms_and_template(family)
-    except NoWaveformError as m:
-        logger.error(str(m))
+    except NoWaveformError as msg:
+        logger.error(msg)
         return
     st = process_waveforms(st)
 
@@ -214,8 +214,8 @@ def plot_families():
     """
     try:
         families = read_selected_families()
-    except (FileNotFoundError, FamilyNotFoundError) as m:
-        logger.error(m)
+    except (FileNotFoundError, FamilyNotFoundError) as msg:
+        logger.error(msg)
         rq_exit(1)
     if len(families) > 20:
         logger.warning(

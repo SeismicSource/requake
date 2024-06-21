@@ -59,8 +59,8 @@ def plot_pair():
         st = get_waveform_pair(pair)
         lag, lag_sec, cc_max = align_pair(st[0], st[1])
         st = process_waveforms(st)
-    except (ValueError, NoWaveformError) as m:
-        logger.error(m)
+    except (ValueError, NoWaveformError) as msg:
+        logger.error(msg)
         rq_exit(1)
     st.normalize()
     tr1, tr2 = st

@@ -69,13 +69,13 @@ def get_waveform(traceid, starttime, endtime):
             network=net, station=sta, location=loc, channel=chan,
             starttime=starttime, endtime=endtime
         )
-    except FDSNNoDataException as m:
-        msg = str(m).replace('\n', ' ')
+    except FDSNNoDataException as err:
+        msg = str(err).replace('\n', ' ')
         raise NoWaveformError(
             f'No waveform data for trace id: {traceid} '
             f'between {starttime} and {endtime}\n'
             f'Error message: {msg}'
-        ) from m
+        ) from err
     # webservices sometimes return longer traces: trim to be sure
     st.trim(starttime=starttime, endtime=endtime)
     st.merge(fill_value='interpolate')
@@ -103,27 +103,29 @@ def get_event_waveform(ev):
         else config.args.traceid
     try:
         traceid_coords = get_traceid_coords(orig_time)
-    except MetadataMismatchError as m:
-        msg = str(m).replace('\n', ' ')
+    except MetadataMismatchError as err:
+        msg = str(err).replace('\n', ' ')
         raise NoWaveformError(
             f'Unable to download waveform data for event {evid} '
             f'and trace_id {traceid}. '
             'Skipping event.\n'
             f'Error message: {msg}'
-        ) from m
+        ) from err
     trace_lat = traceid_coords[traceid]['latitude']
     trace_lon = traceid_coords[traceid]['longitude']
     try:
         p_arrival, s_arrival, distance, dist_deg = get_arrivals(
             trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
-    except Exception as m:  # noqa
-        msg = str(m).replace('\n', ' ')
+    except Exception as err:  # pylint: disable=broad-except
+        # Here we catch a broad exception because get_arrivals can raise
+        # different types of exceptions
+        msg = str(err).replace('\n', ' ')
         raise NoWaveformError(
             f'Unable to compute arrival times for event {evid} '
             f'and trace_id {traceid}. '
             'Skipping event.\n'
             f'Error message: {msg}'
-        ) from m
+        ) from err
     p_arrival_time = orig_time + p_arrival.time
     s_arrival_time = orig_time + s_arrival.time
     pre_p = config.cc_pre_P
@@ -132,14 +134,14 @@ def get_event_waveform(ev):
     t1 = t0 + trace_length
     try:
         tr = get_waveform(traceid, t0, t1)
-    except NoWaveformError as m:
-        msg = str(m).replace('\n', ' ')
+    except NoWaveformError as err:
+        msg = str(err).replace('\n', ' ')
         raise NoWaveformError(
             f'Unable to download waveform data for event {evid} '
             f'and trace_id {traceid}. '
             'Skipping event.\n'
             f'Error message: {msg}'
-        ) from m
+        ) from err
     tr.stats.evid = evid
     tr.stats.ev_lat = ev_lat
     tr.stats.ev_lon = ev_lon
@@ -205,15 +207,15 @@ def get_waveform_pair(pair):
             tr = get_event_waveform(ev)
             tr_cache[cache_key] = tr
             st.append(tr)
-        except NoWaveformError as m:
+        except NoWaveformError as err:
             skipped_evids.append(ev.evid)
-            msg = str(m).replace('\n', ' ')
+            msg = str(err).replace('\n', ' ')
             raise NoWaveformError(
                 f'Unable to download waveform data for event {ev.evid} '
                 f'and trace_id {ev.trace_id}. '
                 'Skipping all pairs containig this event.\n'
                 f'Error message: {msg}'
-            ) from m
+            ) from err
     return st
 
 

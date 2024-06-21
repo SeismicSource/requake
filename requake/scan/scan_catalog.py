@@ -63,13 +63,13 @@ def _process_pairs(fp_out, nevents, catalog):
                     stats2.ev_depth, stats2.mag_type, stats2.mag,
                     lag, lag_sec, cc_max
                 ])
-            except (NoMetadataError, MetadataMismatchError) as m:
-                logger.error(m)
+            except (NoMetadataError, MetadataMismatchError) as msg:
+                logger.error(msg)
                 rq_exit(1)
-            except NoWaveformError as m:
+            except NoWaveformError as msg:
                 # Do not print empty messages
-                if str(m):
-                    logger.warning(str(m))
+                if str(msg):
+                    logger.warning(msg)
     return npairs
 
 
@@ -79,13 +79,13 @@ def scan_catalog():
     """
     try:
         catalog = read_stored_catalog()
-    except (ValueError, FileNotFoundError) as m:
-        logger.error(m)
+    except (ValueError, FileNotFoundError) as msg:
+        logger.error(msg)
         rq_exit(1)
     try:
         fix_non_locatable_events(catalog)
-    except MetadataMismatchError as m:
-        logger.error(m)
+    except MetadataMismatchError as msg:
+        logger.error(msg)
         rq_exit(1)
     nevents = len(catalog)
     logger.info(f'{nevents} events read from catalog file')

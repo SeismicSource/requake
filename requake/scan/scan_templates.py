@@ -80,10 +80,10 @@ def _scan_family_template(template, catalog_file, t0, t1):
         try:
             tr = get_waveform(trace_id, t0, t1)
             trace_cache[key] = tr
-        except NoWaveformError as m:
+        except NoWaveformError as err:
             raise NoWaveformError(
                 f'No data for {trace_id} : {t0} - {t1}'
-            ) from m
+            ) from err
     sys.stdout.write(str(tr) + '\r')
     # We use the time_chunk length as max shift
     config.cc_max_shift = config.time_chunk
@@ -122,10 +122,7 @@ def _read_templates():
     """
     if config.args.template_file is not None:
         return _read_template_from_file()
-    try:
-        families = read_selected_families()
-    except FamilyNotFoundError as m:
-        raise FamilyNotFoundError(m) from m
+    families = read_selected_families()
     templates = []
     for family in families:
         trace_id = family[0].trace_id
@@ -175,8 +172,8 @@ def scan_templates():
     """
     try:
         templates = _read_templates()
-    except (FileNotFoundError, FamilyNotFoundError) as m:
-        logger.error(m)
+    except (FileNotFoundError, FamilyNotFoundError) as msg:
+        logger.error(msg)
         rq_exit(1)
     catalog_files = _template_catalog_files(templates)
     time = config.template_start_time

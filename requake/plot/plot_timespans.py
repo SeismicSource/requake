@@ -76,8 +76,8 @@ def plot_timespans():
     """
     try:
         families = read_selected_families()
-    except (FileNotFoundError, FamilyNotFoundError) as m:
-        logger.error(m)
+    except (FileNotFoundError, FamilyNotFoundError) as msg:
+        logger.error(msg)
         rq_exit(1)
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.tick_params(which='both', top=True, labeltop=True)
@@ -105,8 +105,8 @@ def plot_timespans():
         rq_exit(1)
     try:
         fcolors, norm, cmap = family_colors(families)
-    except ValueError as e:
-        logger.error(e)
+    except ValueError as msg:
+        logger.error(msg)
         rq_exit(1)
     trace_ids = []
     for family, color in zip(families, fcolors):

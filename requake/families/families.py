@@ -262,8 +262,8 @@ def get_family_waveforms(family):
     for ev in family:
         try:
             st += get_event_waveform(ev)
-        except NoWaveformError as m:
-            logger.error(str(m))
+        except NoWaveformError as msg:
+            logger.error(msg)
     if not st:
         raise NoWaveformError(f'No traces found for family {family.number}')
     return st
@@ -302,8 +302,8 @@ def _build_family_number_list():
             fn = [int(family_numbers), ]
         else:
             raise ValueError
-    except ValueError as e:
+    except ValueError as err:
         raise FamilyNotFoundError(
             f'Invalid family numbers: {family_numbers}'
-        ) from e
+        ) from err
     return fn

@@ -117,8 +117,10 @@ def read_catalog():
         except FileNotFoundError:
             logger.error(f'File "{input_cat_file}" not found')
             rq_exit(1)
-        except ValueError as m:
-            logger.error(f'Error reading catalog file "{input_cat_file}": {m}')
+        except ValueError as msg:
+            logger.error(
+                f'Error reading catalog file "{input_cat_file}": {msg}'
+            )
             rq_exit(1)
     else:
         catalog += read_catalog_from_fdsnws()

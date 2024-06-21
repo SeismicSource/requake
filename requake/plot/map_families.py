@@ -111,15 +111,15 @@ def map_families():
     """
     try:
         families = read_selected_families()
-    except (FileNotFoundError, FamilyNotFoundError) as m:
-        logger.error(m)
+    except (FileNotFoundError, FamilyNotFoundError) as msg:
+        logger.error(msg)
         rq_exit(1)
     fig, ax = _make_basemap()
     trans = ccrs.PlateCarree()
     try:
         fcolors, norm, cmap = family_colors(families)
-    except ValueError as e:
-        logger.error(e)
+    except ValueError as msg:
+        logger.error(msg)
         rq_exit(1)
     trace_ids = []
     for family, color in zip(families, fcolors):

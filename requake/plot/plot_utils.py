@@ -206,8 +206,8 @@ def family_colors(families):
     try:
         cmap = cmaps[colorby]
         logger.info(f'Using Matplotlib colormap "{cmap.name}"')
-    except KeyError as e:
-        raise ValueError(f'Invalid value for "colorby": {colorby}') from e
+    except KeyError as err:
+        raise ValueError(f'Invalid value for "colorby": {colorby}') from err
     # special cases
     if colorby == 'family_number':
         norm = colors.Normalize(vmin=-0.5, vmax=9.5)

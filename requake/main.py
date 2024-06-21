@@ -70,6 +70,6 @@ def main():
     try:
         run()
     # pylint: disable=broad-except
-    except Exception as e:
+    except Exception as err:
         from .config.utils import manage_uncaught_exception
-        manage_uncaught_exception(e)
+        manage_uncaught_exception(err)

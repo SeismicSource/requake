@@ -130,10 +130,10 @@ def read_catalog_from_fdsnws():
                 minmagnitude=config.catalog_mag_min,
                 maxmagnitude=config.catalog_mag_max
             )
-        except urllib.error.HTTPError as m:
+        except urllib.error.HTTPError as msg:
             logger.warning(
                 f'Unable to download events from {url} for period '
-                f'{start_time} - {end_time}. {m}'
+                f'{start_time} - {end_time}. {msg}'
             )
     catalog = RequakeCatalog(event_list)
     logger.info(f'{len(catalog)} events downloaded')

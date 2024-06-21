@@ -21,8 +21,8 @@ def print_catalog():
     """
     try:
         catalog = read_stored_catalog()
-    except (ValueError, FileNotFoundError) as m:
-        logger.error(m)
+    except (ValueError, FileNotFoundError) as msg:
+        logger.error(msg)
         rq_exit(1)
 
     headers_fmt = [

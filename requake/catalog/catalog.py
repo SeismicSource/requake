@@ -92,8 +92,8 @@ class RequakeEvent():
             self.mag = float_or_none(word[10])
             self.mag_author = word[11]
             self.location_name = word[12]
-        except IndexError as e:
-            raise ValueError(f'Invalid line: {line}') from e
+        except IndexError as err:
+            raise ValueError(f'Invalid line: {line}') from err
 
     def fdsn_text(self):
         """
@@ -266,14 +266,14 @@ def read_stored_catalog():
         if not cat:
             raise ValueError('Empty catalog')
         return cat
-    except ValueError as m:
+    except ValueError as err:
         raise ValueError(
-            f'Error reading catalog file {config.scan_catalog_file}: {m}'
-        ) from m
-    except FileNotFoundError as m:
+            f'Error reading catalog file {config.scan_catalog_file}: {err}'
+        ) from err
+    except FileNotFoundError as err:
         raise FileNotFoundError(
             f'Catalog file {config.scan_catalog_file} not found'
-        ) from m
+        ) from err
 
 
 def fix_non_locatable_events(catalog):

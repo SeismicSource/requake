@@ -115,8 +115,8 @@ def plot_cumulative():
     """
     try:
         families = read_selected_families()
-    except (FileNotFoundError, FamilyNotFoundError) as m:
-        logger.error(m)
+    except (FileNotFoundError, FamilyNotFoundError) as msg:
+        logger.error(msg)
         rq_exit(1)
     fig, ax = plt.subplots(figsize=(8, 4))
     if config.args.logscale:
@@ -125,8 +125,8 @@ def plot_cumulative():
     try:
         fcolors, norm, cmap = family_colors(families)
         times, cumuls, labels = _get_arrays(families)
-    except ValueError as m:
-        logger.error(m)
+    except ValueError as msg:
+        logger.error(msg)
         rq_exit(1)
     maxtime = max(max(time) for time in times)
     mintime = min(min(time) for time in times)
