@@ -129,7 +129,7 @@ def _setup_logging(progname, action_name):
                 msg = self.format(record)
                 tqdm.tqdm.write(msg)
                 self.flush()
-            except Exception:
+            except (ValueError, TypeError, IOError, OSError):
                 self.handleError(record)
     console = TqdmLoggingHandler()
     console.setLevel(logging.INFO)

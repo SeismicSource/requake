@@ -22,7 +22,7 @@ from ..families import (
     read_selected_families,
     get_family_aligned_waveforms_and_template
 )
-from ..waveforms import process_waveforms
+from ..waveforms import process_waveforms, NoWaveformError
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
@@ -40,10 +40,10 @@ with contextlib.suppress(KeyError):
 def _plot_family(family):
     try:
         st = get_family_aligned_waveforms_and_template(family)
-        st = process_waveforms(st)
-    except Exception as m:
+    except NoWaveformError as m:
         logger.error(str(m))
         return
+    st = process_waveforms(st)
 
     t0 = config.args.starttime
     t1 = config.args.endtime
@@ -56,17 +56,17 @@ def _plot_family(family):
     if t0 is None:
         # For t0, take the earliest time between 10% of envelope
         # and theoretical P arrival
-        P_arrival = tr0.stats.P_arrival_time - tr0.stats.starttime
-        t0_P = P_arrival - 1
+        p_arrival = tr0.stats.P_arrival_time - tr0.stats.starttime
+        t0_p = p_arrival - 1
         t0_env = times[env > 0.1*env_max][0]
-        t0 = min(t0_P, t0_env)
+        t0 = min(t0_p, t0_env)
     if t1 is None:
         t1 = times[env > 0.3*env_max][-1]
 
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
     tracelines = []
-    P_bars = []
-    S_bars = []
+    p_bars = []
+    s_bars = []
     for n, tr in enumerate(st.sort()):
         average_trace = 'average' in tr.stats.evid
         # Normalize trace between t0 and t1
@@ -80,13 +80,13 @@ def _plot_family(family):
         color = '#cc8800' if average_trace else 'black'
         l, = ax.plot(tr.times()-t0, tr.data+n, color=color, linewidth=0.5)
         tracelines.append(l)
-        P_arrival = tr.stats.P_arrival_time - tr.stats.starttime - t0
-        S_arrival = tr.stats.S_arrival_time - tr.stats.starttime - t0
+        p_arrival = tr.stats.P_arrival_time - tr.stats.starttime - t0
+        s_arrival = tr.stats.S_arrival_time - tr.stats.starttime - t0
         hh = 0.15  # pick line half-height
-        P_bar, = ax.plot((P_arrival, P_arrival), (n-hh, n+hh), color='g')
-        S_bar, = ax.plot((S_arrival, S_arrival), (n-hh, n+hh), color='r')
-        P_bars.append(P_bar)
-        S_bars.append(S_bar)
+        p_bar, = ax.plot((p_arrival, p_arrival), (n-hh, n+hh), color='g')
+        s_bar, = ax.plot((s_arrival, s_arrival), (n-hh, n+hh), color='r')
+        p_bars.append(p_bar)
+        s_bars.append(s_bar)
         trans = ax.get_yaxis_transform()
         if average_trace:
             y_label = 'average'
@@ -121,10 +121,10 @@ def _plot_family(family):
             txt.set_path_effects(
                 [PathEffects.withStroke(linewidth=3, foreground='w')])
     legend = ax.legend(
-        [P_bar, S_bar], ['P theo', 'S theo'], loc='lower right')
+        [p_bar, s_bar], ['P theo', 'S theo'], loc='lower right')
     legend.set_visible(False)
-    for bar in P_bars + S_bars:
-        bar.set_visible(False)
+    for ps_bar in p_bars + s_bars:
+        ps_bar.set_visible(False)
     ax.axes.yaxis.set_visible(False)
     ax.minorticks_on()
     ax.tick_params(which='both', top=True, labeltop=False)
@@ -165,8 +165,8 @@ def _plot_family(family):
 
     def _toggle_arrivals():
         _toggle_arrivals.visible = not _toggle_arrivals.visible
-        for bar in P_bars + S_bars:
-            bar.set_visible(_toggle_arrivals.visible)
+        for ps_bar in p_bars + s_bars:
+            ps_bar.set_visible(_toggle_arrivals.visible)
         legend.set_visible(_toggle_arrivals.visible)
         fig.canvas.draw_idle()
 

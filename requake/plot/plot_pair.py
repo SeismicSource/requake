@@ -14,7 +14,10 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from ..config import config, rq_exit
 from ..catalog import fix_non_locatable_events, read_stored_catalog
-from ..waveforms import get_waveform_pair, process_waveforms, align_pair
+from ..waveforms import (
+    get_waveform_pair, process_waveforms, align_pair,
+    NoWaveformError
+)
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
@@ -56,7 +59,7 @@ def plot_pair():
         st = get_waveform_pair(pair)
         lag, lag_sec, cc_max = align_pair(st[0], st[1])
         st = process_waveforms(st)
-    except Exception as m:
+    except (ValueError, NoWaveformError) as m:
         logger.error(m)
         rq_exit(1)
     st.normalize()

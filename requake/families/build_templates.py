@@ -12,17 +12,19 @@ Build waveform templates for one or more event families.
 import logging
 import os
 from ..config import config, rq_exit
+from ..waveforms import NoWaveformError
 from .families import (
-    FamilyNotFoundError,
     read_selected_families,
-    get_family_aligned_waveforms_and_template)
+    get_family_aligned_waveforms_and_template,
+    FamilyNotFoundError
+)
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def _build_template(family):
     try:
         st = get_family_aligned_waveforms_and_template(family)
-    except Exception as m:
+    except NoWaveformError as m:
         logger.error(str(m))
         return
     tr_template = [tr for tr in st if 'average' in tr.stats.evid][0]
@@ -57,8 +59,4 @@ def build_templates():
         logger.error(str(m))
         rq_exit(1)
     for family in families:
-        try:
-            _build_template(family)
-        except Exception as m:
-            logger.error(str(m))
-            continue
+        _build_template(family)

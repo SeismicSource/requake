@@ -20,7 +20,7 @@ from obspy.signal.cross_correlation import correlate, xcorr_max
 from obspy.clients.fdsn.header import FDSNNoDataException
 from scipy.stats import median_abs_deviation
 from ..config import config, rq_exit
-from .station_metadata import get_traceid_coords
+from .station_metadata import get_traceid_coords, MetadataMismatchError
 from .arrivals import get_arrivals
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 model = TauPyModel(model='ak135')
@@ -72,7 +72,8 @@ def get_waveform(traceid, starttime, endtime):
     except FDSNNoDataException as m:
         msg = str(m).replace('\n', ' ')
         raise NoWaveformError(
-            f'Unable to download waveform data for trace id: {traceid}.\n'
+            f'No waveform data for trace id: {traceid} '
+            f'between {starttime} and {endtime}\n'
             f'Error message: {msg}'
         ) from m
     # webservices sometimes return longer traces: trim to be sure
@@ -100,18 +101,45 @@ def get_event_waveform(ev):
     mag_type = ev.mag_type
     traceid = ev.trace_id if config.args.traceid is None\
         else config.args.traceid
-    traceid_coords = get_traceid_coords(orig_time)
+    try:
+        traceid_coords = get_traceid_coords(orig_time)
+    except MetadataMismatchError as m:
+        msg = str(m).replace('\n', ' ')
+        raise NoWaveformError(
+            f'Unable to download waveform data for event {evid} '
+            f'and trace_id {traceid}. '
+            'Skipping event.\n'
+            f'Error message: {msg}'
+        ) from m
     trace_lat = traceid_coords[traceid]['latitude']
     trace_lon = traceid_coords[traceid]['longitude']
-    p_arrival, s_arrival, distance, dist_deg = get_arrivals(
-        trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
+    try:
+        p_arrival, s_arrival, distance, dist_deg = get_arrivals(
+            trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
+    except Exception as m:  # noqa
+        msg = str(m).replace('\n', ' ')
+        raise NoWaveformError(
+            f'Unable to compute arrival times for event {evid} '
+            f'and trace_id {traceid}. '
+            'Skipping event.\n'
+            f'Error message: {msg}'
+        ) from m
     p_arrival_time = orig_time + p_arrival.time
     s_arrival_time = orig_time + s_arrival.time
     pre_p = config.cc_pre_P
     trace_length = config.cc_trace_length
     t0 = p_arrival_time - pre_p
     t1 = t0 + trace_length
-    tr = get_waveform(traceid, t0, t1)
+    try:
+        tr = get_waveform(traceid, t0, t1)
+    except NoWaveformError as m:
+        msg = str(m).replace('\n', ' ')
+        raise NoWaveformError(
+            f'Unable to download waveform data for event {evid} '
+            f'and trace_id {traceid}. '
+            'Skipping event.\n'
+            f'Error message: {msg}'
+        ) from m
     tr.stats.evid = evid
     tr.stats.ev_lat = ev_lat
     tr.stats.ev_lon = ev_lon
@@ -152,12 +180,12 @@ def get_waveform_pair(pair):
     :type pair: tuple of RequakeEvent
     :return: stream containing the two traces
     :rtype: obspy.Stream
+
+    :raises NoWaveformError: if no waveform data is available
     """
     ev1, ev2 = pair
     ev1.trace_id = ev2.trace_id = _get_trace_id(ev1)
     st = Stream()
-    global skipped_evids
-    global tr_cache
     global old_cache_key
     cache_key = '_'.join((ev1.evid, ev1.trace_id))
     # remove trace from cache when evid and/or trace_id changes
@@ -263,18 +291,18 @@ def build_template(st, family):
     """
     tr_template = st[0].copy()
     tr_template.data *= 0.
-    P_arrival = 0.
-    S_arrival = 0.
+    p_arrival = 0.
+    s_arrival = 0.
     for tr in st:
         data = tr.data
         if config.normalize_traces_before_averaging:
             data /= abs(tr.max())
         tr_template.data += data
-        P_arrival += tr.stats.P_arrival_time - tr.stats.starttime
-        S_arrival += tr.stats.S_arrival_time - tr.stats.starttime
+        p_arrival += tr.stats.P_arrival_time - tr.stats.starttime
+        s_arrival += tr.stats.S_arrival_time - tr.stats.starttime
     tr_template.data /= len(st)
-    P_arrival /= len(st)
-    S_arrival /= len(st)
+    p_arrival /= len(st)
+    s_arrival /= len(st)
     tr_template.stats.evid = f'average{family.number:02d}'
     tr_template.stats.ev_lat = family.lat
     tr_template.stats.ev_lon = family.lon
@@ -292,8 +320,8 @@ def build_template(st, family):
     tr_template.stats.dist_deg = dist_deg
     tr_template.stats.distance = distance
     tr_template.stats.starttime = UTCDateTime('1900/01/01T00:00:00')
-    tr_template.stats.P_arrival_time = tr_template.stats.starttime + P_arrival
-    tr_template.stats.S_arrival_time = tr_template.stats.starttime + S_arrival
+    tr_template.stats.P_arrival_time = tr_template.stats.starttime + p_arrival
+    tr_template.stats.S_arrival_time = tr_template.stats.starttime + s_arrival
     tr_template.stats.cc_mean = 0
     tr_template.stats.cc_npairs = 0
     st.append(tr_template)

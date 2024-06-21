@@ -14,7 +14,7 @@ import sys
 import locale
 import shutil
 from datetime import datetime
-from .configobj import ConfigObj
+from .configobj import ConfigObj, ParseError
 from .configobj.validate import Validator
 locale.setlocale(locale.LC_ALL, '')
 
@@ -108,7 +108,7 @@ def read_config(config_file, configspec=None):
         config_obj = ConfigObj(config_file, **kwargs)
     except IOError as err:
         err_exit(err)
-    except Exception as err:
+    except ParseError as err:
         msg = f'Unable to read "{config_file}": {err}'
         err_exit(msg)
     return config_obj

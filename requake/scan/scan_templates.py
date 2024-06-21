@@ -15,9 +15,13 @@ import sys
 from obspy import read
 from ..config import config, rq_exit
 from ..families import (
-    FamilyNotFoundError, read_families, read_selected_families
+    read_families, read_selected_families,
+    FamilyNotFoundError
 )
-from ..waveforms import get_waveform, cc_waveform_pair, get_arrivals
+from ..waveforms import (
+    get_waveform, cc_waveform_pair, get_arrivals,
+    NoWaveformError
+)
 from ..catalog import RequakeEvent, generate_evid
 from .._version import get_versions
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -32,10 +36,12 @@ def _build_event(tr, template, p_arrival_absolute_time):
         ev_lat = template.stats.sac.evla
         ev_lon = template.stats.sac.evlo
         ev_depth = template.stats.sac.evdp
-        P_arrival, _S_arrival, _distance, _dist_deg = get_arrivals(
+        p_arrival, _s_arrival, _distance, _dist_deg = get_arrivals(
             trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
-        orig_time = p_arrival_absolute_time - P_arrival.time
-    except Exception:
+        orig_time = p_arrival_absolute_time - p_arrival.time
+    except Exception:  # pylint: disable=broad-except
+        # Here we catch a broad exception because get_arrivals can fail
+        # in many ways, and we don't want to stop the scan
         orig_time = p_arrival_absolute_time
         ev_lon = ev_lat = ev_depth = None
     ev = RequakeEvent()
@@ -66,7 +72,6 @@ def _cc_detection(tr, template, lag_sec):
 
 
 def _scan_family_template(template, catalog_file, t0, t1):
-    global trace_cache
     trace_id = template.id
     key = f'{t0}_{trace_id}'
     try:
@@ -75,8 +80,10 @@ def _scan_family_template(template, catalog_file, t0, t1):
         try:
             tr = get_waveform(trace_id, t0, t1)
             trace_cache[key] = tr
-        except Exception as m:
-            raise Exception(f'No data for {trace_id} : {t0} - {t1}') from m
+        except NoWaveformError as m:
+            raise NoWaveformError(
+                f'No data for {trace_id} : {t0} - {t1}'
+            ) from m
     sys.stdout.write(str(tr) + '\r')
     # We use the time_chunk length as max shift
     config.cc_max_shift = config.time_chunk
@@ -90,22 +97,29 @@ def _scan_family_template(template, catalog_file, t0, t1):
 
 
 def _read_template_from_file():
+    """
+    Read a template from a file proivided by the user.
+    """
+    families = read_families()
     try:
-        families = read_families()
         family_number = sorted(f.number for f in families)[-1] + 1
-    except Exception:
+    except IndexError:
         family_number = 0
     templates = []
     try:
         tr = read(config.args.template_file)[0]
         tr.stats.family_number = family_number
         templates.append(tr)
-    except Exception as msg:
+    except (FileNotFoundError, TypeError) as msg:
         logger.warning(msg)
     return templates
 
 
 def _read_templates():
+    """
+    Read templates from files in the template directory or from a file
+    provided by the user.
+    """
     if config.args.template_file is not None:
         return _read_template_from_file()
     try:
@@ -121,12 +135,23 @@ def _read_templates():
             tr = read(template_file)[0]
             tr.stats.family_number = family.number
             templates.append(tr)
-        except Exception as msg:
+        except (FileNotFoundError, TypeError) as msg:
             logger.warning(msg)
     return templates
 
 
 def _template_catalog_files(templates):
+    """
+    Create a catalog file for each template.
+
+    Note: the returned dictionary contains file pointers, not file names.
+    These file pointers must be closed by the caller.
+
+    :param templates: list of templates
+    :type templates: list of obspy.Trace objects
+    :return: dictionary of file pointers
+    :rtype: dict
+    """
     catalog_files = {}
     for template in templates:
         template_catalog_dir = os.path.join(
@@ -153,15 +178,10 @@ def scan_templates():
     except (FileNotFoundError, FamilyNotFoundError) as m:
         logger.error(m)
         rq_exit(1)
-    try:
-        catalog_files = _template_catalog_files(templates)
-    except Exception as m:
-        logger.error(str(m))
-        rq_exit(1)
+    catalog_files = _template_catalog_files(templates)
     time = config.template_start_time
     time_chunk = config.time_chunk
     overlap = config.time_chunk_overlap
-    global trace_cache
     while time <= config.template_end_time:
         for template in templates:
             template_signature =\
@@ -171,7 +191,7 @@ def scan_templates():
                 t0 = time
                 t1 = time + time_chunk + overlap
                 _scan_family_template(template, catalog_file, t0, t1)
-            except Exception as msg:
+            except NoWaveformError as msg:
                 logger.warning(msg)
                 continue
         trace_cache.clear()

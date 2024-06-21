@@ -64,6 +64,8 @@ def _get_events_from_fdsnws(
 
     :return: a RequakeCatalog object
     :rtype: RequakeCatalog
+
+    :raises: urllib.error.HTTPError if the URL returns an HTTP error
     """
     # pylint: disable=unused-argument
     arguments = locals()
@@ -128,7 +130,7 @@ def read_catalog_from_fdsnws():
                 minmagnitude=config.catalog_mag_min,
                 maxmagnitude=config.catalog_mag_max
             )
-        except Exception as m:
+        except urllib.error.HTTPError as m:
             logger.warning(
                 f'Unable to download events from {url} for period '
                 f'{start_time} - {end_time}. {m}'

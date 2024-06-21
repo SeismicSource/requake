@@ -17,12 +17,19 @@ from obspy.geodetics import gps2dist_azimuth
 from ..config import config
 from ..formulas import float_or_none, mag_to_slip_in_cm, mag_to_moment
 from ..catalog import RequakeEvent
-from ..waveforms import get_event_waveform, align_traces, build_template
+from ..waveforms import (
+    get_event_waveform, align_traces, build_template,
+    NoWaveformError
+)
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 class FamilyNotFoundError(Exception):
     """Exception raised when a family is not found."""
+
+
+class InvalidFamilyError(Exception):
+    """Exception raised when a family is not valid."""
 
 
 class Family(list):
@@ -223,19 +230,21 @@ def get_family(families, family_number):
     :type family_number: int
     :return: The family.
     :rtype: Family
+
+    :raises FamilyNotFoundError: if no family is found
+    :raises InvalidFamilyError: if the family is not valid
     """
     for family in families:
         if family.number != family_number:
             continue
         if not family.valid:
-            msg = f'Family "{family_number}" is flagged as not valid'
-            raise Exception(msg)
+            raise InvalidFamilyError(
+                f'Family "{family_number}" is flagged as not valid'
+            )
         if (family.endtime - family.starttime) < config.args.longerthan:
-            msg = f'Family "{family.number}" is too short'
-            raise Exception(msg)
+            raise InvalidFamilyError(f'Family "{family_number}" is too short')
         return family
-    msg = f'No family found with number "{family_number}"'
-    raise Exception(msg)
+    raise FamilyNotFoundError(f'No family found with number "{family_number}"')
 
 
 def get_family_waveforms(family):
@@ -246,16 +255,17 @@ def get_family_waveforms(family):
     :type family: Family
     :return: The waveforms.
     :rtype: obspy.Stream
+
+    :raises NoWaveformError: if no waveform is found
     """
     st = Stream()
     for ev in family:
         try:
             st += get_event_waveform(ev)
-        except Exception as m:
+        except NoWaveformError as m:
             logger.error(str(m))
     if not st:
-        msg = f'No traces found for family {family.number}'
-        raise Exception(msg)
+        raise NoWaveformError(f'No traces found for family {family.number}')
     return st
 
 
@@ -291,7 +301,9 @@ def _build_family_number_list():
         elif family_numbers.isnumeric():
             fn = [int(family_numbers), ]
         else:
-            raise Exception
-    except Exception as e:
-        raise Exception(f'Invalid family numbers: {family_numbers}') from e
+            raise ValueError
+    except ValueError as e:
+        raise FamilyNotFoundError(
+            f'Invalid family numbers: {family_numbers}'
+        ) from e
     return fn

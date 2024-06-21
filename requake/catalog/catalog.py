@@ -182,13 +182,13 @@ class RequakeCatalog(list):
             for ev in self:
                 fp.write(ev.fdsn_text() + '\n')
 
-
     def filter(
             self, starttime=None, endtime=None,
             minlatitude=None, maxlatitude=None,
             minlongitude=None, maxlongitude=None,
             mindepth=None, maxdepth=None,
-            minmagnitude=None, maxmagnitude=None):
+            minmagnitude=None, maxmagnitude=None
+    ):
         """
         Filter the catalog, based on the specified criteria.
 
