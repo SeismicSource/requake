@@ -193,10 +193,22 @@ def parse_arguments(progname='requake'):
     #     used by several subparsers
     longerthan = argparse.ArgumentParser(add_help=False)
     longerthan.add_argument(
-        '-l', '--longerthan', type=str, default=0, metavar='DURATION',
+        '-l', '--longerthan', type=str, default='0d', metavar='DURATION',
         help='only use families lasting longer than this value. '
-             'You can specify DURATION in days (e.g., 100d) '
-             'or in years (e.g., 2.5y)'
+             'You can specify DURATION in seconds (e.g., 10s), '
+             'minutes (e.g., 3.3m), hours (e.g., 3.5h), days (e.g., 100d), '
+             'months (e.g., 2M), or in years (e.g., 2.5y)'
+    )
+    # --- shorterthan
+    #     a parent parser for the "shorterthan" option,
+    #     used by several subparsers
+    shorterthan = argparse.ArgumentParser(add_help=False)
+    shorterthan.add_argument(
+        '-S', '--shorterthan', type=str, default=None, metavar='DURATION',
+        help='only use families lasting shorter than this value. '
+             'You can specify DURATION in seconds (e.g., 10s), '
+             'minutes (e.g., 3.3m), hours (e.g., 3.5h), days (e.g., 100d), '
+             'months (e.g., 2M), or in years (e.g., 2.5y)'
     )
     # ---
     # --- minevents
@@ -247,14 +259,16 @@ def parse_arguments(progname='requake'):
     # --- print_families
     subparser.add_parser(
         'print_families',
-        parents=[longerthan, minevents, familynumbers, printformat],
+        parents=[
+            longerthan, shorterthan, minevents, familynumbers, printformat
+        ],
         help='print families to screen'
     )
     # ---
     # --- plot_families
     plotfamilies = subparser.add_parser(
         'plot_families',
-        parents=[longerthan, minevents, familynumbers, traceid],
+        parents=[longerthan, shorterthan, minevents, familynumbers, traceid],
         help='plot traces for one ore more event families'
     )
     plotfamilies.add_argument(
@@ -269,7 +283,7 @@ def parse_arguments(progname='requake'):
     # --- plot_timespans
     timespans = subparser.add_parser(
         'plot_timespans',
-        parents=[longerthan, minevents, familynumbers, colorby],
+        parents=[longerthan, shorterthan, minevents, familynumbers, colorby],
         help='plot family timespans'
     )
     timespans.add_argument(
@@ -286,7 +300,7 @@ def parse_arguments(progname='requake'):
     # --- plot_cumulative
     plotcumulative = subparser.add_parser(
         'plot_cumulative',
-        parents=[longerthan, minevents, familynumbers, colorby],
+        parents=[longerthan, shorterthan, minevents, familynumbers, colorby],
         help='cumulative plot for one or more families'
     )
     plotcumulative.add_argument(
@@ -304,7 +318,7 @@ def parse_arguments(progname='requake'):
     # --- map_families
     mapfamilies = subparser.add_parser(
         'map_families',
-        parents=[longerthan, minevents, familynumbers, colorby],
+        parents=[longerthan, shorterthan, minevents, familynumbers, colorby],
         help='plot families on a map'
     )
     mapfamilies.add_argument(
@@ -343,14 +357,14 @@ def parse_arguments(progname='requake'):
     # --- build_templates
     subparser.add_parser(
         'build_templates',
-        parents=[longerthan, minevents, familynumbers, traceid],
+        parents=[longerthan, shorterthan, minevents, familynumbers, traceid],
         help='build waveform templates for one or more event families'
     )
     # ---
     # --- scan_templates
     scantemplates = subparser.add_parser(
         'scan_templates',
-        parents=[longerthan, minevents, familynumbers, traceid],
+        parents=[longerthan, shorterthan, minevents, familynumbers, traceid],
         help='scan a continuous waveform stream using one or more templates'
     )
     scantemplates.add_argument(
@@ -369,29 +383,61 @@ def parse_arguments(progname='requake'):
             'error: at least one positional argument is required\n'
         )
         sys.exit(2)
-    # Additional code for "longerthan" option
+    # Additional code for "longerthan" and "shorterthan" options
     try:
-        # transform "longerthan" to seconds
-        lt = args.longerthan
-        if lt != 0:
-            suffix = lt[-1]
-            lt_float = float(lt[:-1])
-            if suffix == 'd':
-                lt_float *= 24*60*60
-            elif suffix == 'y':
-                lt_float *= 365*24*60*60
-            else:
-                raise ValueError
-            args.longerthan = lt_float
+        args.longerthan = _timespec_to_sec(args.longerthan)
     except AttributeError:
         pass
     except ValueError:
         sys.stderr.write(
             f"{progname} {args.action}: "
-            f"error: argument -l/--longerthan: invalid value: '{lt}'\n"
+            "error: argument -l/--longerthan: "
+            f"invalid value: '{args.longerthan}'\n"
+        )
+        sys.exit(2)
+    try:
+        args.shorterthan = _timespec_to_sec(args.shorterthan)
+    except AttributeError:
+        pass
+    except ValueError:
+        sys.stderr.write(
+            f"{progname} {args.action}: "
+            "error: argument -S/--shorterthan: "
+            f"invalid value: '{args.shorterthan}'\n"
         )
         sys.exit(2)
     # args.traceid need to exist
     if not hasattr(args, 'traceid'):
         args.traceid = None
     return args
+
+
+def _timespec_to_sec(timespec):
+    """
+    Convert a time specification to seconds.
+
+    :param timespec: Time specification, e.g., "10s", "3.3m", "2h", "1d",
+                     "2M", "3y".
+    :type timespec: str
+    :return: Time in seconds.
+    :rtype: float
+    """
+    if timespec is None:
+        return 1e999
+    suffix = timespec[-1]
+    time_in_seconds = float(timespec[:-1])
+    if suffix == 's':
+        time_in_seconds *= 1
+    elif suffix == 'm':
+        time_in_seconds *= 60
+    elif suffix == 'h':
+        time_in_seconds *= 24*60
+    elif suffix == 'd':
+        time_in_seconds *= 24*60*60
+    elif suffix == 'M':
+        time_in_seconds *= 30*24*60*60
+    elif suffix == 'y':
+        time_in_seconds *= 365*24*60*60
+    else:
+        raise ValueError(f"Invalid time specification: {timespec}")
+    return time_in_seconds

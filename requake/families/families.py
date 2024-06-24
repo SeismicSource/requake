@@ -208,6 +208,9 @@ def read_selected_families():
         if (family.endtime - family.starttime) < config.args.longerthan:
             logger.warning(f'Family "{family.number}" is too short')
             continue
+        if (family.endtime - family.starttime) >= config.args.shorterthan:
+            logger.warning(f'Family "{family.number}" is too long')
+            continue
         if len(family) < config.args.minevents:
             logger.warning(
                 f'Family "{family.number}" has less than '

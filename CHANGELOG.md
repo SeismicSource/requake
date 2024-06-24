@@ -4,6 +4,10 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 
+- New option `--shorterthan` to select families with a duration shorter than a
+  given value. For this option and for `--longerthan` it is now possible to
+  specify the duration in seconds, minutes, hours, or months, in addition to
+  days and years.
 - New option `--colorby` for many plot commands, to color families by a
   specific attribute other than the family number
 - Add missing `street` map style for `map_families`
