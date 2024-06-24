@@ -10,6 +10,9 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
   days and years.
 - New option `--colorby` for many plot commands, to color families by a
   specific attribute other than the family number
+- New option `--colormap` for many plot commands, to select a colormap
+  for coloring families. If not specified, a default colormap for each
+  attribute specified in `--colorby` is used.
 - Add missing `street` map style for `map_families`
 - Improved reading of CSV catalog files:
   - avoid duplicated column guessing

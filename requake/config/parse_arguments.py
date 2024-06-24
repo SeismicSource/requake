@@ -247,6 +247,18 @@ def parse_arguments(progname='requake'):
         help='quantity to color families by. Choose among {%(choices)s} '
              '(default: %(default)s)'
     )
+    # --- colormap
+    #     a parent parser for the "colormap" option,
+    #     used by plotting subparsers
+    colormap = argparse.ArgumentParser(add_help=False)
+    colormap.add_argument(
+        '-C', '--colormap', type=str, default=None,
+        metavar='COLORMAP',
+        help='color map to use for plotting. Use any colormap available in '
+             'Matplotlib (e.g., "viridis", "plasma", "inferno"). '
+             'If not provided, a default color map will be used, based on the '
+             'quantity specified with the -c/--colorby option'
+    )
     # --- traceid
     #     a parent parser for the "traceid" option,
     #     used by several subparsers
@@ -283,7 +295,10 @@ def parse_arguments(progname='requake'):
     # --- plot_timespans
     timespans = subparser.add_parser(
         'plot_timespans',
-        parents=[longerthan, shorterthan, minevents, familynumbers, colorby],
+        parents=[
+            longerthan, shorterthan, minevents, familynumbers, colorby,
+            colormap
+        ],
         help='plot family timespans'
     )
     timespans.add_argument(
@@ -300,7 +315,10 @@ def parse_arguments(progname='requake'):
     # --- plot_cumulative
     plotcumulative = subparser.add_parser(
         'plot_cumulative',
-        parents=[longerthan, shorterthan, minevents, familynumbers, colorby],
+        parents=[
+            longerthan, shorterthan, minevents, familynumbers, colorby,
+            colormap
+        ],
         help='cumulative plot for one or more families'
     )
     plotcumulative.add_argument(
@@ -318,7 +336,10 @@ def parse_arguments(progname='requake'):
     # --- map_families
     mapfamilies = subparser.add_parser(
         'map_families',
-        parents=[longerthan, shorterthan, minevents, familynumbers, colorby],
+        parents=[
+            longerthan, shorterthan, minevents, familynumbers, colorby,
+            colormap
+        ],
         help='plot families on a map'
     )
     mapfamilies.add_argument(

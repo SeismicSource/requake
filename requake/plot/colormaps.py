@@ -11,6 +11,7 @@ Colormaps for Requake.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import matplotlib as mpl
+from ..config import config, rq_exit
 
 _SPATIAL_CMAP = 'plasma'
 
@@ -27,6 +28,13 @@ cmaps = {
     'cumul_slip': mpl.cm.get_cmap('cividis'),
     'slip_rate': mpl.cm.get_cmap('inferno'),
 }
+if config.args.colormap is not None:
+    try:
+        user_cmap = mpl.cm.get_cmap(config.args.colormap)
+    except ValueError:
+        rq_exit(f'Colormap "{config.args.colormap}" not found.')
+    for cmap in cmaps:
+        cmaps[cmap] = user_cmap.copy()
 cmap_labels = {
     'family_number': 'Family Number (last digit)',
     'time': 'Family Start Time',
