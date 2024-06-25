@@ -13,6 +13,8 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 - New option `--colormap` for many plot commands, to select a colormap
   for coloring families. If not specified, a default colormap for each
   attribute specified in `--colorby` is used.
+- New option `--range` to manually specify the range of values for the color
+  scale
 - Add missing `street` map style for `map_families`
 - Improved reading of CSV catalog files:
   - avoid duplicated column guessing

@@ -95,22 +95,22 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- update_config
-    updateconfig = subparser.add_parser(
+    update_config = subparser.add_parser(
         'update_config',
         help='update an existing config file to the latest version'
     )
-    updateconfig.add_argument(
+    update_config.add_argument(
         'config_file', default='requake.conf', nargs='?',
         help='config file to be updated (default: %(default)s)'
     )
     # ---
-    # --- read catalog
-    readcatalog = subparser.add_parser(
+    # --- read_catalog
+    read_catalog = subparser.add_parser(
         'read_catalog',
         help='read an event catalog from web services or from a file',
         formatter_class=NewlineHelpFormatter
     )
-    readcatalog.add_argument(
+    read_catalog.add_argument(
         'catalog_file', nargs='?', help=(
             'Specifies the event catalog file to be used. If not provided, '
             'the event catalog will be downloaded from the FDSN web service '
@@ -130,15 +130,15 @@ def parse_arguments(progname='requake'):
             'the code will exit with an error.'
         )
     )
-    readcatalog.add_argument(
+    read_catalog.add_argument(
         '-a', '--append', action='store_true',
         help='append events to existing catalog'
     )
-    # --- printformat
+    # --- print_format
     #     a parent parser for the "format" option,
     #     used by the "print" subparsers
-    printformat = argparse.ArgumentParser(add_help=False)
-    printformat.add_argument(
+    print_format = argparse.ArgumentParser(add_help=False)
+    print_format.add_argument(
         '-f', '--format', type=str, default='simple',
         choices=['simple', 'markdown', 'csv'],
         help='format for the output table (default: %(default)s)'
@@ -147,7 +147,7 @@ def parse_arguments(progname='requake'):
     # --- print_catalog
     subparser.add_parser(
         'print_catalog',
-        parents=[printformat],
+        parents=[print_format],
         help='print the event catalog to screen'
     )
     # ---
@@ -158,29 +158,29 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- print_pairs
-    printpairs = subparser.add_parser(
+    print_pairs = subparser.add_parser(
         'print_pairs',
-        parents=[printformat],
+        parents=[print_format],
         help='print pairs to screen'
     )
-    printpairs.add_argument(
+    print_pairs.add_argument(
         '-c', '--cc_min',
         type=float, default=None,
         help='minimum cross-correlation coefficient (default: %(default)s)'
     )
-    printpairs.add_argument(
+    print_pairs.add_argument(
         '-C', '--cc_max',
         type=float, default=None,
         help='maximum cross-correlation coefficient (default: %(default)s)'
     )
     # ---
     # --- plot_pair
-    plotpair = subparser.add_parser(
+    plot_pair = subparser.add_parser(
         'plot_pair',
         help='plot traces for a given event pair'
     )
-    plotpair.add_argument('evid1')
-    plotpair.add_argument('evid2')
+    plot_pair.add_argument('evid1')
+    plot_pair.add_argument('evid2')
     # ---
     # --- build_families
     subparser.add_parser(
@@ -220,11 +220,11 @@ def parse_arguments(progname='requake'):
         help='only use families with at least NEVENTS events'
     )
     # ---
-    # --- familynumbers
+    # --- family_numbers
     #     a parent parser for the "family_numbers" option,
     #     used by several subparsers
-    familynumbers = argparse.ArgumentParser(add_help=False)
-    familynumbers.add_argument(
+    family_numbers = argparse.ArgumentParser(add_help=False)
+    family_numbers.add_argument(
         'family_numbers', default='all', nargs='?',
         help='family numbers to use. It can be a single number, '
              'a comma-separated list (ex.: 1,4,8), '
@@ -259,6 +259,22 @@ def parse_arguments(progname='requake'):
              'If not provided, a default color map will be used, based on the '
              'quantity specified with the -c/--colorby option'
     )
+    # --- color_range
+    #     a parent parser for the "range" option,
+    #     used by plotting subparsers
+    # Note that "range" is a reserved word in Python, so we use "color_range"
+    # for the variable name
+    color_range = argparse.ArgumentParser(add_help=False)
+    color_range.add_argument(
+        '-r', '--range', type=str, default=None,
+        metavar='RANGE',
+        help='range of values for the colorbar. Use a comma-separated list of '
+             'two values (e.g., "0,100"). Default behavior is to use the '
+             'minimum and maximum values of the quantity specified with the '
+             '-c/--colorby option. Note that for "duration" the range is '
+             'expressed in years. Also note that this option is ignored if '
+             'the -c/--colorby option is set to "family_number".'
+    )
     # --- traceid
     #     a parent parser for the "traceid" option,
     #     used by several subparsers
@@ -272,7 +288,7 @@ def parse_arguments(progname='requake'):
     subparser.add_parser(
         'print_families',
         parents=[
-            longerthan, shorterthan, minevents, familynumbers, printformat
+            longerthan, shorterthan, minevents, family_numbers, print_format
         ],
         help='print families to screen'
     )
@@ -280,7 +296,7 @@ def parse_arguments(progname='requake'):
     # --- plot_families
     plotfamilies = subparser.add_parser(
         'plot_families',
-        parents=[longerthan, shorterthan, minevents, familynumbers, traceid],
+        parents=[longerthan, shorterthan, minevents, family_numbers, traceid],
         help='plot traces for one ore more event families'
     )
     plotfamilies.add_argument(
@@ -293,15 +309,15 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- plot_timespans
-    timespans = subparser.add_parser(
+    plot_timespans = subparser.add_parser(
         'plot_timespans',
         parents=[
-            longerthan, shorterthan, minevents, familynumbers, colorby,
-            colormap
+            longerthan, shorterthan, minevents, family_numbers, colorby,
+            colormap, color_range
         ],
         help='plot family timespans'
     )
-    timespans.add_argument(
+    plot_timespans.add_argument(
         '-s', '--sortby', type=str, default='family_number',
         metavar='QUANTITY',
         choices=[
@@ -313,36 +329,36 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- plot_cumulative
-    plotcumulative = subparser.add_parser(
+    plot_cumulative = subparser.add_parser(
         'plot_cumulative',
         parents=[
-            longerthan, shorterthan, minevents, familynumbers, colorby,
-            colormap
+            longerthan, shorterthan, minevents, family_numbers, colorby,
+            colormap, color_range
         ],
         help='cumulative plot for one or more families'
     )
-    plotcumulative.add_argument(
+    plot_cumulative.add_argument(
         '-q', '--quantity', type=str, default='slip',
         metavar='QUANTITY',
         choices=['slip', 'moment', 'number'],
         help='cumulative quantity to plot on y-axis. Choose among '
              '{%(choices)s}. Default: %(default)s'
     )
-    plotcumulative.add_argument(
+    plot_cumulative.add_argument(
         '-L', '--logscale', action='store_true',
         help='use log scale for y-axis'
     )
     # ---
     # --- map_families
-    mapfamilies = subparser.add_parser(
+    map_families = subparser.add_parser(
         'map_families',
         parents=[
-            longerthan, shorterthan, minevents, familynumbers, colorby,
-            colormap
+            longerthan, shorterthan, minevents, family_numbers, colorby,
+            colormap, color_range
         ],
         help='plot families on a map'
     )
-    mapfamilies.add_argument(
+    map_families.add_argument(
         '-M', '--mapstyle', type=str, default='satellite',
         metavar='STYLE',
         choices=[
@@ -352,24 +368,24 @@ def parse_arguments(progname='requake'):
         help='style of map to plot. Choose among {%(choices)s} '
              '(default: %(default)s)'
     )
-    mapfamilies.add_argument(
+    map_families.add_argument(
         '-k', '--apikey', type=str, default=None,
         help='API key for Stamen Terrain map tiles (default: %(default)s). '
              'You can get a free API key at https://stadiamaps.com/'
     )
-    mapfamilies.add_argument(
+    map_families.add_argument(
         '-z', '--zoom', type=int, default=None,
         help='zoom level for the map tiles (default: None). Note that '
              'certain map tiles might not be available at all zoom levels'
     )
     # ---
     # --- flag_family
-    flagfamily = subparser.add_parser(
+    flag_family = subparser.add_parser(
         'flag_family',
         help='flag a family of repeating earthquakes as valid or not valid'
     )
-    flagfamily.add_argument('family_number')
-    flagfamily.add_argument(
+    flag_family.add_argument('family_number')
+    flag_family.add_argument(
         'is_valid',
         help='"true" (or "t") to flag family as valid, '
              '"false" (or "f") to flag family as not valid'
@@ -378,17 +394,17 @@ def parse_arguments(progname='requake'):
     # --- build_templates
     subparser.add_parser(
         'build_templates',
-        parents=[longerthan, shorterthan, minevents, familynumbers, traceid],
+        parents=[longerthan, shorterthan, minevents, family_numbers, traceid],
         help='build waveform templates for one or more event families'
     )
     # ---
     # --- scan_templates
-    scantemplates = subparser.add_parser(
+    scan_templates = subparser.add_parser(
         'scan_templates',
-        parents=[longerthan, shorterthan, minevents, familynumbers, traceid],
+        parents=[longerthan, shorterthan, minevents, family_numbers, traceid],
         help='scan a continuous waveform stream using one or more templates'
     )
-    scantemplates.add_argument(
+    scan_templates.add_argument(
         '-T', '--template_file', type=str, default=None, metavar='FILE',
         help='use the provided file as template. '
              'File must be in SAC format, with a P pick in the '

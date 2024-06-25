@@ -190,6 +190,32 @@ def duration_string(family):
     return f'{duration:.1f} {_short_units[units]}'
 
 
+def _minmax(values):
+    """
+    Return the min and max values of a list of values.
+    Use the range parameter if specified.
+
+    :param values: List of values
+    :type values: list
+    :return: vmin, vmax
+    :rtype: float, float
+    """
+    vmin = np.nanmin(values)
+    vmax = np.nanmax(values)
+    if config.args.range is not None:
+        try:
+            if config.args.colorby == 'time':
+                vmin, vmax = mdates.datestr2num(config.args.range.split(','))
+            else:
+                vmin, vmax = map(float, config.args.range.split(','))
+        except ValueError:
+            logger.error(
+                f'Invalid value for "range": "{config.args.range}". '
+                'Using min/max values instead'
+            )
+    return vmin, vmax
+
+
 def family_colors(families):
     """
     Return the family colors, according to the colorby parameter.
@@ -246,7 +272,8 @@ def family_colors(families):
         values = [family.starttime.matplotlib_date for family in families]
     # Convert values to float numpy array. This changes None values to np.nan
     values = np.array(values, dtype=float)
-    norm = colors.Normalize(vmin=min(values), vmax=max(values))
+    vmin, vmax = _minmax(values)
+    norm = colors.Normalize(vmin, vmax)
     fcolors = [cmap(norm(value)) for value in values]
     return fcolors, norm, cmap
 
@@ -283,10 +310,10 @@ def _family_colors_duration(families, cmap):
     :rtype: list, matplotlib.colors.Normalize, matplotlib.cm.ScalarMappable
     """
     durations = [family.duration for family in families]
-    max_duration = max(durations)
+    min_duration, max_duration = _minmax(durations)
     max_duration_new_units, units = _duration_units(max_duration)
     multiplier = max_duration_new_units/max_duration
-    min_duration_new_units = min(durations)*multiplier
+    min_duration_new_units = min_duration*multiplier
     norm = colors.Normalize(
         vmin=min_duration_new_units, vmax=max_duration_new_units)
     fcolors = [cmap(norm(duration*multiplier)) for duration in durations]
