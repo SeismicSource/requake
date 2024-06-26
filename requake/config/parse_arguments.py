@@ -307,6 +307,10 @@ def parse_arguments(progname='requake'):
         '-e', '--endtime', type=float, default=None,
         help='end time, in seconds relative to trace start, for the plot'
     )
+    plotfamilies.add_argument(
+        '-T', '--template', action='store_true',
+        help='plot family members found with template scan'
+    )
     # ---
     # --- plot_timespans
     plot_timespans = subparser.add_parser(

@@ -16,6 +16,7 @@ Copyright (c) 2021-2024 Claudio Satriano <satriano@ipgp.fr>
 - New option `--range` to manually specify the range of values for the color
   scale
 - Add missing `street` map style for `map_families`
+- Initial support for plotting families found with template scan
 - Improved reading of CSV catalog files:
   - avoid duplicated column guessing
   - ensure that prefectly matching column field names are correctly guessed

@@ -9,8 +9,11 @@ Family classes and functions.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
+import sys
 import logging
 import csv
+import os
+from glob import glob
 import numpy as np
 from obspy import UTCDateTime, Stream
 from obspy.geodetics import gps2dist_azimuth
@@ -149,9 +152,9 @@ class Family(list):
         return distance/1e3
 
 
-def read_families():
+def _read_families_from_catalog_scan():
     """
-    Read a list of families from file.
+    Read a list of families from the catalog scan output.
 
     :return: List of families.
     :rtype: list of Family
@@ -184,6 +187,51 @@ def read_families():
         if family is not None:
             families.append(family)
     return families
+
+
+def _read_families_from_template_scan():
+    """
+    Read a list of families from the template scan output.
+
+    :return: List of families.
+    :rtype: list of Family
+    """
+    template_catalogs = glob(
+        f'{config.args.outdir}/template_catalogs/catalog*.txt'
+    )
+    families = []
+    for template_catalog in template_catalogs:
+        fname = os.path.basename(template_catalog)
+        catalog_name = fname.split('.')[0]
+        trace_id = fname.lstrip(f'{catalog_name}.').rstrip('.txt')
+        family_number = int(catalog_name.lstrip('catalog'))
+        family = Family(family_number)
+        with open(template_catalog, 'r', encoding='utf-8') as fp:
+            for row in fp:
+                fields = row.split('|')
+                ev = RequakeEvent()
+                ev.evid = fields[0].strip()
+                ev.orig_time = UTCDateTime(fields[1].strip())
+                ev.lon = float(fields[2].strip())
+                ev.lat = float(fields[3].strip())
+                ev.depth = float(fields[4].strip())
+                ev.trace_id = trace_id
+                family.append(ev)
+        families.append(family)
+    return families
+
+
+def read_families():
+    """
+    Read families from the catalog scan output or from the template scan
+    output.
+
+    :return: List of families.
+    :rtype: list of Family
+    """
+    if getattr(config.args, 'template', False):
+        return _read_families_from_template_scan()
+    return _read_families_from_catalog_scan()
 
 
 def read_selected_families():
@@ -262,11 +310,20 @@ def get_family_waveforms(family):
     :raises NoWaveformError: if no waveform is found
     """
     st = Stream()
-    for ev in family:
+    nevs = len(family)
+    clear_line = '\x1b[2K\r'  # escape sequence to clear line
+    for n, ev in enumerate(family):
+        sys.stdout.write(
+            f'{clear_line}Family {family.number}: '
+            f'reading waveform for event {ev.evid}: {n+1}/{nevs}')
         try:
             st += get_event_waveform(ev)
         except NoWaveformError as msg:
+            sys.stdout.write('\n')
             logger.error(msg)
+    sys.stdout.write(
+        f'{clear_line}Family {family.number}: reading waveforms: done.\n'
+    )
     if not st:
         raise NoWaveformError(f'No traces found for family {family.number}')
     return st
