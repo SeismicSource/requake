@@ -98,7 +98,7 @@ def _scan_family_template(template, catalog_file, t0, t1):
 
 def _read_template_from_file():
     """
-    Read a template from a file proivided by the user.
+    Read a template from a file provided by the user.
     """
     families = read_families()
     try:
