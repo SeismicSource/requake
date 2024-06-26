@@ -28,7 +28,7 @@ cmaps = {
     'cumul_slip': mpl.cm.get_cmap('cividis'),
     'slip_rate': mpl.cm.get_cmap('inferno'),
 }
-if config.args.colormap is not None:
+if getattr(config.args, 'colormap', None) is not None:
     try:
         user_cmap = mpl.cm.get_cmap(config.args.colormap)
     except ValueError:
