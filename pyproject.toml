@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=64", "versioneer[toml]"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "requake"
+dynamic = ["version", "readme"]
+authors = [
+    { name = "Claudio Satriano", email = "satriano@ipgp.fr" },
+]
+description = "Repeating earthquakes search and analysis"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+requires-python = ">3.7"
+dependencies = [
+    "scipy>=1.5.0",
+    "obspy>=1.2.0",
+    "argcomplete",
+    "tqdm",
+    "tabulate",
+]
+
+[project.license]
+text = "GNU General Public License v3 or later (GPLv3+)"
+
+[project.urls]
+Homepage = "https://requake.seismicsource.org"
+Source = "https://github.com/SeismicSource/requake"
+Documentation = "https://requake.readthedocs.io"
+
+[project.scripts]
+requake = "requake.main:main"
+
+[tool.setuptools]
+include-package-data = true
+platforms = [
+    "OS",
+    "Independent",
+]
+
+[tool.setuptools.packages.find]
+include = ["requake", "requake.*"]
+
+[tool.setuptools.package-data]
+"*" = ["LICENSE"]
+"requake.config" = ["*.conf"]
+
+[tool.setuptools.dynamic]
+version = {attr = "requake.__version__"}
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "requake/_version.py"
+versionfile_build = "requake/_version.py"
+tag_prefix = "v"
+parentdir_prefix = "requake-"
