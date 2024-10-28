@@ -40,7 +40,7 @@ You can install it easily through `pip`:
 ### Installing a development snapshot
 
 If you need a recent feature that is not in the latest release (see the
-`unreleased` section in [CHANGELOG](CHANGELOG.md)), you want to use the more
+`unreleased` section in [CHANGELOG][changelog-link]), you want to use the more
 recent development snapshot from the
 [Requake GitHub repository](https://github.com/SeismicSource/requake).
 
