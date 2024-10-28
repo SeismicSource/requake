@@ -5,7 +5,7 @@ Repeating earthquakes search and analysis.
 
 :Copyright: 2021-2024 Claudio Satriano satriano@ipgp.fr
 :Release: |release|
-:Date:    |today|
+:Date:    |release date|
 
 Description
 -----------

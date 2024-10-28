@@ -3,6 +3,7 @@
 # pylint: disable=wrong-import-position,invalid-name
 import sys
 import os
+from datetime import datetime
 import sphinxcontrib.katex as katex
 sys.path.insert(0, os.path.abspath('.'))
 from write_configfile import write_configfile  # noqa
@@ -14,7 +15,7 @@ sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.join(os.path.abspath('..'), 'requake'))
 from requake._version import get_versions  # NOQA
 __version__ = get_versions()['version']
-
+__release_date__ = get_versions()['date']
 
 # -- Project information -----------------------------------------------------
 
@@ -30,6 +31,11 @@ release = __version__
 # The short X.Y version.
 version = release.split('-')[0]
 
+# Release date in the format "Month DD, YYYY"
+release_date = datetime.strptime(
+    __release_date__, '%Y-%m-%dT%H:%M:%S%z'
+).strftime('%b %d, %Y')
+rst_epilog = f'\n.. |release date| replace:: {release_date}'
 
 # -- General configuration ---------------------------------------------------
 
