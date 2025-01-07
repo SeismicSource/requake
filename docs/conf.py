@@ -20,7 +20,7 @@ __release_date__ = get_versions()['date']
 # -- Project information -----------------------------------------------------
 
 project = 'Requake'
-copyright = '2021-2024, Claudio Satriano'  # pylint: disable=redefined-builtin
+copyright = '2021-2025, Claudio Satriano'  # pylint: disable=redefined-builtin
 author = 'Claudio Satriano'
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
