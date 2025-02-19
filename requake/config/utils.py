@@ -169,7 +169,8 @@ def update_config_file(config_file, configspec):
             v = None
         config_new[k] = v
     migrate_options = {
-        # 'old_option': 'new_option'
+        # 'old_option': 'new_option',
+        'waveform_data_path': 'sds_data_path',
     }
     for old_opt, new_opt in migrate_options.items():
         if old_opt in config_obj and config_obj[old_opt] != 'None':

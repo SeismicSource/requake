@@ -168,7 +168,7 @@ def _connect_station_dataselect():
         logger.info(
             f'Connected to FDSN station server: {config.fdsn_station_url}'
         )
-    if config.waveform_data_path is not None:
+    if config.sds_data_path is not None:
         _connect_sds()
     else:
         config.dataselect_client = FDSNClient(config.fdsn_dataselect_url)
@@ -182,16 +182,16 @@ def _connect_sds():
     """
     Connect to a local SeisComP Data Structure (SDS) archive.
     """
-    _client = SDSClient(config.waveform_data_path)
+    _client = SDSClient(config.sds_data_path)
     all_nslc = _client.get_all_nslc()
     if not all_nslc:
         raise FileNotFoundError(
-            f'No SDS archive found in {config.waveform_data_path}'
+            f'No SDS archive found in {config.sds_data_path}'
         )
     config.dataselect_client = _client
     logger.info(
         'Reading waveform data from local SDS archive: '
-        f'{config.waveform_data_path}'
+        f'{config.sds_data_path}'
     )
     all_nslc_str = '\n'.join('.'.join(nslc) for nslc in all_nslc)
     logger.info(f'Found the following NSLC codes:\n{all_nslc_str}')

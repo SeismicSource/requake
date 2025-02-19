@@ -4,6 +4,9 @@ Copyright (c) 2021-2025 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 
+Note: you might want to run `requake update_config` to update your config file
+to the latest version.
+
 - New option `--shorterthan` to select families with a duration shorter than a
   given value. For this option and for `--longerthan` it is now possible to
   specify the duration in seconds, minutes, hours, or months, in addition to
@@ -15,6 +18,7 @@ Copyright (c) 2021-2025 Claudio Satriano <satriano@ipgp.fr>
   attribute specified in `--colorby` is used.
 - New option `--range` to manually specify the range of values for the color
   scale
+- Option `waveform_data_path` renamed to `sds_data_path`
 - Add missing `street` map style for `map_families`
 - Initial support for plotting families found with template scan
 - Improved reading of CSV catalog files:
