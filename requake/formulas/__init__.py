@@ -11,4 +11,6 @@ Formulas for the Requake package.
 """
 from .moment import mag_to_moment  # noqa
 from .slip import mag_to_slip_in_cm  # noqa
-from .conversion import float_or_none, int_or_none  # noqa
+from .conversion import (  # noqa
+    float_or_none, int_or_none, field_match_score, guess_field_names
+)

@@ -12,37 +12,9 @@ Read an event catalog from a CSV file.
 import logging
 import csv
 from obspy import UTCDateTime
-from ..formulas import float_or_none, int_or_none
+from ..formulas import float_or_none, int_or_none, field_match_score
 from .catalog import RequakeCatalog, RequakeEvent, generate_evid
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
-
-
-def _field_match_score(field, field_list):
-    """
-    Return the length of the longest substring of field that matches any of
-    the field names in field_list.
-
-    :param field: field name
-    :type field: str
-    :param field_list: list of field names
-    :type field_list: list of str
-
-    :return: the length of the longest substring of field that matches any of
-        the field names in field_list
-    :rtype: int
-    """
-    # return a very high score for a perfect match
-    if field.lower().strip() in field_list:
-        return 999
-    scores = [
-        len(guess)
-        for guess in field_list
-        if guess in field.lower().strip()
-    ]
-    try:
-        return max(scores)
-    except ValueError:
-        return 0
 
 
 def _guess_field_names(input_fields):
@@ -57,6 +29,7 @@ def _guess_field_names(input_fields):
         longitude, depth, magnitude and magnitude type
     :rtype: dict
     """
+    # TODO: use the version in formulas.conversion
     field_guesses = {
         'evid': ['evid', 'event_id', 'eventid', 'event_id', 'id', 'evidid'],
         'orig_time': [
@@ -98,7 +71,7 @@ def _guess_field_names(input_fields):
     output_field_scores = {field: 0 for field in output_fields}
     for in_field in input_fields:
         for field_name, guess_list in field_guesses.items():
-            score = _field_match_score(in_field, guess_list)
+            score = field_match_score(in_field, guess_list)
             if score > output_field_scores[field_name]:
                 output_field_scores[field_name] = score
                 output_fields[field_name] = in_field
@@ -178,7 +151,7 @@ def read_catalog_from_csv(filename):
     """
     delimiter, nrows = _csv_file_info(filename)
     with open(filename, 'r', encoding='utf8') as fp:
-        reader = csv.DictReader(fp, delimiter=delimiter)
+        reader = csv.DictReader(fp, delimiter=delimiter, skipinitialspace=True)
         fields = _guess_field_names(reader.fieldnames)
         nrows -= 1  # first row is the header
         cat = RequakeCatalog()

@@ -17,7 +17,6 @@ import logging
 import signal
 import tqdm
 from obspy import UTCDateTime
-from obspy import read_inventory
 from obspy.clients.filesystem.sds import Client as SDSClient
 from obspy.clients.fdsn import Client as FDSNClient
 from obspy.clients.fdsn.header import FDSNNoServiceException
@@ -156,14 +155,7 @@ def _connect_station_dataselect():
 
     Those can be either FDSN web services or local files.
     """
-    if config.station_metadata_path is not None:
-        config.inventory = read_inventory(config.station_metadata_path)
-        config.station_client = None
-        logger.info(
-            'Reading station metadata from local file: '
-            f'{config.station_metadata_path}'
-        )
-    else:
+    if config.station_metadata_path is None:
         config.station_client = FDSNClient(config.fdsn_station_url)
         logger.info(
             f'Connected to FDSN station server: {config.fdsn_station_url}'
