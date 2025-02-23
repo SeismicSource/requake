@@ -18,6 +18,8 @@ to the latest version.
   attribute specified in `--colorby` is used.
 - New option `--range` to manually specify the range of values for the color
   scale
+- New option `--force` for commands that write files, to overwrite existing
+  files without asking
 - Config option `waveform_data_path` renamed to `sds_data_path`
 - New config option `event_data_path` to specify the path to a local directory
   with waveform files organized per event

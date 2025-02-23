@@ -88,6 +88,14 @@ def parse_arguments(progname='requake'):
         action='version',
         version=f"%(prog)s {get_versions()['version']}",
     )
+    # --- force
+    #     A parent parser for the "force" option,
+    #     used by several subparsers
+    force = argparse.ArgumentParser(add_help=False)
+    force.add_argument(
+        '-f', '--force', action='store_true',
+        help='force overwriting of existing files'
+    )
     # --- sample_config
     subparser.add_parser(
         'sample_config',
@@ -107,6 +115,7 @@ def parse_arguments(progname='requake'):
     # --- read_catalog
     read_catalog = subparser.add_parser(
         'read_catalog',
+        parents=[force],
         help='read an event catalog from web services or from a file',
         formatter_class=NewlineHelpFormatter
     )
@@ -154,6 +163,7 @@ def parse_arguments(progname='requake'):
     # --- scan_catalog
     subparser.add_parser(
         'scan_catalog',
+        parents=[force],
         help='scan an existing catalog for earthquake pairs'
     )
     # ---
@@ -185,6 +195,7 @@ def parse_arguments(progname='requake'):
     # --- build_families
     subparser.add_parser(
         'build_families',
+        parents=[force],
         help='build families of repeating earthquakes from a catalog of pairs'
     )
     # ---

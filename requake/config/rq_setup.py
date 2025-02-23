@@ -262,19 +262,19 @@ def configure(args):
     if (
         args.action == 'read_catalog' and
         not args.append and
-        not write_ok(config.scan_catalog_file)
+        not write_ok(config.scan_catalog_file, args.force)
     ):
         print('Exiting now.')
         sys.exit(0)
     if (
         args.action == 'scan_catalog' and
-        not write_ok(config.scan_catalog_pairs_file)
+        not write_ok(config.scan_catalog_pairs_file, args.force)
     ):
         print('Exiting now.')
         sys.exit(0)
     if (
         args.action == 'build_families' and
-        not write_ok(config.build_families_outfile)
+        not write_ok(config.build_families_outfile, args.force)
     ):
         print('Exiting now.')
         sys.exit(0)

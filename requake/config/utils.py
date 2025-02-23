@@ -43,15 +43,20 @@ def parse_configspec():
     return read_config(configspec_file)
 
 
-def write_ok(filepath):
+def write_ok(filepath, force=False):
     """
     Check if a file can be written.
 
     :param filepath: File path.
     :type filepath: str
+    :param force: Force writing.
+    :type force: bool
+
     :return: True if file can be written, False otherwise.
     :rtype: bool
     """
+    if force:
+        return True
     if os.path.exists(filepath):
         ans = input(
             f'"{filepath}" already exists. Do you want to overwrite it? [y/N] '
