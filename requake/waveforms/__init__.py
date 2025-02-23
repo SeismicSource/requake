@@ -10,7 +10,7 @@ Functions for waveform analysis.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 from .waveforms import (  # noqa
-    get_waveform, get_event_waveform,
+    get_waveform_from_client, get_event_waveform,
     get_waveform_pair, cc_waveform_pair,
     process_waveforms,
     align_pair, align_traces,

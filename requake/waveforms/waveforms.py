@@ -12,7 +12,9 @@ Functions for downloading and processing waveforms.
 import contextlib
 import logging
 from itertools import combinations
+from pathlib import Path
 import numpy as np
+from obspy import read
 from obspy import Stream, UTCDateTime
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.taup import TauPyModel
@@ -60,9 +62,24 @@ def _get_trace_id(ev):
     return min(distances, key=distances.get)
 
 
-def get_waveform(traceid, starttime, endtime):
-    """Download waveform for a given traceid, start and end time."""
+def get_waveform_from_client(traceid, starttime, endtime):
+    """
+    Get a waveform from a FDSN or SDS client.
+
+    :param traceid: trace id
+    :type traceid: str
+    :param starttime: start time
+    :type starttime: obspy.UTCDateTime
+    :param endtime: end time
+    :type endtime: obspy.UTCDateTime
+
+    :return: waveform trace
+    :rtype: obspy.Trace
+    """
     client = config.dataselect_client
+    if client is None:
+        raise NoWaveformError(
+            'No dataselect_client defined in the config file')
     net, sta, loc, chan = traceid.split('.')
     try:
         st = client.get_waveforms(
@@ -89,8 +106,134 @@ def get_waveform(traceid, starttime, endtime):
     return tr
 
 
+def _get_arrivals_and_distance(
+        trace_lat, trace_lon, ev_lat, ev_lon, ev_depth, orig_time):
+    """
+    Get arrivals and distance for a given trace and event
+
+    :param trace_lat: latitude of the trace
+    :type trace_lat: float
+    :param trace_lon: longitude of the trace
+    :type trace_lon: float
+    :param ev_lat: latitude of the event
+    :type ev_lat: float
+    :param ev_lon: longitude of the event
+    :type ev_lon: float
+    :param ev_depth: depth of the event
+    :type ev_depth: float
+    :param orig_time: origin time of the event
+    :type orig_time: obspy.UTCDateTime
+
+    :return: P and S arrivals and distance
+    :rtype: tuple of obspy.taup.Arrival, obspy.taup.Arrival, float, float
+    """
+    try:
+        p_arrival, s_arrival, distance, dist_deg = get_arrivals(
+            trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
+    except Exception as err:  # pylint: disable=broad-except
+        # Here we catch a broad exception because get_arrivals can raise
+        # different types of exceptions
+        raise ValueError(err) from err
+    p_arrival_time = orig_time + p_arrival.time  # pylint: disable=no-member
+    s_arrival_time = orig_time + s_arrival.time  # pylint: disable=no-member
+    return p_arrival_time, s_arrival_time, distance, dist_deg
+
+
+def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
+    """
+    Get a waveform for a given event and traceid through
+    an FDSN or SDS client.
+
+    :param evid: event id
+    :type evid: str
+    :param traceid: trace id
+    :type traceid: str
+    :param p_arrival_time: P arrival time
+    :type p_arrival_time: obspy.UTCDateTime
+
+    :return: waveform trace
+    :rtype: obspy.Trace
+
+    :raises NoWaveformError: if no waveform data is available
+    """
+    pre_p = config.cc_pre_P
+    trace_length = config.cc_trace_length
+    t0 = p_arrival_time - pre_p
+    t1 = t0 + trace_length
+    try:
+        return get_waveform_from_client(traceid, t0, t1)
+    except NoWaveformError as err:
+        msg = str(err).replace('\n', ' ')
+        raise NoWaveformError(
+            f'Unable to download waveform data for event {evid} '
+            f'and trace_id {traceid}. '
+            'Skipping event.\n'
+            f'Error message: {msg}'
+        ) from err
+
+
+def _get_event_waveform_from_event_data_parh(evid, traceid):
+    """
+    Get a waveform for a given event and traceid by selecting a pre-cut
+    trace from the event_data_path defined in the config.
+
+    :param evid: event id
+    :type evid: str
+    :param traceid: trace id
+    :type traceid: str
+
+    :return: waveform trace
+    :rtype: obspy.Trace
+
+    :raises NoWaveformError: if no waveform data is available
+    """
+    event_data_path = config.event_data_path
+    if event_data_path is None:
+        raise NoWaveformError('No event_data_path defined in the config file')
+    event_data_path = Path(event_data_path)
+    if not event_data_path.exists():
+        raise NoWaveformError(
+            f'Event data path "{event_data_path}" does not exist'
+        )
+    event_dir = next(
+        (subdir for subdir in event_data_path.iterdir()
+            if evid in subdir.name),
+        None)
+    if event_dir is None:
+        raise NoWaveformError(
+            f'No waveform data for event {evid} in "{event_data_path}"'
+        )
+    net, sta, loc, chan = traceid.split('.')
+    # no network code (either '' or '@@'), replace with a wildcard
+    if net in ['@@', '']:
+        net = '*'
+    # if station name contains an underscore or a dot, replace it with a jolly
+    # character (question mark)
+    sta = sta.replace('_', '?').replace('.', '?')
+    # an empty channel means all channels, replace with a wildcard
+    if chan == '':
+        chan = '*'
+    st = read(event_dir / '*').select(
+        network=net, station=sta, location=loc, channel=chan)
+    if not st:
+        raise NoWaveformError(
+            f'No waveform data for trace id: {traceid} in "{event_dir}"'
+        )
+    return st[0]
+
+
 def get_event_waveform(ev):
-    """Download waveform for a given event at a given trace_id."""
+    """
+    Download waveform for a given event and for trace_id defined in the config.
+
+    :param ev: an event
+    :type ev: RequakeEvent
+
+    :return: waveform trace
+    :rtype: obspy.Trace
+
+    :raises NoWaveformError: if no waveform data is available
+    """
     evid = ev.evid
     ev_lat = ev.lat
     ev_lon = ev.lon
@@ -111,14 +254,14 @@ def get_event_waveform(ev):
             'Skipping event.\n'
             f'Error message: {msg}'
         ) from err
-    trace_lat = traceid_coords[traceid]['latitude']
-    trace_lon = traceid_coords[traceid]['longitude']
+    coords = traceid_coords[traceid]
+    trace_lat = coords['latitude']
+    trace_lon = coords['longitude']
     try:
-        p_arrival, s_arrival, distance, dist_deg = get_arrivals(
-            trace_lat, trace_lon, ev_lat, ev_lon, ev_depth)
-    except Exception as err:  # pylint: disable=broad-except
-        # Here we catch a broad exception because get_arrivals can raise
-        # different types of exceptions
+        p_arrival_time, s_arrival_time, distance, dist_deg =\
+            _get_arrivals_and_distance(
+                trace_lat, trace_lon, ev_lat, ev_lon, ev_depth, orig_time)
+    except ValueError as err:
         msg = str(err).replace('\n', ' ')
         raise NoWaveformError(
             f'Unable to compute arrival times for event {evid} '
@@ -126,34 +269,26 @@ def get_event_waveform(ev):
             'Skipping event.\n'
             f'Error message: {msg}'
         ) from err
-    p_arrival_time = orig_time + p_arrival.time
-    s_arrival_time = orig_time + s_arrival.time
-    pre_p = config.cc_pre_P
-    trace_length = config.cc_trace_length
-    t0 = p_arrival_time - pre_p
-    t1 = t0 + trace_length
     try:
-        tr = get_waveform(traceid, t0, t1)
+        tr = _get_event_waveform_from_event_data_parh(evid, traceid)
     except NoWaveformError as err:
-        msg = str(err).replace('\n', ' ')
-        raise NoWaveformError(
-            f'Unable to download waveform data for event {evid} '
-            f'and trace_id {traceid}. '
-            'Skipping event.\n'
-            f'Error message: {msg}'
-        ) from err
-    tr.stats.evid = evid
-    tr.stats.ev_lat = ev_lat
-    tr.stats.ev_lon = ev_lon
-    tr.stats.ev_depth = ev_depth
-    tr.stats.orig_time = orig_time
-    tr.stats.mag = mag
-    tr.stats.mag_type = mag_type
-    tr.stats.coords = traceid_coords[traceid]
-    tr.stats.dist_deg = dist_deg
-    tr.stats.distance = distance
-    tr.stats.P_arrival_time = p_arrival_time
-    tr.stats.S_arrival_time = s_arrival_time
+        logger.warning(err)
+        tr = _get_event_waveform_from_client(evid, traceid, p_arrival_time)
+    tr_stats = {
+        'evid': evid,
+        'ev_lat': ev_lat,
+        'ev_lon': ev_lon,
+        'ev_depth': ev_depth,
+        'orig_time': orig_time,
+        'mag': mag,
+        'mag_type': mag_type,
+        'coords': coords,
+        'dist_deg': dist_deg,
+        'distance': distance,
+        'P_arrival_time': p_arrival_time,
+        'S_arrival_time': s_arrival_time
+    }
+    tr.stats.update(tr_stats)
     return tr
 
 
@@ -161,7 +296,7 @@ def process_waveforms(st):
     """Demean and filter a waveform trace or stream."""
     st = st.copy()
     st.detrend(type='demean')
-    st.taper(max_percentage=0.05)
+    st.taper(max_percentage=0.05, type='cosine')
     st.filter(
         type='bandpass',
         freqmin=config.cc_freq_min,
@@ -211,7 +346,7 @@ def get_waveform_pair(pair):
             skipped_evids.append(ev.evid)
             msg = str(err).replace('\n', ' ')
             raise NoWaveformError(
-                f'Unable to download waveform data for event {ev.evid} '
+                f'Unable to get waveform data for event {ev.evid} '
                 f'and trace_id {ev.trace_id}. '
                 'Skipping all pairs containig this event.\n'
                 f'Error message: {msg}'

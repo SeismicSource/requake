@@ -195,36 +195,32 @@ def manage_uncaught_exception(exception):
     import scipy as sp
     import obspy
     import matplotlib
-    sys.stderr.write("""
-# BEGIN TRACEBACK #############################################################
-""")
-    sys.stderr.write('\n')
-    traceback.print_exc()
-    sys.stderr.write("""
-# END TRACEBACK ###############################################################
-""")
-    sys.stderr.write("""
-
-Congratulations, you've found a bug in Requake! 🐞
-
-Please report it on https://github.com/SeismicSource/requake/issues
-or by email to satriano@ipgp.fr.
-
-Include the following information in your report:
-
-""")
-    sys.stderr.write(f'  Requake version: {__version__}\n')
-    sys.stderr.write(f'  Python version: {sys.version}\n')
-    sys.stderr.write(f'  NumPy version: {np.__version__}\n')
-    sys.stderr.write(f'  SciPy version: {sp.__version__}\n')
-    sys.stderr.write(f'  ObsPy version: {obspy.__version__}\n')
-    sys.stderr.write(f'  Matplotlib version: {matplotlib.__version__}\n')
-    sys.stderr.write(f'  Platform: {sys.platform}\n')
-    sys.stderr.write(f'  Command line: {" ".join(sys.argv)}\n')
-    sys.stderr.write(f'  Error message: {str(exception)}\n')
-    sys.stderr.write('\n')
+    import pygments
+    from pygments.lexers.python import PythonLexer
+    from pygments.formatters.terminal import TerminalFormatter
+    tb_str = ''.join(
+        traceback.format_exception(
+            type(exception), exception, exception.__traceback__))
+    colored_tb = pygments.highlight(tb_str, PythonLexer(), TerminalFormatter())
     sys.stderr.write(
-        'Also, please copy and paste the traceback above in your '
-        'report.\n\n')
-    sys.stderr.write('Thank you for your help!\n\n')
+        f'\n# BEGIN TRACEBACK {"#" * 62}\n'
+        f'\n{colored_tb}'
+        f'\n# END TRACEBACK {"#" * 62}\n\n'
+        "Congratulations, you've found a bug in Requake! 🐞\n\n"
+        'Please report it on https://github.com/SeismicSource/requake/issues\n'
+        'or by email to satriano@ipgp.fr.\n\n'
+        'Include the following information in your report:\n\n'
+        f'  Requake version: {__version__}\n'
+        f'  Python version: {sys.version}\n'
+        f'  NumPy version: {np.__version__}\n'
+        f'  SciPy version: {sp.__version__}\n'
+        f'  ObsPy version: {obspy.__version__}\n'
+        f'  Matplotlib version: {matplotlib.__version__}\n'
+        f'  Platform: {sys.platform}\n'
+        f'  Command line: {" ".join(sys.argv)}\n'
+        f'  Error message: {str(exception)}\n'
+        '\n'
+        'Also, please copy and paste the traceback above in your report.\n\n'
+        'Thank you for your help!\n\n'
+    )
     sys.exit(1)

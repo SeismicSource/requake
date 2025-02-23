@@ -19,7 +19,7 @@ from ..families import (
     FamilyNotFoundError
 )
 from ..waveforms import (
-    get_waveform, cc_waveform_pair, get_arrivals,
+    get_waveform_from_client, cc_waveform_pair, get_arrivals,
     NoWaveformError
 )
 from ..catalog import RequakeEvent, generate_evid
@@ -78,7 +78,7 @@ def _scan_family_template(template, catalog_file, t0, t1):
         tr = trace_cache[key]
     except KeyError:
         try:
-            tr = get_waveform(trace_id, t0, t1)
+            tr = get_waveform_from_client(trace_id, t0, t1)
             trace_cache[key] = tr
         except NoWaveformError as err:
             raise NoWaveformError(

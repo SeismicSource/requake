@@ -18,7 +18,9 @@ to the latest version.
   attribute specified in `--colorby` is used.
 - New option `--range` to manually specify the range of values for the color
   scale
-- Option `waveform_data_path` renamed to `sds_data_path`
+- Config option `waveform_data_path` renamed to `sds_data_path`
+- New config option `event_data_path` to specify the path to a local directory
+  with waveform files organized per event
 - Add missing `street` map style for `map_families`
 - Initial support for plotting families found with template scan
 - Improved reading of CSV catalog files:

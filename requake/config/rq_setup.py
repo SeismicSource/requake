@@ -160,14 +160,16 @@ def _connect_station_dataselect():
         logger.info(
             f'Connected to FDSN station server: {config.fdsn_station_url}'
         )
+    config.dataselect_client = None
     if config.sds_data_path is not None:
         _connect_sds()
-    else:
-        config.dataselect_client = FDSNClient(config.fdsn_dataselect_url)
-        logger.info(
-            'Connected to FDSN dataselect server: '
-            f'{config.fdsn_dataselect_url}'
-        )
+    if config.event_data_path is not None:
+        return
+    config.dataselect_client = FDSNClient(config.fdsn_dataselect_url)
+    logger.info(
+        'Connected to FDSN dataselect server: '
+        f'{config.fdsn_dataselect_url}'
+    )
 
 
 def _connect_sds():

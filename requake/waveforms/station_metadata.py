@@ -160,6 +160,78 @@ def _download_metadata():
     )
 
 
+def get_traceid_coords_old(orig_time=None):
+    """
+    Get coordinates for the trace_ids specified in config file.
+
+    :param orig_time: origin time
+    :type orig_time: obspy.UTCDateTime
+    :return: a dictionary with trace_id as key and coordinates as value
+    :rtype: dict
+
+    :raises MetadataMismatchError: if coordinates are not found
+    """
+    if config.inventory is None:
+        _read_station_metadata()
+    if config.inventory is None:
+        _download_metadata()
+    traceid_coords = {}
+    for trace_id in config.catalog_trace_id:
+        net, sta, loc, chan = trace_id.split('.')
+        net = net or '@@'
+        _trace_id = f'{net}.{sta}.{loc}.{chan}'
+        try:
+            coords = config.inventory.get_coordinates(_trace_id, orig_time)
+        # pylint: disable=broad-except
+        except Exception:
+            # note: get_coordinaets raises a generic Exception
+            # try again with empty channel code
+            try:
+                _trace_id = f'{net}.{sta}.{loc}.'
+                coords = config.inventory.get_coordinates(_trace_id, orig_time)
+            except Exception as err:
+                raise MetadataMismatchError(
+                    f'Unable to find coordinates for trace {trace_id} '
+                    f'at time {orig_time}'
+                ) from err
+        traceid_coords[trace_id] = coords
+    return traceid_coords
+
+
+def _fetch_coordinates(net, sta, loc, chan, orig_time):
+    """
+    Fetch coordinates for a trace_id at a given time.
+
+    Attempt to retrieve coordinates, first with full trace_id,
+    then without channel.
+
+    :param net: network code
+    :type net: str
+    :param sta: station code
+    :type sta: str
+    :param loc: location code
+    :type loc: str
+    :param chan: channel code
+    :type chan: str
+    :param orig_time: origin time
+    :type orig_time: obspy.UTCDateTime
+
+    :return: coordinates or None
+    :rtype: dict
+    """
+    for ch in [chan, '']:
+        _trace_id = f'{net}.{sta}.{loc}.{ch}'
+        try:
+            return config.inventory.get_coordinates(_trace_id, orig_time)
+        # pylint: disable=broad-except
+        # note: get_coordinaets raises a generic Exception
+        except Exception:
+            # Try next option if it fails
+            continue
+    # If both attempts fail, return None
+    return None
+
+
 def get_traceid_coords(orig_time=None):
     """
     Get coordinates for the trace_ids specified in config file.
@@ -177,13 +249,13 @@ def get_traceid_coords(orig_time=None):
         _download_metadata()
     traceid_coords = {}
     for trace_id in config.catalog_trace_id:
-        try:
-            coords = config.inventory.get_coordinates(trace_id, orig_time)
-        except Exception as err:
-            # note: get_coordinaets raises a generic Exception
+        net, sta, loc, chan = trace_id.split('.')
+        net = net or '@@'
+        coords = _fetch_coordinates(net, sta, loc, chan, orig_time)
+        if coords is None:
             raise MetadataMismatchError(
                 f'Unable to find coordinates for trace {trace_id} '
                 f'at time {orig_time}'
-            ) from err
+            )
         traceid_coords[trace_id] = coords
     return traceid_coords
