@@ -33,6 +33,7 @@ dependencies = [
     "argcomplete",
     "tqdm",
     "tabulate",
+    "pygments",
 ]
 
 [project.license]
