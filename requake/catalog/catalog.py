@@ -270,7 +270,7 @@ def read_stored_catalog():
         raise ValueError(
             f'Error reading catalog file {config.scan_catalog_file}: {err}'
         ) from err
-    except FileNotFoundError as err:
+    except (FileNotFoundError, NotADirectoryError) as err:
         raise FileNotFoundError(
             f'Catalog file {config.scan_catalog_file} not found'
         ) from err
