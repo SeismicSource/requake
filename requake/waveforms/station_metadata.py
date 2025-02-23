@@ -105,7 +105,6 @@ def _read_station_metadata():
     if smd_path is None:
         config.inventory = None
         return
-    config.inventory = _read_station_metadata_from_csv(smd_path)
     try:
         config.inventory = read_inventory(smd_path)
     except (FileNotFoundError, TypeError):
