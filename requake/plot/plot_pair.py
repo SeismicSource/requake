@@ -74,7 +74,7 @@ def plot_pair():
     fig.canvas.manager.set_window_title(title)
     title = f'{tr1.stats.evid}-{tr2.stats.evid} CC: {cc_max:.2f}'
     ax[0].set_title(title, loc='left')
-    title = f'{tr1.id} | {config.cc_freq_min:.1f}-{config.cc_freq_max:.1f} Hz'
+    title = f'{tr1.id} | {tr1.stats.freq_min:.1f}-{tr1.stats.freq_max:.1f} Hz'
     ax[0].set_title(title, loc='right')
     stats1 = tr1.stats
     stats2 = tr2.stats

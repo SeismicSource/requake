@@ -20,6 +20,8 @@ to the latest version.
   scale
 - New option `--force` for commands that write files, to overwrite existing
   files without asking
+- New option `--freq_band` for trace plotting commands, to override the
+  frequency band specified in the config file
 - Config option `waveform_data_path` renamed to `sds_data_path`
 - New config option `event_data_path` to specify the path to a local directory
   with waveform files organized per event

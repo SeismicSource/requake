@@ -302,16 +302,39 @@ def get_event_waveform(ev):
     return tr
 
 
-def process_waveforms(st):
-    """Demean and filter a waveform trace or stream."""
-    st = st.copy()
-    st.detrend(type='demean')
-    st.taper(max_percentage=0.05, type='cosine')
-    st.filter(
+def process_waveforms(tr_or_st):
+    """
+    Demean and filter a waveform trace or stream.
+
+    :param tr_or_st: waveform stream or trace
+    :type tr_or_st: obspy.Stream or obspy.Trace
+
+    :return: processed waveform stream or trace
+    :rtype: obspy.Stream or obspy.Trace
+    """
+    tr_or_st = tr_or_st.copy()
+    tr_or_st.detrend(type='demean')
+    tr_or_st.taper(max_percentage=0.05, type='cosine')
+    freq_min = (
+        config.args.freq_band[0] if config.args.freq_band else
+        config.cc_freq_min
+    )
+    freq_max = (
+        config.args.freq_band[1] if config.args.freq_band else
+        config.cc_freq_max
+    )
+    tr_or_st.filter(
         type='bandpass',
-        freqmin=config.cc_freq_min,
-        freqmax=config.cc_freq_max)
-    return st
+        freqmin=freq_min,
+        freqmax=freq_max)
+    if isinstance(tr_or_st, Stream):
+        for tr in tr_or_st:
+            tr.stats.freq_min = freq_min
+            tr.stats.freq_max = freq_max
+    else:
+        tr_or_st.stats.freq_min = freq_min
+        tr_or_st.stats.freq_max = freq_max
+    return tr_or_st
 
 
 skipped_evids = []

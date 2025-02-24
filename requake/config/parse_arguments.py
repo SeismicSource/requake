@@ -183,6 +183,7 @@ def parse_arguments(progname='requake'):
         type=float, default=None,
         help='maximum cross-correlation coefficient (default: %(default)s)'
     )
+    # ---
     # --- traceid
     #     a parent parser for the "traceid" option,
     #     used by several subparsers
@@ -192,10 +193,21 @@ def parse_arguments(progname='requake'):
         help='use this traceid instead of the one set in the config file'
     )
     # ---
+    # --- freq_band
+    #     a parent parser for the "freq_band" option,
+    #     used by several subparsers
+    freq_band = argparse.ArgumentParser(add_help=False)
+    freq_band.add_argument(
+        '-F', '--freq_band', nargs=2, type=float, default=None,
+        metavar=('FREQ_MIN', 'FREQ_MAX'),
+        help='use this frequency band instead of the one set in the '
+             'config file. Specify FREQ_MIN and FREQ_MAX in Hz.'
+    )
+    # ---
     # --- plot_pair
     plot_pair = subparser.add_parser(
         'plot_pair',
-        parents=[traceid],
+        parents=[traceid, freq_band],
         help='plot traces for a given event pair'
     )
     plot_pair.add_argument('evid1')
@@ -308,7 +320,10 @@ def parse_arguments(progname='requake'):
     # --- plot_families
     plotfamilies = subparser.add_parser(
         'plot_families',
-        parents=[longerthan, shorterthan, minevents, family_numbers, traceid],
+        parents=[
+            longerthan, shorterthan, minevents, family_numbers,
+            traceid, freq_band
+        ],
         help='plot traces for one ore more event families'
     )
     plotfamilies.add_argument(
