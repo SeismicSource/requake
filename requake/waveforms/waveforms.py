@@ -242,8 +242,10 @@ def get_event_waveform(ev):
     orig_time = ev.orig_time
     mag = ev.mag
     mag_type = ev.mag_type
-    traceid = ev.trace_id if config.args.traceid is None\
+    traceid = (
+        ev.trace_id if config.args.traceid is None
         else config.args.traceid
+    )
     try:
         traceid_coords = get_traceid_coords(orig_time)
     except MetadataMismatchError as err:
@@ -254,7 +256,15 @@ def get_event_waveform(ev):
             'Skipping event.\n'
             f'Error message: {msg}'
         ) from err
-    coords = traceid_coords[traceid]
+    try:
+        coords = traceid_coords[traceid]
+    except KeyError as err:
+        msg = str(err).replace('\n', ' ')
+        raise NoWaveformError(
+            f'No metadata for trace_id {traceid} '
+            'in the metadata file. Skipping event.\n'
+            f'Error message: {msg}'
+        ) from err
     trace_lat = coords['latitude']
     trace_lon = coords['longitude']
     try:

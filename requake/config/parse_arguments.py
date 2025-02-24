@@ -183,10 +183,19 @@ def parse_arguments(progname='requake'):
         type=float, default=None,
         help='maximum cross-correlation coefficient (default: %(default)s)'
     )
+    # --- traceid
+    #     a parent parser for the "traceid" option,
+    #     used by several subparsers
+    traceid = argparse.ArgumentParser(add_help=False)
+    traceid.add_argument(
+        '-t', '--traceid', type=str, default=None,
+        help='use this traceid instead of the one set in the config file'
+    )
     # ---
     # --- plot_pair
     plot_pair = subparser.add_parser(
         'plot_pair',
+        parents=[traceid],
         help='plot traces for a given event pair'
     )
     plot_pair.add_argument('evid1')
@@ -285,14 +294,6 @@ def parse_arguments(progname='requake'):
              '-c/--colorby option. Note that for "duration" the range is '
              'expressed in years. Also note that this option is ignored if '
              'the -c/--colorby option is set to "family_number".'
-    )
-    # --- traceid
-    #     a parent parser for the "traceid" option,
-    #     used by several subparsers
-    traceid = argparse.ArgumentParser(add_help=False)
-    traceid.add_argument(
-        '-t', '--traceid', type=str, default=None,
-        help='use this traceid instead of the default one for the family'
     )
     # ---
     # --- print_families

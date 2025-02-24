@@ -233,7 +233,7 @@ def _fetch_coordinates(net, sta, loc, chan, orig_time):
 
 def get_traceid_coords(orig_time=None):
     """
-    Get coordinates for the trace_ids specified in config file.
+    Get coordinates for the trace_ids specified in config file or from args.
 
     :param orig_time: origin time
     :type orig_time: obspy.UTCDateTime
@@ -247,7 +247,10 @@ def get_traceid_coords(orig_time=None):
     if config.inventory is None:
         _download_metadata()
     traceid_coords = {}
-    for trace_id in config.catalog_trace_id:
+    traceid_list = config.catalog_trace_id
+    if config.args.traceid is not None:
+        traceid_list.append(config.args.traceid)
+    for trace_id in traceid_list:
         net, sta, loc, chan = trace_id.split('.')
         net = net or '@@'
         coords = _fetch_coordinates(net, sta, loc, chan, orig_time)
