@@ -251,7 +251,13 @@ def get_traceid_coords(orig_time=None):
     if config.args.traceid is not None:
         traceid_list.append(config.args.traceid)
     for trace_id in traceid_list:
-        net, sta, loc, chan = trace_id.split('.')
+        try:
+            net, sta, loc, chan = trace_id.split('.')
+        except ValueError as err:
+            raise MetadataMismatchError(
+                f'Invalid trace_id: {trace_id}. Must be in the format '
+                'NET.STA.LOC.CHAN'
+            ) from err
         net = net or '@@'
         coords = _fetch_coordinates(net, sta, loc, chan, orig_time)
         if coords is None:
