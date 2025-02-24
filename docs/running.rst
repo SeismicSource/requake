@@ -44,12 +44,20 @@ Certain commands (e.g., ``plot_pair``\ ) require further arguments
 
 Requake supports command line tab completion for commands and arguments, thanks
 to `argcomplete <https://kislyuk.github.io/argcomplete/>`_.
-To enable command line tab completion, add the following line to your
-``.bashrc`` or ``.zshrc``:
+To enable command line tab completion run:
 
 .. code-block::
 
-   eval "$(register-python-argcomplete requake)"
+    activate-global-python-argcomplete
+
+
+(This is a one-time command that needs to be run only once).
+
+Or, alternatively, add the following line to your ``.bashrc`` or ``.zshrc``:
+
+.. code-block::
+
+    eval "$(register-python-argcomplete requake)"
 
 
 Typical workflow

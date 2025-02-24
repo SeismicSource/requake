@@ -20,18 +20,43 @@ It can either scan an existing earthquake catalog to search for similar events,
 or perform template matching on a continuous waveform stream.
 
 Catalogs and waveforms can be read from local files or downloaded using
-standard [FDSN web services](https://www.fdsn.org/webservices/).
+standard [FDSN web services].
 
-Requake is written in Python and uses [ObsPy](https://obspy.org) as backend.
+Requake is written in Python and uses [ObsPy] as backend.
 
 ## Installation
 
 ### Installing the latest release
 
-#### Using pip and PyPI (preferred method)
+#### Using Anaconda
 
-The latest release of Requake is available on the
-[Python Package Index](https://pypi.org/project/requake/).
+The following command will automatically create an [Anaconda] environment
+named `requake`, install the required packages and install the latest
+version of SourceSpec via `pip`:
+
+    conda env create --file https://raw.githubusercontent.com/SeismicSource/requake/main/requake_conda_env.yml
+
+If you want a different name for your environment, use:
+
+    conda env create -n YOUR_ENV_NAME --file https://raw.githubusercontent.com/SeismicSource/requake/main/requake_conda_env.yml
+
+Activate the environment with:
+
+    conda activate requake
+
+(or `conda activate YOUR_ENV_NAME`)
+
+To keep Requake updated run the following command from within the environment:
+
+    pip install --upgrade requake
+
+Or, to switch to a development snapshot, run:
+
+    pip install git+https://github.com/SeismicSource/requake.git
+
+#### Using pip and PyPI
+
+The latest release of Requake is available on the [Python Package Index].
 
 You can install it easily through `pip`:
 
@@ -41,8 +66,7 @@ You can install it easily through `pip`:
 
 If you need a recent feature that is not in the latest release (see the
 `unreleased` section in [CHANGELOG][changelog-link]), you want to use the more
-recent development snapshot from the
-[Requake GitHub repository](https://github.com/SeismicSource/requake).
+recent development snapshot from the [Requake GitHub repository].
 
 #### Using pip
 
@@ -114,9 +138,14 @@ Certain commands (e.g., `plot_pair`) require further arguments (use, e.g.,
 `requake plot_pair -h` to get help).
 
 Requake supports command line tab completion for commands and arguments, thanks
-to [argcomplete](https://kislyuk.github.io/argcomplete/).
-To enable command line tab completion, add the following line to your `.bashrc`
-or `.zshrc`:
+to [argcomplete].
+To enable command line tab completion run:
+
+    activate-global-python-argcomplete
+
+(This is a one-time command that needs to be run only once).
+
+Or, alternatively, add the following line to your `.bashrc` or `.zshrc`:
 
     eval "$(register-python-argcomplete requake)"
 
@@ -182,6 +211,14 @@ You can also cite the following abstract presented at the
 [changelog-link]: https://github.com/SeismicSource/requake/blob/main/CHANGELOG.md
 [DOI-badge]: https://zenodo.org/badge/DOI/10.5281/zenodo.10832204.svg
 [DOI-link]: https://doi.org/10.5281/zenodo.10832204
+[Requake GitHub repository]: https://github.com/SeismicSource/requake
+
+<!-- External links -->
+[FDSN web services]: https://www.fdsn.org/webservices/
+[ObsPy]: https://obspy.org
+[Anaconda]: https://www.anaconda.com/download
+[Python Package Index]: https://pypi.org/project/requake/
+[argcomplete]: https://kislyuk.github.io/argcomplete/
 
 <!-- References -->
 [doi: 10.5281/ZENODO.10832204]: https://doi.org/10.5281/ZENODO.10832204

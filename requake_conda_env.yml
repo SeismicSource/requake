@@ -1,0 +1,16 @@
+name: requake
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.7
+  - conda
+  - scipy>=1.5.0
+  - obspy>=1.2.0
+  - cartopy
+  - argcomplete
+  - tqdm
+  - tabulate
+  - pygments
+  - pip
+  - pip:
+    - requake
