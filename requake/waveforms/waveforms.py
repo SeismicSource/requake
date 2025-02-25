@@ -204,9 +204,8 @@ def _get_event_waveform_from_event_data_path(evid, traceid):
             f'No waveform data for event {evid} in "{event_data_path}"'
         )
     net, sta, loc, chan = traceid.split('.')
-    # no network code (either '' or '@@'), replace with a wildcard
-    if net in ['@@', '']:
-        net = '*'
+    # replace '@@' with an empty network code
+    net = net if net != '@@' else ''
     # if station name contains an underscore or a dot, replace it with a jolly
     # character (question mark)
     sta = sta.replace('_', '?').replace('.', '?')
