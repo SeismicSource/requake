@@ -136,7 +136,7 @@ def _plot_family(family):
     fig.canvas.manager.set_window_title(title)
     title = (
         f'{tr0.id} | {tr0.stats.distance:.1f} km | '
-        f'{config.cc_freq_min:.1f}-{config.cc_freq_max:.1f} Hz'
+        f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f} Hz'
     )
     ax.set_title(title, loc='right')
 
