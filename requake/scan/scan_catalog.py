@@ -32,6 +32,22 @@ def _pair_ok(pair):
     return distance <= config.catalog_search_range
 
 
+def _fix_trace_id(stats):
+    """
+    Fix trace_id in a ObsPy stats object by replacing dots with underscores.
+    This makes trace_id compliant with the FDSN standard.
+
+    The fixes are done in place.
+
+    :param stats: ObsPy stats object
+    :type stats: ObsPy AttribDict
+    """
+    stats.network = stats.network.replace('.', '_')
+    stats.station = stats.station.replace('.', '_')
+    stats.location = stats.location.replace('.', '_')
+    stats.channel = stats.channel.replace('.', '_')
+
+
 def _process_pairs(fp_out, nevents, catalog):
     """Process event pairs."""
     fieldnames = [
@@ -55,6 +71,9 @@ def _process_pairs(fp_out, nevents, catalog):
                 lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
                 stats1 = tr1.stats
                 stats2 = tr2.stats
+                _fix_trace_id(stats1)
+                _fix_trace_id(stats2)
+                print(tr1.id, tr2.id)
                 writer.writerow([
                     stats1.evid, stats2.evid, tr1.id,
                     stats1.orig_time, stats1.ev_lon, stats1.ev_lat,
