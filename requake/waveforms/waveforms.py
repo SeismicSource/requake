@@ -431,6 +431,8 @@ def cc_waveform_pair(tr1, tr2, mode='events'):
 def align_pair(tr1, tr2):
     """Align tr2 respect to tr1 using cross-correlation."""
     lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
+    # make sure lag is an integer
+    lag = int(round(lag))
     # apply lag to trace #2
     # if lag is positive, trace #2 is delayed
     if lag > 0:
@@ -486,6 +488,11 @@ def _stack_traces(st):
         data = tr.data
         if config.normalize_traces_before_averaging:
             data /= abs(tr.max())
+        # make sure that the two traces have the same length
+        if len(data) < len(tr_stack.data):
+            data = np.pad(data, (0, len(tr_stack.data)-len(data)))
+        elif len(data) > len(tr_stack.data):
+            data = data[:len(tr_stack.data)]
         tr_stack.data += data
         p_arrival += tr.stats.P_arrival_time - tr.stats.starttime
         s_arrival += tr.stats.S_arrival_time - tr.stats.starttime
