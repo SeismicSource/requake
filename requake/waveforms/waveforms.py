@@ -172,7 +172,7 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
         ) from err
 
 
-def _get_event_waveform_from_event_data_parh(evid, traceid):
+def _get_event_waveform_from_event_data_path(evid, traceid):
     """
     Get a waveform for a given event and traceid by selecting a pre-cut
     trace from the event_data_path defined in the config.
@@ -280,7 +280,7 @@ def get_event_waveform(ev):
             f'Error message: {msg}'
         ) from err
     try:
-        tr = _get_event_waveform_from_event_data_parh(evid, traceid)
+        tr = _get_event_waveform_from_event_data_path(evid, traceid)
     except NoWaveformError as err:
         logger.warning(err)
         tr = _get_event_waveform_from_client(evid, traceid, p_arrival_time)
