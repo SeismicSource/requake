@@ -278,11 +278,22 @@ def get_event_waveform(ev):
             'Skipping event.\n'
             f'Error message: {msg}'
         ) from err
+    waveform_errors = []
     try:
         tr = _get_event_waveform_from_event_data_path(evid, traceid)
-    except NoWaveformError as err:
-        logger.warning(err)
-        tr = _get_event_waveform_from_client(evid, traceid, p_arrival_time)
+    except NoWaveformError as err1:
+        waveform_errors.append(str(err1))
+        try:
+            tr = _get_event_waveform_from_client(evid, traceid, p_arrival_time)
+        except NoWaveformError as err2:
+            waveform_errors.append(str(err2))
+            msg = ' '.join(waveform_errors)
+            raise NoWaveformError(
+                f'Unable to get waveform data for event {evid} '
+                f'and trace_id {traceid}. '
+                'Skipping event.\n'
+                f'Error messages: {msg}'
+            ) from err2
     tr_stats = {
         'evid': evid,
         'ev_lat': ev_lat,
