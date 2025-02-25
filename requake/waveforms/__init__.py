@@ -18,6 +18,6 @@ from .waveforms import (  # noqa
     NoWaveformError
 )
 from .station_metadata import (  # noqa
-    get_traceid_coords, NoMetadataError, MetadataMismatchError
+    load_inventory, get_traceid_coords, NoMetadataError, MetadataMismatchError
 )
 from .arrivals import get_arrivals  # noqa

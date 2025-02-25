@@ -159,6 +159,18 @@ def _download_metadata():
     )
 
 
+def load_inventory():
+    """
+    Load the inventory object if not already loaded.
+
+    The inventory is stored in the config object.
+    """
+    if config.inventory is None:
+        _read_station_metadata()
+    if config.inventory is None:
+        _download_metadata()
+
+
 def _fetch_coordinates(net, sta, loc, chan, orig_time):
     """
     Fetch coordinates for a trace_id at a given time.
@@ -204,10 +216,7 @@ def get_traceid_coords(orig_time=None):
 
     :raises MetadataMismatchError: if coordinates are not found
     """
-    if config.inventory is None:
-        _read_station_metadata()
-    if config.inventory is None:
-        _download_metadata()
+    load_inventory()
     traceid_coords = {}
     traceid_list = config.catalog_trace_id
     if config.args.traceid is not None:

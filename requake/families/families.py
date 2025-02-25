@@ -21,7 +21,7 @@ from ..config import config
 from ..formulas import float_or_none, mag_to_slip_in_cm, mag_to_moment
 from ..catalog import RequakeEvent
 from ..waveforms import (
-    get_event_waveform, align_traces, build_template,
+    load_inventory, get_event_waveform, align_traces, build_template,
     NoWaveformError
 )
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -309,6 +309,8 @@ def get_family_waveforms(family):
 
     :raises NoWaveformError: if no waveform is found
     """
+    # make sure inventory is loaded in the config object
+    load_inventory()
     st = Stream()
     nevs = len(family)
     clear_line = '\x1b[2K\r'  # escape sequence to clear line
