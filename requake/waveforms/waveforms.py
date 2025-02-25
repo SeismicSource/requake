@@ -316,12 +316,12 @@ def process_waveforms(tr_or_st):
     tr_or_st.detrend(type='demean')
     tr_or_st.taper(max_percentage=0.05, type='cosine')
     freq_min = (
-        config.args.freq_band[0] if config.args.freq_band else
-        config.cc_freq_min
+        config.args.freq_band[0] if getattr(config.args, 'freq_band', None)
+        else config.cc_freq_min
     )
     freq_max = (
-        config.args.freq_band[1] if config.args.freq_band else
-        config.cc_freq_max
+        config.args.freq_band[1] if getattr(config.args, 'freq_band', None)
+        else config.cc_freq_max
     )
     tr_or_st.filter(
         type='bandpass',
