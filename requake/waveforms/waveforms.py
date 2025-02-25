@@ -438,18 +438,55 @@ def align_pair(tr1, tr2):
 
 
 def align_traces(st):
-    """Align traces in stream using cross-correlation."""
+    """
+    Align traces in stream using cross-correlation.
+
+    :param st: stream of traces
+    :type st: obspy.Stream
+    """
+    # first, align all traces to the first one
+    tr0 = st[0]
+    for tr in st[1:]:
+        _, _, cc_max = align_pair(tr0, tr)
+    # then, align all traces to the stacked trace; repeat twice
+    for _ in range(2):
+        tr_stack = _stack_traces(st)
+        for tr in st:
+            _, _, cc_max = align_pair(tr_stack, tr)
+            tr.stats.cc_mean = cc_max
+
+
+def _stack_traces(st):
+    """
+    Stack traces in stream.
+
+    :param st: stream of traces
+    :type st: obspy.Stream
+
+    :return: stacked trace
+    :rtype: obspy.Trace
+    """
+    tr_stack = st[0].copy()
+    tr_stack.data *= 0.
+    p_arrival = 0.
+    s_arrival = 0.
     for tr in st:
-        tr.stats.cc_mean = 0
-        tr.stats.cc_npairs = 0
-    for tr1, tr2 in combinations(st, 2):
-        _, _, cc_max = align_pair(tr1, tr2)
-        tr1.stats.cc_mean += cc_max
-        tr1.stats.cc_npairs += 1
-        tr2.stats.cc_mean += cc_max
-        tr2.stats.cc_npairs += 1
-    for tr in st:
-        tr.stats.cc_mean /= tr.stats.cc_npairs
+        tr.detrend('demean')
+        data = tr.data
+        if config.normalize_traces_before_averaging:
+            data /= abs(tr.max())
+        tr_stack.data += data
+        p_arrival += tr.stats.P_arrival_time - tr.stats.starttime
+        s_arrival += tr.stats.S_arrival_time - tr.stats.starttime
+    tr_stack.data /= len(st)
+    p_arrival /= len(st)
+    s_arrival /= len(st)
+    tr_stack.stats.starttime = UTCDateTime('1900/01/01T00:00:00')
+    tr_stack.stats.P_arrival_time = tr_stack.stats.starttime + p_arrival
+    tr_stack.stats.S_arrival_time = tr_stack.stats.starttime + s_arrival
+    tr_stack.stats.cc_mean = 0
+    tr_stack.stats.cc_npairs = 0
+    return tr_stack
 
 
 def build_template(st, family):
@@ -458,20 +495,7 @@ def build_template(st, family):
 
     Assumes that the stream is realigned.
     """
-    tr_template = st[0].copy()
-    tr_template.data *= 0.
-    p_arrival = 0.
-    s_arrival = 0.
-    for tr in st:
-        data = tr.data
-        if config.normalize_traces_before_averaging:
-            data /= abs(tr.max())
-        tr_template.data += data
-        p_arrival += tr.stats.P_arrival_time - tr.stats.starttime
-        s_arrival += tr.stats.S_arrival_time - tr.stats.starttime
-    tr_template.data /= len(st)
-    p_arrival /= len(st)
-    s_arrival /= len(st)
+    tr_template = _stack_traces(st)
     tr_template.stats.evid = f'average{family.number:02d}'
     tr_template.stats.ev_lat = family.lat
     tr_template.stats.ev_lon = family.lon
@@ -488,9 +512,4 @@ def build_template(st, family):
     distance /= 1e3
     tr_template.stats.dist_deg = dist_deg
     tr_template.stats.distance = distance
-    tr_template.stats.starttime = UTCDateTime('1900/01/01T00:00:00')
-    tr_template.stats.P_arrival_time = tr_template.stats.starttime + p_arrival
-    tr_template.stats.S_arrival_time = tr_template.stats.starttime + s_arrival
-    tr_template.stats.cc_mean = 0
-    tr_template.stats.cc_npairs = 0
     st.append(tr_template)
