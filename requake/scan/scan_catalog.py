@@ -9,6 +9,7 @@ Catalog-based repeater scan for Requake.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
+import sys
 import logging
 import csv
 from math import factorial
@@ -60,35 +61,41 @@ def _process_pairs(fp_out, nevents, catalog):
     writer.writerow(fieldnames)
     npairs = int(factorial(nevents)/(factorial(2)*factorial(nevents-2)))
     logger.info(f'Processing {npairs:n} event pairs')
-    with tqdm(total=npairs, unit='pairs', unit_scale=True) as pbar:
-        for pair in combinations(catalog, 2):
+    # Only show progress bar if running in a terminal
+    pbar = (
+        tqdm(total=npairs, unit='pairs', unit_scale=True)
+        if sys.stderr.isatty()
+        else None
+    )
+    for pair in combinations(catalog, 2):
+        if pbar is not None:
             pbar.update()
-            if not _pair_ok(pair):
-                continue
-            try:
-                pair_st = get_waveform_pair(pair)
-                tr1, tr2 = pair_st.traces
-                lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
-                stats1 = tr1.stats
-                stats2 = tr2.stats
-                _fix_trace_id(stats1)
-                _fix_trace_id(stats2)
-                print(tr1.id, tr2.id)
-                writer.writerow([
-                    stats1.evid, stats2.evid, tr1.id,
-                    stats1.orig_time, stats1.ev_lon, stats1.ev_lat,
-                    stats1.ev_depth, stats1.mag_type, stats1.mag,
-                    stats2.orig_time, stats2.ev_lon, stats2.ev_lat,
-                    stats2.ev_depth, stats2.mag_type, stats2.mag,
-                    lag, lag_sec, cc_max
-                ])
-            except (NoMetadataError, MetadataMismatchError) as msg:
-                logger.error(msg)
-                rq_exit(1)
-            except NoWaveformError as msg:
-                # Do not print empty messages
-                if str(msg):
-                    logger.warning(msg)
+        if not _pair_ok(pair):
+            continue
+        try:
+            pair_st = get_waveform_pair(pair)
+            tr1, tr2 = pair_st.traces
+            lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
+            stats1 = tr1.stats
+            stats2 = tr2.stats
+            _fix_trace_id(stats1)
+            _fix_trace_id(stats2)
+            print(tr1.id, tr2.id)
+            writer.writerow([
+                stats1.evid, stats2.evid, tr1.id,
+                stats1.orig_time, stats1.ev_lon, stats1.ev_lat,
+                stats1.ev_depth, stats1.mag_type, stats1.mag,
+                stats2.orig_time, stats2.ev_lon, stats2.ev_lat,
+                stats2.ev_depth, stats2.mag_type, stats2.mag,
+                lag, lag_sec, cc_max
+            ])
+        except (NoMetadataError, MetadataMismatchError) as msg:
+            logger.error(msg)
+            rq_exit(1)
+        except NoWaveformError as msg:
+            # Do not print empty messages
+            if str(msg):
+                logger.warning(msg)
     return npairs
 
 
