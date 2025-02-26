@@ -90,6 +90,29 @@ def _color_handler_emit(fn):
     return new
 
 
+def _setup_tqdm_logging(logger_root):
+    """Set up a tqdm logging handler."""
+
+    class TqdmLoggingHandler(logging.Handler):
+        """A logging handler that writes to tqdm."""
+        def __init__(self, level=logging.NOTSET):
+            super().__init__(level)
+
+        def emit(self, record):
+            try:
+                msg = self.format(record)
+                tqdm.tqdm.write(msg)
+                self.flush()
+            except (ValueError, TypeError, IOError, OSError):
+                self.handleError(record)
+    console = TqdmLoggingHandler()
+    console.setLevel(logging.INFO)
+    # Add logger color coding on all platforms but win32
+    if sys.platform != 'win32' and sys.stdout.isatty():
+        console.emit = _color_handler_emit(console.emit)
+    logger_root.addHandler(console)
+
+
 def _setup_logging(progname, action_name):
     """Set up the logging infrastructure."""
     global logger
@@ -118,24 +141,14 @@ def _setup_logging(progname, action_name):
         filehand.setFormatter(formatter)
         logger_root.addHandler(filehand)
 
-    class TqdmLoggingHandler(logging.Handler):
-        """A logging handler that writes to tqdm."""
-        def __init__(self, level=logging.NOTSET):
-            super().__init__(level)
-
-        def emit(self, record):
-            try:
-                msg = self.format(record)
-                tqdm.tqdm.write(msg)
-                self.flush()
-            except (ValueError, TypeError, IOError, OSError):
-                self.handleError(record)
-    console = TqdmLoggingHandler()
-    console.setLevel(logging.INFO)
-    # Add logger color coding on all platforms but win32
-    if sys.platform != 'win32' and sys.stdout.isatty():
-        console.emit = _color_handler_emit(console.emit)
-    logger_root.addHandler(console)
+    if sys.stderr.isatty():
+        _setup_tqdm_logging(logger_root)
+    else:
+        console = logging.StreamHandler()
+        console.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(levelname)-8s %(message)s')
+        console.setFormatter(formatter)
+        logger_root.addHandler(console)
 
     logger = logging.getLogger(progname)
 
