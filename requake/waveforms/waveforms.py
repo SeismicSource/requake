@@ -11,7 +11,6 @@ Functions for downloading and processing waveforms.
 """
 import contextlib
 import logging
-from itertools import combinations
 from pathlib import Path
 import numpy as np
 from obspy import read
