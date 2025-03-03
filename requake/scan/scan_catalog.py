@@ -80,7 +80,6 @@ def _process_pairs(fp_out, nevents, catalog):
             stats2 = tr2.stats
             _fix_trace_id(stats1)
             _fix_trace_id(stats2)
-            print(tr1.id, tr2.id)
             writer.writerow([
                 stats1.evid, stats2.evid, tr1.id,
                 stats1.orig_time, stats1.ev_lon, stats1.ev_lat,
