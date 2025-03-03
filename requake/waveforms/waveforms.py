@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Functions for downloading and processing waveforms.
+Functions for fetching and processing waveforms.
 
 :copyright:
     2021-2025 Claudio Satriano <satriano@ipgp.fr>
@@ -164,7 +164,7 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
     except NoWaveformError as err:
         msg = str(err).replace('\n', ' ')
         raise NoWaveformError(
-            f'Unable to download waveform data for event {evid} '
+            f'Unable to get waveform data for event {evid} '
             f'and trace_id {traceid}. '
             'Skipping event.\n'
             f'Error message: {msg}'
@@ -222,7 +222,8 @@ def _get_event_waveform_from_event_data_path(evid, traceid):
 
 def get_event_waveform(ev):
     """
-    Download waveform for a given event and for trace_id defined in the config.
+    Get waveform for a given event and for trace_id defined in the config
+    or passed as a command line argument.
 
     :param ev: an event
     :type ev: RequakeEvent
@@ -249,7 +250,7 @@ def get_event_waveform(ev):
     except MetadataMismatchError as err:
         msg = str(err).replace('\n', ' ')
         raise NoWaveformError(
-            f'Unable to download waveform data for event {evid} '
+            f'Unable to get waveform data for event {evid} '
             f'and trace_id {traceid}. '
             'Skipping event.\n'
             f'Error message: {msg}'
@@ -353,7 +354,7 @@ old_cache_key = None
 
 def get_waveform_pair(pair):
     """
-    Download traces for a given pair.
+    Get waveforms for a given pair.
 
     :param pair: pair of events
     :type pair: tuple of RequakeEvent
