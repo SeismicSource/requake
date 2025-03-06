@@ -297,8 +297,13 @@ def configure(args):
     _check_library_versions()
     # Set up logging
     _setup_logging('requake', args.action)
-    # save config to output dir
-    shutil.copy(args.configfile, args.outdir)
+    # save config to output dir (only for actions that write to outdir)
+    actions_writing_to_outdir = (
+        'read_catalog', 'scan_catalog', 'build_families',
+        'build_templates', 'scan_templates'
+    )
+    if args.action in actions_writing_to_outdir:
+        shutil.copy(args.configfile, args.outdir)
     _parse_catalog_options()
     actions_needing_fdsn_station_dataselect = (
         'scan_catalog', 'plot_pair', 'plot_families', 'build_templates',
