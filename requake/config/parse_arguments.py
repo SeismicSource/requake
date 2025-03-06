@@ -309,12 +309,17 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- print_families
-    subparser.add_parser(
+    printfamilies = subparser.add_parser(
         'print_families',
         parents=[
             longerthan, shorterthan, minevents, family_numbers, print_format
         ],
         help='print families to screen'
+    )
+    printfamilies.add_argument(
+        '-d', '--detailed', action='store_true',
+        help='print detailed information for each family, including a list '
+             'of events'
     )
     # ---
     # --- plot_families

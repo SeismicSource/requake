@@ -22,6 +22,8 @@ to the latest version.
   files without asking
 - New option `--freq_band` for trace plotting commands, to override the
   frequency band specified in the config file
+- New option `--detailed` for `print_families`, to print more detailed
+  information about each family, including the list of events
 - Config option `waveform_data_path` renamed to `sds_data_path`
 - New config option `event_data_path` to specify the path to a local directory
   with waveform files organized per event
