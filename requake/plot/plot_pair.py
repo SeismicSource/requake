@@ -37,7 +37,11 @@ def _get_pair():
     :raises ValueError: If an error occurs while reading the catalog.
     :raises FileNotFoundError: If the catalog file is not found.
     """
-    catalog = read_stored_catalog()
+    try:
+        catalog = read_stored_catalog()
+    except FileNotFoundError as msg:
+        logger.error(msg)
+        rq_exit(1)
     fix_non_locatable_events(catalog)
     evid1 = config.args.evid1
     evid2 = config.args.evid2
