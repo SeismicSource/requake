@@ -450,12 +450,8 @@ def parse_arguments(progname='requake'):
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
     if args.action is None:
-        parser.print_usage(sys.stderr)
-        sys.stderr.write(
-            f'{progname}: '
-            'error: at least one positional argument is required\n'
-        )
-        sys.exit(2)
+        parser.print_help()
+        sys.exit(0)
     # Additional code for "longerthan" and "shorterthan" options
     try:
         args.longerthan = _timespec_to_sec(args.longerthan)
