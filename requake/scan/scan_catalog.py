@@ -113,6 +113,11 @@ def scan_catalog():
         logger.error(msg)
         rq_exit(1)
     nevents = len(catalog)
+    if nevents < 2:
+        logger.error(
+            'Not enough events in catalog. '
+            'You need at least 2 events to run the scan 😉')
+        rq_exit(1)
     logger.info(f'{nevents} events read from catalog file')
     logger.info('Building event pairs...')
     logger.info('Computing waveform cross-correlation...')
