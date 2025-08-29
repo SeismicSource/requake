@@ -115,12 +115,14 @@ class WaveformPair:
                     # will be different at each iteration
                     self.tr_cache[cache_key] = tr
                 st.append(tr)
-            except NoWaveformError:
+            except NoWaveformError as err:
                 self.skipped_evids_traceids.append(cache_key)
+                msg = str(err).replace('\n', ' ')
                 logger.warning(
                     f'No waveform data for event {ev.evid} and trace_id '
                     f'{ev.trace_id}. Skipping all pairs containing this '
                     'event and trace_id.'
+                    f'Error message: {msg}'
                 )
             ev1 = False
         if len(st) < 2:

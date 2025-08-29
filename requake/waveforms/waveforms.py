@@ -165,11 +165,11 @@ def _get_event_waveform_from_event_data_path(evid, traceid):
     """
     event_data_path = config.event_data_path
     if event_data_path is None:
-        raise NoWaveformError('No event_data_path defined in the config file')
+        raise NoWaveformError('No event_data_path defined in the config file.')
     event_data_path = Path(event_data_path)
     if not event_data_path.exists():
         raise NoWaveformError(
-            f'Event data path "{event_data_path}" does not exist'
+            f'Event data path "{event_data_path}" does not exist.'
         )
     event_dir = next(
         (subdir for subdir in event_data_path.iterdir()
@@ -177,7 +177,7 @@ def _get_event_waveform_from_event_data_path(evid, traceid):
         None)
     if event_dir is None:
         raise NoWaveformError(
-            f'No waveform data for event {evid} in "{event_data_path}"'
+            f'No waveform data for event {evid} in "{event_data_path}."'
         )
     net, sta, loc, chan = traceid.split('.')
     # replace '@@' with an empty network code
@@ -192,7 +192,7 @@ def _get_event_waveform_from_event_data_path(evid, traceid):
         network=net, station=sta, location=loc, channel=chan)
     if not st:
         raise NoWaveformError(
-            f'No waveform data for trace id: {traceid} in "{event_dir}"'
+            f'No waveform data for trace id: {traceid} in "{event_dir}."'
         )
     return st[0]
 
