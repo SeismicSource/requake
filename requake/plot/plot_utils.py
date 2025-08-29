@@ -11,8 +11,9 @@ Plot utils.
 """
 import logging
 import contextlib
-import matplotlib.dates as mdates
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from matplotlib import cm, colors
 from ..config import config
 from .colormaps import cmaps
@@ -349,3 +350,43 @@ def plot_colorbar(fig, ax, cmap, norm):
         format_time_axis(cbar.ax, which='yaxis', grid=False)
     with contextlib.suppress(AttributeError):
         cbar.ax.set_ylabel(cmap.label)
+
+
+def save_or_show_plot(fig, plot_file_basename, show=True):
+    """
+    Save or show the plot.
+
+    :param fig: The Matplotlib figure to save or show.
+    :param plot_file_basename: The base filename for the plot.
+        Only used if the 'output' command line argument contains just the
+        file format (e.g. 'png', 'pdf') or nothing is specified.
+    :param show: Whether to show the plot or not.
+    :type show: bool
+    """
+    output = config.args.output
+    if output == 'NO_OUTPUT':
+        if show:
+            plt.show()
+        return
+    if output is None:
+        plot_format = 'png'
+    elif output.lower() in ('pdf', 'svg', 'png', 'jpg', 'jpeg'):
+        plot_format = output.lower()
+    else:
+        plot_format = None
+    if plot_format is None:
+        plot_file_name = output
+    else:
+        plot_file_name = f'{plot_file_basename}.{plot_format}'
+        # sanitize plot filename
+        plot_file_name = plot_file_name\
+            .replace(' ', '_')\
+            .replace(':', '-')\
+            .replace('/', '-')
+    fig.savefig(
+        plot_file_name,
+        dpi=300,
+        bbox_inches='tight',
+    )
+    print(f'Plot saved as {plot_file_name}')
+    plt.close(fig)

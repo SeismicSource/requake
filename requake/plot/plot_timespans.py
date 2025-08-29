@@ -17,7 +17,7 @@ from ..config import config, rq_exit
 from ..families import FamilyNotFoundError, read_selected_families
 from .plot_utils import (
     format_time_axis, plot_title, hover_annotation, duration_string,
-    family_colors, plot_colorbar
+    family_colors, plot_colorbar, save_or_show_plot
 )
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
@@ -138,4 +138,4 @@ def plot_timespans():
     annot.set_visible(False)
     annot.hover_annotation = True
     fig.canvas.mpl_connect('motion_notify_event', hover_annotation)
-    plt.show()
+    save_or_show_plot(fig, 'family_timespans')

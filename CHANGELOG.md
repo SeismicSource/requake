@@ -24,6 +24,8 @@ to the latest version.
   frequency band specified in the config file
 - New option `--detailed` for `print_families`, to print more detailed
   information about each family, including the list of events
+- New option `--output` to save plots to files instead of showing them on
+  screen
 - Config option `waveform_data_path` renamed to `sds_data_path`
 - New config option `event_data_path` to specify the path to a local directory
   with waveform files organized per event

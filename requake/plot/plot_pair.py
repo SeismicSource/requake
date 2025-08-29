@@ -18,6 +18,7 @@ from ..waveforms import (
     WaveformPair, process_waveforms, align_pair,
     NoWaveformError
 )
+from .plot_utils import save_or_show_plot
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
@@ -124,4 +125,7 @@ def plot_pair():
         _ax.yaxis.set_tick_params(which='minor', bottom=False)
         _ax.grid(True)
         _ax.legend(loc='upper right')
-    plt.show()
+    plot_file_basename = (
+        f'{evid1}_{evid2}_{tr_id}_{freq_min:.1f}-{freq_max:.1f}Hz'
+    )
+    save_or_show_plot(fig, plot_file_basename)

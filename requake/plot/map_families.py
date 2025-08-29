@@ -19,7 +19,8 @@ from obspy.geodetics import gps2dist_azimuth
 from ..config import config, rq_exit
 from ..families import FamilyNotFoundError, read_selected_families
 from .plot_utils import (
-    plot_title, hover_annotation, duration_string, family_colors, plot_colorbar
+    plot_title, hover_annotation, duration_string, family_colors,
+    plot_colorbar, save_or_show_plot
 )
 from .cached_tiler import CachedTiler
 from .map_tiles import (
@@ -155,4 +156,4 @@ def map_families():
     annot.set_visible(False)
     annot.hover_annotation = True
     fig.canvas.mpl_connect('motion_notify_event', hover_annotation)
-    plt.show()
+    save_or_show_plot(fig, 'family_map')

@@ -23,6 +23,7 @@ from ..families import (
     get_family_aligned_waveforms_and_template
 )
 from ..waveforms import process_waveforms, NoWaveformError
+from .plot_utils import save_or_show_plot
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 # Reduce logging level for Matplotlib to avoid DEBUG messages
 mpl_logger = logging.getLogger('matplotlib')
@@ -139,6 +140,10 @@ def _plot_family(family):
         f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f} Hz'
     )
     ax.set_title(title, loc='right')
+    figure_name = (
+        f'family_{family.number}_{tr0.id}_'
+        f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f}Hz'
+    )
 
     def _zoom_lines(zoom_level):
         for line in tracelines:
@@ -206,6 +211,7 @@ def _plot_family(family):
     _keypress.time_zoom_level = 1
     _keypress.pan_amount = 0
     fig.canvas.mpl_connect('key_press_event', _keypress)
+    return fig, figure_name
 
 
 def plot_families():
@@ -226,13 +232,15 @@ def plot_families():
             'how to select specific families.')
         families = families[:20]
     for family in families:
-        _plot_family(family)
-    print('''
-    Use left/right arrow keys to scroll backwards/forward in time.
-    Use shift+left/shift+right to increase/decrease the time window.
-    Use up/down arrow keys to increase/decrease trace amplitude.
-    Press '0' to reset the view.
-    Press 'a' to show/hide theoretical arrivals.
-    Press 'q' to close a plot.
-    ''')
-    plt.show()
+        fig, figure_name = _plot_family(family)
+        save_or_show_plot(fig, figure_name, show=False)
+    if config.args.output == 'NO_OUTPUT':
+        print('''
+        Use left/right arrow keys to scroll backwards/forward in time.
+        Use shift+left/shift+right to increase/decrease the time window.
+        Use up/down arrow keys to increase/decrease trace amplitude.
+        Press '0' to reset the view.
+        Press 'a' to show/hide theoretical arrivals.
+        Press 'q' to close a plot.
+        ''')
+        plt.show()

@@ -204,10 +204,23 @@ def parse_arguments(progname='requake'):
              'config file. Specify FREQ_MIN and FREQ_MAX in Hz.'
     )
     # ---
+    # --- parent parser for saving plots to file instead of showing
+    #     them on screen
+    output = argparse.ArgumentParser(add_help=False)
+    output.add_argument(
+        '-o', '--output', type=str, default='NO_OUTPUT', nargs='?',
+        metavar='FILE_OR_FORMAT',
+        help='Save the plot instead of displaying it. Provide a filename '
+             '(e.g., "plot.png") to specify the output name and format, or '
+             'just a format (e.g., "png", "pdf", "svg") to automatically '
+             'generate a default filename. If omitted, the plot is saved as '
+             'a PNG file with a default name.'
+    )
+    # ---
     # --- plot_pair
     plot_pair = subparser.add_parser(
         'plot_pair',
-        parents=[traceid, freq_band],
+        parents=[traceid, freq_band, output],
         help='plot traces for a given event pair'
     )
     plot_pair.add_argument('evid1')
@@ -309,37 +322,37 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- print_families
-    printfamilies = subparser.add_parser(
+    print_families = subparser.add_parser(
         'print_families',
         parents=[
             longerthan, shorterthan, minevents, family_numbers, print_format
         ],
         help='print families to screen'
     )
-    printfamilies.add_argument(
+    print_families.add_argument(
         '-d', '--detailed', action='store_true',
         help='print detailed information for each family, including a list '
              'of events'
     )
     # ---
     # --- plot_families
-    plotfamilies = subparser.add_parser(
+    plot_families = subparser.add_parser(
         'plot_families',
         parents=[
             longerthan, shorterthan, minevents, family_numbers,
-            traceid, freq_band
+            traceid, freq_band, output
         ],
         help='plot traces for one ore more event families'
     )
-    plotfamilies.add_argument(
+    plot_families.add_argument(
         '-s', '--starttime', type=float, default=None,
         help='start time, in seconds relative to trace start, for the plot'
     )
-    plotfamilies.add_argument(
+    plot_families.add_argument(
         '-e', '--endtime', type=float, default=None,
         help='end time, in seconds relative to trace start, for the plot'
     )
-    plotfamilies.add_argument(
+    plot_families.add_argument(
         '-T', '--template', action='store_true',
         help='plot family members found with template scan'
     )
@@ -349,7 +362,7 @@ def parse_arguments(progname='requake'):
         'plot_timespans',
         parents=[
             longerthan, shorterthan, minevents, family_numbers, colorby,
-            colormap, color_range
+            colormap, color_range, output
         ],
         help='plot family timespans'
     )
@@ -369,7 +382,7 @@ def parse_arguments(progname='requake'):
         'plot_cumulative',
         parents=[
             longerthan, shorterthan, minevents, family_numbers, colorby,
-            colormap, color_range
+            colormap, color_range, output
         ],
         help='cumulative plot for one or more families'
     )
@@ -390,7 +403,7 @@ def parse_arguments(progname='requake'):
         'map_families',
         parents=[
             longerthan, shorterthan, minevents, family_numbers, colorby,
-            colormap, color_range
+            colormap, color_range, output
         ],
         help='plot families on a map'
     )
