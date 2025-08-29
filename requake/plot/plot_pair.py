@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from ..config import config, rq_exit
 from ..catalog import fix_non_locatable_events, read_stored_catalog
 from ..waveforms import (
-    get_waveform_pair, process_waveforms, align_pair,
+    WaveformPair, process_waveforms, align_pair,
     NoWaveformError
 )
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -24,6 +24,8 @@ mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 # Make text editable in Illustrator
 mpl.rcParams['pdf.fonttype'] = 42
+# Reduce logging level for fontTools to avoid DEBUG messages
+logging.getLogger('fontTools').setLevel(logging.WARNING)
 
 
 def _get_pair():
@@ -58,9 +60,10 @@ def plot_pair():
     """
     Download and plot traces for an event pair.
     """
+    waveform_pair = WaveformPair()
     try:
         pair = _get_pair()
-        st = get_waveform_pair(pair)
+        st = waveform_pair.get_waveform_pair(pair)
         lag, lag_sec, cc_max = align_pair(st[0], st[1])
         st = process_waveforms(st)
     except (ValueError, NoWaveformError) as msg:
@@ -68,20 +71,25 @@ def plot_pair():
         rq_exit(1)
     st.normalize()
     tr1, tr2 = st
+    tr_id = tr1.id
+    stats1 = tr1.stats
+    stats2 = tr2.stats
+    evid1 = stats1.evid
+    evid2 = stats2.evid
+    freq_min = stats1.freq_min
+    freq_max = stats2.freq_max
     logger.info(
-        f'{tr1.stats.evid} {tr2.stats.evid} -- '
+        f'{evid1} {evid2} -- '
         f'lag: {lag} lag_sec: {lag_sec:.1f} cc_max: {cc_max:.2f}'
     )
     fig, ax = plt.subplots(
         2, 1, figsize=(12, 6), sharex=True, sharey=True)
-    title = f'{tr1.stats.evid}-{tr2.stats.evid}'
+    title = f'{evid1}-{evid2}'
     fig.canvas.manager.set_window_title(title)
-    title = f'{tr1.stats.evid}-{tr2.stats.evid} CC: {cc_max:.2f}'
+    title = f'{evid1}-{evid2} CC: {cc_max:.2f}'
     ax[0].set_title(title, loc='left')
-    title = f'{tr1.id} | {tr1.stats.freq_min:.1f}-{tr1.stats.freq_max:.1f} Hz'
+    title = f'{tr_id} | {freq_min:.1f}-{freq_max:.1f} Hz'
     ax[0].set_title(title, loc='right')
-    stats1 = tr1.stats
-    stats2 = tr2.stats
     if stats1.mag is not None:
         mag1_str = f'{stats1.mag_type} {stats1.mag:.1f}'
     else:
@@ -91,13 +99,13 @@ def plot_pair():
     else:
         mag2_str = 'no mag'
     label1 = (
-        f'{stats1.evid}, {mag1_str}, '
+        f'{evid1}, {mag1_str}, '
         f'{stats1.orig_time.strftime("%Y-%m-%dT%H:%M:%S")}\n'
         f'{stats1.ev_lat:.4f}°N {stats1.ev_lon:.4f}°E '
         f'{stats1.ev_depth:.3f} km'
     )
     label2 = (
-        f'{stats2.evid}, {mag2_str}, '
+        f'{evid2}, {mag2_str}, '
         f'{stats2.orig_time.strftime("%Y-%m-%dT%H:%M:%S")}\n'
         f'{stats2.ev_lat:.4f}°N {stats2.ev_lon:.4f}°E '
         f'{stats2.ev_depth:.3f} km'
@@ -105,9 +113,9 @@ def plot_pair():
     lw = 0.8  # linewidth
     data1 = tr1.data
     data2 = tr2.data
-    ax[0].plot(tr2.times(), data2, color='gray', lw=lw, label=stats2.evid)
+    ax[0].plot(tr2.times(), data2, color='gray', lw=lw, label=evid2)
     ax[0].plot(tr1.times(), data1, color='blue', lw=lw, label=label1)
-    ax[1].plot(tr1.times(), data1, color='gray', lw=lw, label=stats1.evid)
+    ax[1].plot(tr1.times(), data1, color='gray', lw=lw, label=evid1)
     ax[1].plot(tr2.times(), data2, color='blue', lw=lw, label=label2)
     ax[1].set_xlabel('Time (s)')
     for _ax in ax:

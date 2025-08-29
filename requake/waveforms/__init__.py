@@ -11,12 +11,13 @@ Functions for waveform analysis.
 """
 from .waveforms import (  # noqa
     get_waveform_from_client, get_event_waveform,
-    get_waveform_pair, cc_waveform_pair,
+    cc_waveform_pair,
     process_waveforms,
     align_pair, align_traces,
     build_template,
     NoWaveformError
 )
+from .waveform_pair import WaveformPair  # noqa
 from .station_metadata import (  # noqa
     load_inventory, get_traceid_coords, NoMetadataError, MetadataMismatchError
 )

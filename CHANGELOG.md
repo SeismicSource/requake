@@ -28,6 +28,8 @@ to the latest version.
 - New config option `event_data_path` to specify the path to a local directory
   with waveform files organized per event
 - Add missing `street` map style for `map_families`
+- Catalog scan: when more than a station is provided and the closest station
+  to the event is not available, use the next closest station instead.
 - Initial support for plotting families found with template scan
 - Improved reading of CSV catalog files:
   - avoid duplicated column guessing

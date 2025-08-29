@@ -9,14 +9,12 @@ Functions for fetching and processing waveforms.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
-import contextlib
 import logging
 from pathlib import Path
 import numpy as np
 from obspy import read
 from obspy import Stream, UTCDateTime
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
-from obspy.taup import TauPyModel
 from obspy.signal.cross_correlation import correlate, xcorr_max
 from obspy.clients.fdsn.header import FDSNNoDataException
 from scipy.stats import median_abs_deviation
@@ -24,41 +22,10 @@ from ..config import config, rq_exit
 from .station_metadata import get_traceid_coords, MetadataMismatchError
 from .arrivals import get_arrivals
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
-model = TauPyModel(model='ak135')
 
 
 class NoWaveformError(Exception):
     """Exception raised for missing waveform data."""
-
-
-def _get_trace_id(ev):
-    """
-    Get trace id to use with the given event.
-
-    If there is only one trace_id in the config file, return it.
-    If there are multiple trace_ids, return the one closest to the event.
-
-    :param ev: an event
-    :type ev: RequakeEvent
-    :return: the trace_id to use
-    :rtype: str
-    """
-    trace_ids = config.catalog_trace_id
-    if len(trace_ids) == 1:
-        return trace_ids[0]
-    ev_lat = ev.lat
-    ev_lon = ev.lon
-    orig_time = ev.orig_time
-    traceid_coords = get_traceid_coords(orig_time)
-    distances = {}
-    for trace_id, coords in traceid_coords.items():
-        trace_lat = coords['latitude']
-        trace_lon = coords['longitude']
-        distance, _, _ = gps2dist_azimuth(
-            trace_lat, trace_lon, ev_lat, ev_lon)
-        distances[trace_id] = distance
-    # return the trace_id for the closest trace
-    return min(distances, key=distances.get)
 
 
 def get_waveform_from_client(traceid, starttime, endtime):
@@ -345,56 +312,6 @@ def process_waveforms(tr_or_st):
         tr_or_st.stats.freq_min = freq_min
         tr_or_st.stats.freq_max = freq_max
     return tr_or_st
-
-
-skipped_evids = []
-tr_cache = {}
-old_cache_key = None
-
-
-def get_waveform_pair(pair):
-    """
-    Get waveforms for a given pair.
-
-    :param pair: pair of events
-    :type pair: tuple of RequakeEvent
-    :return: stream containing the two traces
-    :rtype: obspy.Stream
-
-    :raises NoWaveformError: if no waveform data is available
-    """
-    ev1, ev2 = pair
-    ev1.trace_id = ev2.trace_id = _get_trace_id(ev1)
-    st = Stream()
-    global old_cache_key
-    cache_key = '_'.join((ev1.evid, ev1.trace_id))
-    # remove trace from cache when evid and/or trace_id changes
-    if old_cache_key is not None and cache_key != old_cache_key:
-        with contextlib.suppress(KeyError):
-            del tr_cache[cache_key]
-    old_cache_key = cache_key
-    for ev in pair:
-        if ev.evid in skipped_evids:
-            raise NoWaveformError
-        # use cached trace, if possible
-        cache_key = '_'.join((ev.evid, ev.trace_id))
-        with contextlib.suppress(KeyError):
-            st.append(tr_cache[cache_key])
-            continue
-        try:
-            tr = get_event_waveform(ev)
-            tr_cache[cache_key] = tr
-            st.append(tr)
-        except NoWaveformError as err:
-            skipped_evids.append(ev.evid)
-            msg = str(err).replace('\n', ' ')
-            raise NoWaveformError(
-                f'Unable to get waveform data for event {ev.evid} '
-                f'and trace_id {ev.trace_id}. '
-                'Skipping all pairs containig this event.\n'
-                f'Error message: {msg}'
-            ) from err
-    return st
 
 
 def cc_waveform_pair(tr1, tr2, mode='events'):

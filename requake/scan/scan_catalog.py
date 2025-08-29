@@ -19,7 +19,7 @@ from obspy.geodetics import gps2dist_azimuth
 from ..config import config, rq_exit
 from ..catalog import fix_non_locatable_events, read_stored_catalog
 from ..waveforms import (
-    get_waveform_pair, cc_waveform_pair,
+    WaveformPair, cc_waveform_pair,
     NoWaveformError, NoMetadataError, MetadataMismatchError
 )
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -67,13 +67,14 @@ def _process_pairs(fp_out, nevents, catalog):
         if sys.stderr.isatty()
         else None
     )
+    waveform_pair = WaveformPair()
     for pair in combinations(catalog, 2):
         if pbar is not None:
             pbar.update()
         if not _pair_ok(pair):
             continue
         try:
-            pair_st = get_waveform_pair(pair)
+            pair_st = waveform_pair.get_waveform_pair(pair)
             tr1, tr2 = pair_st.traces
             lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
             stats1 = tr1.stats
