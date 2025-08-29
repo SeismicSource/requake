@@ -111,15 +111,26 @@ def _guess_field_names(input_fields):
 
 def _csv_file_info(filename):
     """
-    Determine the delimiter and the number of rows in a CSV file.
+    Determine the encoding, the delimiter and the number of rows in a CSV file.
 
     :param filename: input filename
     :type filename: str
 
-    :return: a tuple with the delimiter and the number of rows
+    :return: a tuple with the encoding, the delimiter and the number of rows
     :rtype: tuple
     """
-    with open(filename, 'r', encoding='utf8') as fp:
+    try:
+        fp = open(filename, 'r', encoding='utf8')
+        # Try reading a small chunk to check encoding
+        fp.read(10)
+        fp.seek(0)
+        encoding = 'utf8'
+    except UnicodeDecodeError:
+        fp = open(filename, 'r', encoding='utf16')
+        fp.read(10)
+        fp.seek(0)
+        encoding = 'utf16'
+    with fp:
         nrows = sum(1 for _ in fp)
         fp.seek(0)
         n_first_lines = 5
@@ -133,7 +144,7 @@ def _csv_file_info(filename):
             delimiter = ';'
         else:
             delimiter = ' '
-    return delimiter, nrows
+    return encoding, delimiter, nrows
 
 
 def read_catalog_from_csv(filename):
@@ -149,8 +160,8 @@ def read_catalog_from_csv(filename):
     :raises FileNotFoundError: if filename does not exist
     :raises ValueError: if no origin time field is found
     """
-    delimiter, nrows = _csv_file_info(filename)
-    with open(filename, 'r', encoding='utf8') as fp:
+    encoding, delimiter, nrows = _csv_file_info(filename)
+    with open(filename, 'r', encoding=encoding) as fp:
         reader = csv.DictReader(fp, delimiter=delimiter, skipinitialspace=True)
         fields = _guess_field_names(reader.fieldnames)
         nrows -= 1  # first row is the header
