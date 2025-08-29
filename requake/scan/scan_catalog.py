@@ -58,6 +58,7 @@ def _process_pairs(fp_out, catalog):
     ]
     writer = csv.writer(fp_out)
     writer.writerow(fieldnames)
+    fp_out.flush()
     logger.info('Precomputing valid event pairs...')
     valid_pairs = [
         pair for pair in combinations(catalog, 2) if _pair_ok(pair)
@@ -71,6 +72,7 @@ def _process_pairs(fp_out, catalog):
         else None
     )
     waveform_pair = WaveformPair()
+    n_success = 0
     for pair in valid_pairs:
         if pbar is not None:
             pbar.update()
@@ -90,6 +92,9 @@ def _process_pairs(fp_out, catalog):
                 stats2.ev_depth, stats2.mag_type, stats2.mag,
                 lag, lag_sec, cc_max
             ])
+            n_success += 1
+            if n_success % 10 == 0:
+                fp_out.flush()
         except (NoMetadataError, MetadataMismatchError) as msg:
             logger.error(msg)
             rq_exit(1)
