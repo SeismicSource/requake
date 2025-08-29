@@ -16,7 +16,7 @@ from obspy.geodetics import gps2dist_azimuth
 from obspy.taup import TauPyModel
 from ..config import config
 from .waveforms import get_event_waveform, NoWaveformError
-from .station_metadata import get_traceid_coords
+from .station_metadata import get_traceid_coords, MetadataMismatchError
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
@@ -62,7 +62,15 @@ class WaveformPair:
             self.trace_id_attempts[ev.evid].append(trace_id)
             return trace_id
         ev_lat, ev_lon, orig_time = ev.lat, ev.lon, ev.orig_time
-        traceid_coords = get_traceid_coords(orig_time)
+        try:
+            traceid_coords = get_traceid_coords(orig_time)
+        except MetadataMismatchError as err:
+            logger.error(
+                f'No metadata available for event {ev.evid} at {orig_time}.'
+            )
+            raise NoWaveformError(
+                f'No valid trace_id available for event {ev.evid}'
+            ) from err
         # Compute distances
         distances = {}
         for trace_id, coords in traceid_coords.items():

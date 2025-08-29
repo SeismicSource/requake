@@ -122,6 +122,9 @@ def _download_metadata():
     Download metadata for the trace_ids specified in config file.
 
     The metadata is stored in the config object.
+
+    :raises MetadataMismatchError: if the metadata does not match
+        the expected format
     """
     logger.info('Downloading station metadata...')
     inv = Inventory()
@@ -133,7 +136,13 @@ def _download_metadata():
     else:
         trace_ids = config.catalog_trace_id
     for trace_id in trace_ids:
-        net, sta, loc, chan = trace_id.split('.')
+        try:
+            net, sta, loc, chan = trace_id.split('.')
+        except ValueError as err:
+            raise MetadataMismatchError(
+                f'Invalid trace_id: {trace_id}. Must be in the format '
+                'NET.STA.LOC.CHAN'
+            ) from err
         try:
             inv += cl.get_stations(
                 network=net, station=sta, location=loc, channel=chan,
@@ -218,9 +227,11 @@ def get_traceid_coords(orig_time=None):
     """
     load_inventory()
     traceid_coords = {}
-    traceid_list = config.catalog_trace_id
-    if config.args.traceid is not None:
-        traceid_list.append(config.args.traceid)
+    traceid_list = (
+        config.catalog_trace_id
+        if config.args.traceid is None
+        else [config.args.traceid, ]
+    )
     for trace_id in traceid_list:
         try:
             net, sta, loc, chan = trace_id.split('.')

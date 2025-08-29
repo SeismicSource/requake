@@ -22,7 +22,7 @@ from ..formulas import float_or_none, mag_to_slip_in_cm, mag_to_moment
 from ..catalog import RequakeEvent
 from ..waveforms import (
     load_inventory, get_event_waveform, align_traces, build_template,
-    NoWaveformError
+    NoWaveformError, MetadataMismatchError
 )
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -339,8 +339,13 @@ def get_family_aligned_waveforms_and_template(family):
     :type family: Family
     :return: An obspy stream containing the aligned waveforms and the template.
     :rtype: obspy.Stream
+
+    :raises: NoWaveformError: if no waveforms are found
     """
-    st = get_family_waveforms(family)
+    try:
+        st = get_family_waveforms(family)
+    except (NoWaveformError, MetadataMismatchError) as msg:
+        raise NoWaveformError(msg) from msg
     align_traces(st)
     build_template(st, family)
     return st
