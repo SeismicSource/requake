@@ -59,6 +59,16 @@ def get_waveform_from_client(traceid, starttime, endtime):
             f'between {starttime} and {endtime}\n'
             f'Error message: {msg}'
         ) from err
+    # ObsPy FDSN client raises an AttributeError when a timeout occurs
+    # (this is a bug in ObsPy)
+    except AttributeError as err:
+        msg = str(err).replace('\n', ' ')
+        raise NoWaveformError(
+            f'Timeout occurred while trying '
+            f'to get waveform data for trace id: {traceid} '
+            f'between {starttime} and {endtime}\n'
+            f'Error message: {msg}'
+        ) from err
     # webservices sometimes return longer traces: trim to be sure
     st.trim(starttime=starttime, endtime=endtime)
     st.merge(fill_value='interpolate')
