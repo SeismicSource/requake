@@ -30,6 +30,7 @@ to the latest version.
 - Add missing `street` map style for `map_families`
 - Catalog scan: when more than a station is provided and the closest station
   to the event is not available, use the next closest station instead.
+- Catalog scan: accurate estimation of the number of event pairs to process
 - Initial support for plotting families found with template scan
 - Improved reading of CSV catalog files:
   - avoid duplicated column guessing

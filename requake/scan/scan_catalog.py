@@ -12,7 +12,6 @@ Catalog-based repeater scan for Requake.
 import sys
 import logging
 import csv
-from math import factorial
 from itertools import combinations
 from tqdm import tqdm
 from obspy.geodetics import gps2dist_azimuth
@@ -49,7 +48,7 @@ def _fix_trace_id(stats):
     stats.channel = stats.channel.replace('.', '_')
 
 
-def _process_pairs(fp_out, nevents, catalog):
+def _process_pairs(fp_out, catalog):
     """Process event pairs."""
     fieldnames = [
         'evid1', 'evid2', 'trace_id',
@@ -59,7 +58,11 @@ def _process_pairs(fp_out, nevents, catalog):
     ]
     writer = csv.writer(fp_out)
     writer.writerow(fieldnames)
-    npairs = int(factorial(nevents)/(factorial(2)*factorial(nevents-2)))
+    logger.info('Precomputing valid event pairs...')
+    valid_pairs = [
+        pair for pair in combinations(catalog, 2) if _pair_ok(pair)
+    ]
+    npairs = len(valid_pairs)
     logger.info(f'Processing {npairs:n} event pairs')
     # Only show progress bar if running in a terminal
     pbar = (
@@ -68,11 +71,9 @@ def _process_pairs(fp_out, nevents, catalog):
         else None
     )
     waveform_pair = WaveformPair()
-    for pair in combinations(catalog, 2):
+    for pair in valid_pairs:
         if pbar is not None:
             pbar.update()
-        if not _pair_ok(pair):
-            continue
         try:
             pair_st = waveform_pair.get_waveform_pair(pair)
             tr1, tr2 = pair_st.traces
@@ -123,6 +124,6 @@ def scan_catalog():
     logger.info('Building event pairs...')
     logger.info('Computing waveform cross-correlation...')
     with open(config.scan_catalog_pairs_file, 'w', encoding='utf-8') as fp_out:
-        npairs = _process_pairs(fp_out, nevents, catalog)
+        npairs = _process_pairs(fp_out, catalog)
     logger.info(f'Processed {npairs:n} event pairs')
     logger.info(f'Done! Output written to {config.scan_catalog_pairs_file}')
