@@ -208,7 +208,7 @@ def read_catalog_from_csv(filename):
             ev.lat = float_or_none(row[fields['lat']])
             ev.depth = float_or_none(row[fields['depth']])
             ev.mag_type = row[fields['mag_type']]
-            if ev.mag_type.lower() == 'nan':
+            if ev.mag_type is not None and ev.mag_type.lower() == 'nan':
                 ev.mag_type = 'M'
             ev.mag = float_or_none(row[fields['mag']])
             cat.append(ev)
