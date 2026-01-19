@@ -6,6 +6,7 @@ Repeating earthquakes search and analysis.
 :Copyright: 2021-2026 Claudio Satriano satriano@ipgp.fr
 :Release: |release|
 :Date:    |release date|
+:Project Page: `GitHub`_
 
 Description
 -----------
@@ -42,3 +43,7 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+
+.. links
+.. _GitHub: https://github.com/seismicsource/requake

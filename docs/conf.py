@@ -95,6 +95,7 @@ html_logo = '../imgs/Requake_logo_white.svg'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 html_css_files = ['custom.css']
+html_js_files = ['custom.js']
 
 
 def setup(app):
