@@ -5,7 +5,7 @@ If you used Requake for a scientific paper, please cite it as:
 
 ..
 
-   Satriano, C. (2025). Requake: Repeating earthquakes search and analysis (X.Y).
+   Satriano, C. (2026). Requake: Repeating earthquakes search and analysis (X.Y).
    `doi: 10.5281/ZENODO.10832204 <https://doi.org/10.5281/ZENODO.10832204>`_
 
 

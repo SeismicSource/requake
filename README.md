@@ -10,7 +10,7 @@ Repeating earthquakes search and analysis.
 [![docs-badge]][docs-link]
 [![DOI-badge]][DOI-link]
 
-Copyright (c) 2021-2025 Claudio Satriano <satriano@ipgp.fr>
+Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## Description
 
@@ -187,7 +187,7 @@ parallelization will be implemented.
 
 If you used Requake for a scientific paper, please cite it as:
 
-> Satriano, C. (2025). Requake: Repeating earthquakes search and analysis (X.Y).
+> Satriano, C. (2026). Requake: Repeating earthquakes search and analysis (X.Y).
 > [doi: 10.5281/ZENODO.10832204]
 
 Please replace `X.Y` with the Requake version number you used.

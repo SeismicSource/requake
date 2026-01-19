@@ -1,6 +1,6 @@
 # Requake Changelog
 
-Copyright (c) 2021-2025 Claudio Satriano <satriano@ipgp.fr>
+Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 

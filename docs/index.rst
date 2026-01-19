@@ -3,7 +3,7 @@ Requake
 
 Repeating earthquakes search and analysis.
 
-:Copyright: 2021-2025 Claudio Satriano satriano@ipgp.fr
+:Copyright: 2021-2026 Claudio Satriano satriano@ipgp.fr
 :Release: |release|
 :Date:    |release date|
 
