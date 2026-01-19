@@ -11,6 +11,7 @@ Write configuration file documentation page.
 """
 import os
 
+
 def write_configfile(_app):
     """Write configuration file documentation page."""
     with open('configuration_file.rst', 'w', encoding='utf-8') as fp:
