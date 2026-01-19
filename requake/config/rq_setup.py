@@ -16,17 +16,14 @@ import shutil
 import logging
 import signal
 import tqdm
-from obspy import UTCDateTime
-from obspy.clients.filesystem.sds import Client as SDSClient
-from obspy.clients.fdsn import Client as FDSNClient
-from obspy.clients.fdsn.header import FDSNNoServiceException
 from .._version import get_versions
 from .config import config
 from .utils import (
     parse_configspec, read_config, validate_config, write_sample_config,
     update_config_file, write_ok
 )
-# pylint: disable=global-statement,import-outside-toplevel
+# Note: modules are lazily imported to speed up the startup time.
+# pylint: disable=relative-beyond-top-level,import-outside-toplevel
 
 logger = None  # pylint: disable=invalid-name
 PYTHON_VERSION_STR = None
@@ -115,7 +112,7 @@ def _setup_tqdm_logging(logger_root):
 
 def _setup_logging(progname, action_name):
     """Set up the logging infrastructure."""
-    global logger
+    global logger  # pylint: disable=global-statement
 
     logger_root = logging.getLogger()
     # captureWarnings is not supported in old versions of python
@@ -168,6 +165,7 @@ def _connect_station_dataselect():
 
     Those can be either FDSN web services or local files.
     """
+    from obspy.clients.fdsn import Client as FDSNClient
     if config.station_metadata_path is None:
         config.station_client = FDSNClient(config.fdsn_station_url)
         logger.info(
@@ -189,6 +187,7 @@ def _connect_sds():
     """
     Connect to a local SeisComP Data Structure (SDS) archive.
     """
+    from obspy.clients.filesystem.sds import Client as SDSClient
     _client = SDSClient(config.sds_data_path)
     all_nslc = _client.get_all_nslc()
     if not all_nslc:
@@ -206,6 +205,7 @@ def _connect_sds():
 
 def _parse_catalog_options():
     """Parse catalog options into lists."""
+    from obspy import UTCDateTime
     config.catalog_start_times = []
     config.catalog_end_times = []
     config.catalog_fdsn_event_urls = [config.catalog_fdsn_event_url]
@@ -228,6 +228,7 @@ def _parse_catalog_options():
 
 def _connect_fdsn_catalog():
     """Connect to FDSN catalog services."""
+    from obspy.clients.fdsn import Client as FDSNClient
     config.catalog_fdsn_event_clients = []
     for url in config.catalog_fdsn_event_urls:
         config.catalog_fdsn_event_clients.append(FDSNClient(url))
@@ -314,10 +315,18 @@ def configure(args):
             _connect_station_dataselect()
         if args.action == 'read_catalog' and not args.catalog_file:
             _connect_fdsn_catalog()
-    except (FileNotFoundError, ValueError, FDSNNoServiceException) as msg:
+    except (FileNotFoundError, ValueError) as msg:
         logger.error(msg)
         rq_exit(1)
+    except Exception as msg:
+        # Lazy import to catch FDSNNoServiceException
+        from obspy.clients.fdsn.header import FDSNNoServiceException
+        if isinstance(msg, FDSNNoServiceException):
+            logger.error(msg)
+            rq_exit(1)
+        raise
     # Template times must be UTCDateTime objects
+    from obspy import UTCDateTime
     config.template_start_time = UTCDateTime(config.template_start_time)
     config.template_end_time = UTCDateTime(config.template_end_time)
 
