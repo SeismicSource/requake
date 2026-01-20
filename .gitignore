@@ -12,3 +12,6 @@ build/
 
 #IDE
 .vscode
+
+#Code outputs
+requake_out/
