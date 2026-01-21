@@ -9,6 +9,7 @@ Plot utils.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
+import os
 import logging
 import contextlib
 import numpy as np
@@ -383,6 +384,10 @@ def save_or_show_plot(fig, plot_file_basename, show=True):
             .replace(' ', '_')\
             .replace(':', '-')\
             .replace('/', '-')
+    # if plot_file_name contains directories, create them
+    plot_dir = os.path.dirname(plot_file_name)
+    if plot_dir and not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
     fig.savefig(
         plot_file_name,
         dpi=300,
