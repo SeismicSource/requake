@@ -15,3 +15,5 @@ build/
 
 #Code outputs
 requake_out/
+requake_plots/
+maptiles/
