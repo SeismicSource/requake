@@ -1,0 +1,28 @@
+{
+  "title": "Requake: Repeating earthquakes search and analysis",
+  "version": "0.7",
+  "description": "Requake is a command line tool to search and analyse repeating earthquakes from catalogs and waveform streams.",
+  "upload_type": "software",
+  "license": "GPL-3.0-or-later",
+  "creators": [
+    {
+      "name": "Satriano, Claudio",
+      "affiliation": "Université Paris Cité, Institut de physique du globe de Paris, CNRS, F-75005 Paris, France",
+      "orcid": "0000-0002-3039-2530"
+    }
+  ],
+  "keywords": [
+    "seismology",
+    "earthquakes",
+    "repeating-earthquakes",
+    "template-matching",
+    "obspy"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/SeismicSource/requake",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}

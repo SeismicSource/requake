@@ -15,8 +15,9 @@ VERSION input:
 
 Create a release commit and annotated git tag following this repository workflow:
 1) Move CHANGELOG "unreleased" entries to "vVERSION - YYYY-MM-DD"
-2) Commit CHANGELOG as "Release vVERSION"
-3) Create annotated tag "vVERSION"
+2) Update version in .zenodo.json and CITATION.cff
+3) Commit release files as "Release vVERSION"
+4) Create annotated tag "vVERSION"
 
 Options:
   --dry-run  Validate and print the actions without changing files
@@ -77,7 +78,11 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "Not inside a gi
 cd "$REPO_ROOT"
 
 CHANGELOG="CHANGELOG.md"
+ZENODO_JSON=".zenodo.json"
+CITATION_CFF="CITATION.cff"
 [[ -f "$CHANGELOG" ]] || die "Missing $CHANGELOG"
+[[ -f "$ZENODO_JSON" ]] || die "Missing $ZENODO_JSON"
+[[ -f "$CITATION_CFF" ]] || die "Missing $CITATION_CFF"
 
 if ! git diff-index --quiet HEAD --; then
     die "Working tree is not clean. Commit or stash changes before releasing."
@@ -107,11 +112,13 @@ if $DRY_RUN; then
     echo
     echo "Dry run checks passed. Planned actions:"
     echo "  1) Update $CHANGELOG headings"
-    echo "  2) git add $CHANGELOG"
-    echo "  3) git commit -m \"$COMMIT_MSG\""
-    echo "  4) git tag -a $TAG -m \"$COMMIT_MSG\""
+    echo "  2) Update version in $ZENODO_JSON"
+    echo "  3) Update version in $CITATION_CFF"
+    echo "  4) git add $CHANGELOG $ZENODO_JSON $CITATION_CFF"
+    echo "  5) git commit -m \"$COMMIT_MSG\""
+    echo "  6) git tag -a $TAG -m \"$COMMIT_MSG\""
     BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-    echo "  5) git push origin $BRANCH $TAG"
+    echo "  7) git push origin $BRANCH $TAG"
     echo
     echo "Undo (if not pushed):"
     echo "  git tag -d $TAG"
@@ -144,7 +151,52 @@ END {
 mv "$TMP_FILE" "$CHANGELOG"
 trap - EXIT
 
-git add "$CHANGELOG"
+TMP_FILE="$(mktemp)"
+trap 'rm -f "$TMP_FILE"' EXIT
+
+awk -v ver="$VERSION" '
+BEGIN { done=0 }
+{
+    if (!done && $0 ~ /^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"[^"]+",?[[:space:]]*$/) {
+        sub(/"version"[[:space:]]*:[[:space:]]*"[^"]+"/, "\"version\": \"" ver "\"")
+        done=1
+    }
+    print $0
+}
+END {
+    if (!done) {
+        exit 2
+    }
+}
+' "$ZENODO_JSON" > "$TMP_FILE" || die "Failed to update version in $ZENODO_JSON"
+
+mv "$TMP_FILE" "$ZENODO_JSON"
+trap - EXIT
+
+TMP_FILE="$(mktemp)"
+trap 'rm -f "$TMP_FILE"' EXIT
+
+awk -v ver="$VERSION" '
+BEGIN { done=0 }
+{
+    if (!done && $0 ~ /^[[:space:]]*version:[[:space:]]*"[^"]+"[[:space:]]*$/) {
+        print "version: \"" ver "\""
+        done=1
+    } else {
+        print $0
+    }
+}
+END {
+    if (!done) {
+        exit 2
+    }
+}
+' "$CITATION_CFF" > "$TMP_FILE" || die "Failed to update version in $CITATION_CFF"
+
+mv "$TMP_FILE" "$CITATION_CFF"
+trap - EXIT
+
+git add "$CHANGELOG" "$ZENODO_JSON" "$CITATION_CFF"
 git commit -m "$COMMIT_MSG"
 git tag -a "$TAG" -m "$COMMIT_MSG"
 

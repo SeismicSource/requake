@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using this metadata."
+title: "Requake: Repeating earthquakes search and analysis"
+version: "0.7"
+type: software
+abstract: "Requake is a command line tool to search and analyse repeating earthquakes from catalogs and waveform streams."
+license: "GPL-3.0-or-later"
+authors:
+  - family-names: "Satriano"
+    given-names: "Claudio"
+    affiliation: "Université Paris Cité, Institut de physique du globe de Paris, CNRS, F-75005 Paris, France"
+    orcid: "https://orcid.org/0000-0002-3039-2530"
+keywords:
+  - "seismology"
+  - "earthquakes"
+  - "repeating-earthquakes"
+  - "template-matching"
+  - "obspy"
+repository-code: "https://github.com/SeismicSource/requake"
