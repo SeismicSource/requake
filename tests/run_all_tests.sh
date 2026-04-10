@@ -14,6 +14,10 @@ if [ -z "$1" ] || { [ "$1" != "run" ] && [ "$1" != "clean" ]; }; then
     exit 1
 fi
 
+# Always run relative to this script's directory so it works from any cwd.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Counters
 TOTAL_TESTS=0
 PASSED_TESTS=0
@@ -23,8 +27,7 @@ FAILED_TESTS=0
 TEST_DIRS=()
 while IFS= read -r line; do
     TEST_DIRS+=("$line")
-done < <(find . -maxdepth 2 -name "run_test.sh" -type f -print0 | \
-    xargs -0 dirname | sort)
+done < <(find . -maxdepth 2 -name "run_test.sh" -type f -exec dirname {} \; | sort -u)
 
 if [ ${#TEST_DIRS[@]} -eq 0 ]; then
     echo -e "${RED}Error: No test directories found${NC}"
