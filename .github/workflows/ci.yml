@@ -1,0 +1,66 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  detect-source-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      source_changed: ${{ steps.filter.outputs.source }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Detect source changes
+        id: filter
+        uses: dorny/paths-filter@v4.0.1
+        with:
+          filters: |
+            source:
+              - 'requake/**'
+
+  integration-tests:
+    needs:
+      - detect-source-changes
+    if: needs.detect-source-changes.outputs.source_changed == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install requake and dependencies
+        run: python -m pip install .
+
+      - name: Run integration tests
+        run: bash tests/run_all_tests.sh run
+
+      - name: Clean integration test outputs
+        if: always()
+        run: bash tests/run_all_tests.sh clean
+
+  dist:
+    needs:
+      - detect-source-changes
+      - integration-tests
+    if: >-
+      always() &&
+      (needs.detect-source-changes.outputs.source_changed != 'true' ||
+      needs.integration-tests.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build wheel and SDist
+        run: pipx run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          path: dist/*
+
+      - name: Check metadata
+        run: pipx run twine check dist/*
