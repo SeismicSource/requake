@@ -70,7 +70,10 @@ jobs:
     name: >-
       Publish to PyPI
     # upload to PyPI on every tag starting with 'v'
-    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_type == 'tag' &&
+      startsWith(github.ref_name, 'v')
     needs:
     - dist
     runs-on: ubuntu-latest
