@@ -4,6 +4,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 
+## v0.7 - 2026-04-10
+
 This version requires at least Python 3.9.
 
 Note: you might want to run `requake update_config` to update your config file
