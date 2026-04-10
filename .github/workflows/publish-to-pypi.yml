@@ -1,4 +1,4 @@
-name: Build wheel and deploy to PyPI
+name: Publish Release to PyPI
 
 on:
   push:
@@ -7,24 +7,26 @@ on:
 
 jobs:
   dist:
-    name: Build release distributions
+    name: Build Release Distributions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout Repository
+        uses: actions/checkout@v6
 
-      - name: Build wheel and SDist
+      - name: Build Wheel and Source Distribution
         run: pipx run build
 
-      - name: Check metadata
+      - name: Validate Package Metadata
         run: pipx run twine check dist/*
 
-      - uses: actions/upload-artifact@v7
+      - name: Upload Release Artifacts
+        uses: actions/upload-artifact@v7
         with:
           name: pypi-dists
           path: dist/*
 
   publish-to-pypi:
-    name: Publish to PyPI
+    name: Publish Artifacts to PyPI
     needs:
       - dist
     runs-on: ubuntu-latest
@@ -34,10 +36,10 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - name: Download all the dists
+      - name: Download Release Artifacts
         uses: actions/download-artifact@v8
         with:
           name: pypi-dists
           path: dist
-      - name: Publish distribution to PyPI
+      - name: Upload Artifacts to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

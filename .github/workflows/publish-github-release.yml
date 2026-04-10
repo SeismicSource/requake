@@ -1,4 +1,4 @@
-name: Release on GitHub
+name: Publish GitHub Release Notes
 
 on:
   push:
@@ -7,10 +7,12 @@ on:
 
 jobs:
   release_version:
+    name: Publish GitHub Release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - name: Generate GitHub Release
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+      - name: Generate Release Notes from Changelog
         uses: lsegal/github-release-from-changelog-action@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

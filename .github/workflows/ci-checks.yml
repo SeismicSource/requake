@@ -1,16 +1,18 @@
-name: CI
+name: Run CI Checks
 
 on: [push, pull_request]
 
 jobs:
   detect-source-changes:
+    name: Detect Source Changes
     runs-on: ubuntu-latest
     outputs:
       source_changed: ${{ steps.filter.outputs.source }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout Repository
+        uses: actions/checkout@v6
 
-      - name: Detect source changes
+      - name: Detect Source Changes
         id: filter
         uses: dorny/paths-filter@v4.0.1
         with:
@@ -19,6 +21,7 @@ jobs:
               - 'requake/**'
 
   integration-tests:
+    name: Run Integration Tests
     needs:
       - detect-source-changes
     if: needs.detect-source-changes.outputs.source_changed == 'true'
@@ -27,23 +30,26 @@ jobs:
       matrix:
         python-version: ['3.10', '3.11', '3.12']
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout Repository
+        uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - name: Set Up Python
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install requake and dependencies
+      - name: Install Requake and Dependencies
         run: python -m pip install .
 
-      - name: Run integration tests
+      - name: Run Integration Tests
         run: bash tests/run_all_tests.sh run
 
-      - name: Clean integration test outputs
+      - name: Clean Integration Test Outputs
         if: always()
         run: bash tests/run_all_tests.sh clean
 
   dist:
+    name: Build Distribution Packages
     needs:
       - detect-source-changes
       - integration-tests
@@ -53,14 +59,16 @@ jobs:
       needs.integration-tests.result == 'success')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout Repository
+        uses: actions/checkout@v6
 
-      - name: Build wheel and SDist
+      - name: Build Wheel and Source Distribution
         run: pipx run build
 
-      - uses: actions/upload-artifact@v7
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v7
         with:
           path: dist/*
 
-      - name: Check metadata
+      - name: Validate Package Metadata
         run: pipx run twine check dist/*
