@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it using this metadata."
 title: "Requake: Repeating earthquakes search and analysis"
-version: "0.7.1"
+version: "0.7.2"
 type: software
 abstract: "Requake is an open-source command-line application for detecting, searching, and analyzing repeating earthquakes using seismic event catalogs and waveform data streams. It provides researchers with tools to identify repeating-event families, examine waveform similarity, and study earthquake recurrence patterns in a reproducible workflow."
 license: "GPL-3.0-or-later"
