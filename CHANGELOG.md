@@ -4,6 +4,9 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## unreleased
 
+This release is intended to validate the new release workflow.
+It introduces no new features or bug fixes.
+
 ## v0.7 - 2026-04-10
 
 This version requires at least Python 3.9.
