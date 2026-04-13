@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it using this metadata."
 title: "Requake: Repeating earthquakes search and analysis"
-version: "0.7"
+version: "0.7.1"
 type: software
 abstract: "Requake is a command line tool to search and analyse repeating earthquakes from catalogs and waveform streams."
 license: "GPL-3.0-or-later"

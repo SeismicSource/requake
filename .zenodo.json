@@ -1,6 +1,6 @@
 {
   "title": "Requake: Repeating earthquakes search and analysis",
-  "version": "0.7",
+  "version": "0.7.1",
   "description": "Requake is a command line tool to search and analyse repeating earthquakes from catalogs and waveform streams.",
   "upload_type": "software",
   "license": "GPL-3.0-or-later",
