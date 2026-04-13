@@ -14,7 +14,7 @@ VERSION input:
     - The created git tag is always "vVERSION" (example: "v0.7")
 
 Create a release commit and annotated git tag following this repository workflow:
-1) Move CHANGELOG "unreleased" entries to "vVERSION - YYYY-MM-DD"
+1) Replace CHANGELOG "unreleased" heading with "vVERSION - YYYY-MM-DD"
 2) Update version in .zenodo.json and CITATION.cff
 3) Commit release files as "Release vVERSION"
 4) Create annotated tag "vVERSION"
@@ -111,7 +111,7 @@ echo "  dry-run: $DRY_RUN"
 if $DRY_RUN; then
     echo
     echo "Dry run checks passed. Planned actions:"
-    echo "  1) Update $CHANGELOG headings"
+    echo "  1) Replace CHANGELOG 'unreleased' heading with version and date"
     echo "  2) Update version in $ZENODO_JSON"
     echo "  3) Update version in $CITATION_CFF"
     echo "  4) git add $CHANGELOG $ZENODO_JSON $CITATION_CFF"
@@ -133,8 +133,6 @@ awk -v ver="$VERSION" -v d="$RELEASE_DATE" '
 BEGIN { done=0 }
 {
     if (!done && $0 == "## unreleased") {
-        print "## unreleased"
-        print ""
         print "## v" ver " - " d
         done=1
     } else {
