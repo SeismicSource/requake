@@ -16,6 +16,8 @@ jobs:
         uses: actions/checkout@v6
       - name: Generate Release Notes from Changelog
         uses: CSchoel/release-notes-from-changelog@v1
+        with:
+          begin-pattern: '/^## v?${RELEASE_VERSION}( -.*)?$/'
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
