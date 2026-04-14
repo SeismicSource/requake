@@ -122,7 +122,7 @@ if $DRY_RUN; then
     echo "Dry run checks passed. Planned actions:"
     echo "  1) Replace CHANGELOG '[unreleased]' heading with version and date, replace '[unreleased]:' footer link with new version link"
     echo "  2) Update version in $ZENODO_JSON"
-    echo "  3) Update version in $CITATION_CFF"
+    echo "  3) Update version and date-released in $CITATION_CFF"
     echo "  4) git add $CHANGELOG $ZENODO_JSON $CITATION_CFF"
     echo "  5) git commit -m \"$COMMIT_MSG\""
     echo "  6) git tag -a $TAG -m \"$COMMIT_MSG\""
@@ -189,22 +189,25 @@ trap - EXIT
 TMP_FILE="$(mktemp)"
 trap 'rm -f "$TMP_FILE"' EXIT
 
-awk -v ver="$VERSION" '
-BEGIN { done=0 }
+awk -v ver="$VERSION" -v d="$RELEASE_DATE" '
+BEGIN { version_done=0; date_done=0 }
 {
-    if (!done && $0 ~ /^[[:space:]]*version:[[:space:]]*"[^"]+"[[:space:]]*$/) {
+    if (!version_done && $0 ~ /^[[:space:]]*version:[[:space:]]*"[^"]+"[[:space:]]*$/) {
         print "version: \"" ver "\""
-        done=1
+        version_done=1
+    } else if (!date_done && $0 ~ /^[[:space:]]*date-released:[[:space:]]*"[^"]+"[[:space:]]*$/) {
+        print "date-released: \"" d "\""
+        date_done=1
     } else {
         print $0
     }
 }
 END {
-    if (!done) {
+    if (!version_done || !date_done) {
         exit 2
     }
 }
-' "$CITATION_CFF" > "$TMP_FILE" || die "Failed to update version in $CITATION_CFF"
+' "$CITATION_CFF" > "$TMP_FILE" || die "Failed to update version/date-released in $CITATION_CFF"
 
 mv "$TMP_FILE" "$CITATION_CFF"
 trap - EXIT
