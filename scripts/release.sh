@@ -6,16 +6,20 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: scripts/make_release.sh VERSION [--dry-run]
+Usage: scripts/release.sh VERSION [--dry-run]
 
 VERSION input:
     - You can pass "0.7" or "v0.7" (both are accepted)
     - Recommended input is "0.7"
     - The created git tag is always "vVERSION" (example: "v0.7")
 
-Create a release commit and annotated git tag following this repository workflow:
-1) Replace CHANGELOG "unreleased" heading with "vVERSION - YYYY-MM-DD"
+Create a release commit+tag and start the next development cycle:
+1) Replace CHANGELOG "[unreleased]" heading with "[VERSION] - YYYY-MM-DD",
+   and replace the "[unreleased]:" footer link with the new version link
 2) Update version in .zenodo.json and CITATION.cff
+3) Commit as "Release vVERSION" and create annotated tag
+4) Re-add "[unreleased]" section and footer link to CHANGELOG
+5) Commit as "Start next development cycle"
 3) Commit release files as "Release vVERSION"
 4) Create annotated tag "vVERSION"
 
@@ -24,13 +28,13 @@ Options:
   -h, --help Show this help
 
 Note:
-    Run help as "scripts/make_release.sh -h" (not just "-h").
+    Run help as "scripts/release.sh -h" (not just "-h").
 
 Examples:
-    scripts/make_release.sh 0.7
-    scripts/make_release.sh v0.7
-    scripts/make_release.sh 0.7.1
-    scripts/make_release.sh v0.7 --dry-run
+    scripts/release.sh 0.7
+    scripts/release.sh v0.7
+    scripts/release.sh 0.7.1
+    scripts/release.sh v0.7 --dry-run
 EOF
 }
 
@@ -95,9 +99,14 @@ if git show-ref --tags --verify --quiet "refs/tags/$TAG"; then
     die "Tag $TAG already exists"
 fi
 
-if ! grep -q '^## unreleased$' "$CHANGELOG"; then
-    die "Could not find '## unreleased' in $CHANGELOG"
+if ! grep -q '^## \[unreleased\]$' "$CHANGELOG"; then
+    die "Could not find '## [unreleased]' in $CHANGELOG"
 fi
+
+PREV_VERSION=$(grep -m1 '^## \[[0-9]' "$CHANGELOG" | sed 's/^## \[\([^]]*\)\].*/\1/')
+[[ -n "$PREV_VERSION" ]] || die "Could not determine previous version from $CHANGELOG"
+
+REPO_URL="$(git remote get-url origin | sed 's/\.git$//; s|^git@github\.com:|https://github.com/|')"
 
 RELEASE_DATE="$(date +%Y-%m-%d)"
 COMMIT_MSG="Release $TAG"
@@ -111,38 +120,44 @@ echo "  dry-run: $DRY_RUN"
 if $DRY_RUN; then
     echo
     echo "Dry run checks passed. Planned actions:"
-    echo "  1) Replace CHANGELOG 'unreleased' heading with version and date"
+    echo "  1) Replace CHANGELOG '[unreleased]' heading with version and date, replace '[unreleased]:' footer link with new version link"
     echo "  2) Update version in $ZENODO_JSON"
     echo "  3) Update version in $CITATION_CFF"
     echo "  4) git add $CHANGELOG $ZENODO_JSON $CITATION_CFF"
     echo "  5) git commit -m \"$COMMIT_MSG\""
     echo "  6) git tag -a $TAG -m \"$COMMIT_MSG\""
+    echo "  7) Re-add '[unreleased]' section and footer link to $CHANGELOG"
+    echo "  8) git add $CHANGELOG"
+    echo "  9) git commit -m \"Start next development cycle\""
     BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-    echo "  7) git push origin $BRANCH $TAG"
+    echo "  10) git push origin $BRANCH $TAG"
     echo
     echo "Undo (if not pushed):"
     echo "  git tag -d $TAG"
-    echo "  git reset --hard HEAD~1"
+    echo "  git reset --hard HEAD~2"
     exit 0
 fi
 
 TMP_FILE="$(mktemp)"
 trap 'rm -f "$TMP_FILE"' EXIT
 
-awk -v ver="$VERSION" -v d="$RELEASE_DATE" '
-BEGIN { done=0 }
-{
-    if (!done && $0 == "## unreleased") {
-        print "## v" ver " - " d
-        done=1
-    } else {
-        print $0
-    }
+awk -v ver="$VERSION" -v d="$RELEASE_DATE" -v prev="$PREV_VERSION" \
+    -v repo="$REPO_URL" '
+BEGIN { heading_done=0; link_done=0 }
+!heading_done && /^## \[unreleased\]$/ {
+    print "## [" ver "] - " d
+    heading_done=1
+    next
 }
+!link_done && /^\[unreleased\]:/ {
+    print "[" ver "]: " repo "/compare/v" prev "...v" ver
+    link_done=1
+    next
+}
+{ print }
 END {
-    if (!done) {
-        exit 2
-    }
+    if (!heading_done) { exit 2 }
+    if (!link_done) { exit 3 }
 }
 ' "$CHANGELOG" > "$TMP_FILE" || die "Failed to update $CHANGELOG"
 
@@ -198,11 +213,34 @@ git add "$CHANGELOG" "$ZENODO_JSON" "$CITATION_CFF"
 git commit -m "$COMMIT_MSG"
 git tag -a "$TAG" -m "$COMMIT_MSG"
 
+# --- Start next development cycle ---
+TMP_FILE="$(mktemp)"
+trap 'rm -f "$TMP_FILE"' EXIT
+
+awk -v ver="$VERSION" -v repo="$REPO_URL" '
+!heading_done && /^## \[[0-9]/ {
+    print "## [unreleased]"
+    print ""
+    heading_done=1
+}
+!link_done && /^\[[0-9]/ {
+    print "[unreleased]: " repo "/compare/v" ver "...HEAD"
+    link_done=1
+}
+{ print }
+' "$CHANGELOG" > "$TMP_FILE" || die "Failed to re-add [unreleased] section to $CHANGELOG"
+
+mv "$TMP_FILE" "$CHANGELOG"
+trap - EXIT
+
+git add "$CHANGELOG"
+git commit -m "Start next development cycle"
+
 echo
-echo "Release commit and tag created locally."
+echo "Done. Release commit+tag and next-cycle commit created locally."
 echo "Push manually with:"
 echo "  git push origin $(git rev-parse --abbrev-ref HEAD) $TAG"
 echo
 echo "Undo (if not pushed):"
 echo "  git tag -d $TAG"
-echo "  git reset --hard HEAD~1"
+echo "  git reset --hard HEAD~2"

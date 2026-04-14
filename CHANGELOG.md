@@ -2,17 +2,22 @@
 
 Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
-## v0.7.2 - 2026-04-13
+## [unreleased]
 
 This release is intended to validate the new release workflow.
 It introduces no new features or bug fixes.
 
-## v0.7.1 - 2026-04-13
+## [0.7.2] - 2026-04-13
 
 This release is intended to validate the new release workflow.
 It introduces no new features or bug fixes.
 
-## v0.7 - 2026-04-10
+## [0.7.1] - 2026-04-13
+
+This release is intended to validate the new release workflow.
+It introduces no new features or bug fixes.
+
+## [0.7] - 2026-04-10
 
 This version requires at least Python 3.9.
 
@@ -52,7 +57,7 @@ to the latest version.
   - warn if an invalid time format is found
 - Colored terminal output for warnings and errors
 
-## v0.6 - 2024-05-04
+## [0.6] - 2024-05-04
 
 Note: you might want to run `requake update_config` to update your config file
 to the latest version.
@@ -69,7 +74,7 @@ to the latest version.
 - New verb `update_config`: update an existing config file to the latest
   version
 
-## v0.5 - 2024-04-23
+## [0.5] - 2024-04-23
 
 - New config options: `station_metadata_path` and `waveform_data_path` to
   read station metadata and waveform data from files. Supports any metadata
@@ -81,11 +86,11 @@ to the latest version.
 - `print_families`: autoset duration units based on the average duration
 - `plot_timespans`: default sorting changed to `family_number`
 
-## v0.4.1 - 2024-03-11
+## [0.4.1] - 2024-03-11
 
 - Bugfix: `requake` executable was not installed
 
-## v0.4 - 2024-03-11
+## [0.4] - 2024-03-11
 
 - Package license changed to GPL-3.0 or later
 - New verb: `read_catalog`: read a catalog from web services or from a file
@@ -109,7 +114,7 @@ to the latest version.
 - Support for events with no location
 - Bugfix: `plot_timespans`: correctly plot x time axis when sort by `time`
 
-## v0.3 - 2021-11-08
+## [0.3] - 2021-11-08
 
 - New verb: `build_templates`
 - New option: `cc_allow_negative` to search for anticorrelated events
@@ -123,7 +128,7 @@ to the latest version.
   - also shift theoretical arrivals when aligning traces
 - Bugfix: last family was not read from family file
 
-## v0.2 - 2021-09-24
+## [0.2] - 2021-09-24
 
 Mostly a bugfix release with a slightly improved trace plotting.
 
@@ -131,6 +136,18 @@ Mostly a bugfix release with a slightly improved trace plotting.
 - Bugfix: detrend traces before filtering
 - `plot_families`: print number of events and station-event distance
 
-## v0.1 - 2021-09-16
+## [0.1] - 2021-09-16
 
 - Initial release, not yet feature complete
+
+[unreleased]: https://github.com/SeismicSource/requake/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/SeismicSource/requake/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/SeismicSource/requake/compare/v0.7...v0.7.1
+[0.7]: https://github.com/SeismicSource/requake/compare/v0.6...v0.7
+[0.6]: https://github.com/SeismicSource/requake/compare/v0.5...v0.6
+[0.5]: https://github.com/SeismicSource/requake/compare/v0.4.1...v0.5
+[0.4.1]: https://github.com/SeismicSource/requake/compare/v0.4...v0.4.1
+[0.4]: https://github.com/SeismicSource/requake/compare/v0.3...v0.4
+[0.3]: https://github.com/SeismicSource/requake/compare/v0.2...v0.3
+[0.2]: https://github.com/SeismicSource/requake/compare/v0.1...v0.2
+[0.1]: https://github.com/SeismicSource/requake/releases/tag/v0.1
