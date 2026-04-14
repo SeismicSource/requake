@@ -2,7 +2,7 @@
 
 Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
-## [unreleased]
+## [0.7.3] - 2026-04-14
 
 This release is intended to validate the new release workflow.
 It introduces no new features or bug fixes.
@@ -140,7 +140,7 @@ Mostly a bugfix release with a slightly improved trace plotting.
 
 - Initial release, not yet feature complete
 
-[unreleased]: https://github.com/SeismicSource/requake/compare/v0.7.2...HEAD
+[0.7.3]: https://github.com/SeismicSource/requake/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/SeismicSource/requake/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/SeismicSource/requake/compare/v0.7...v0.7.1
 [0.7]: https://github.com/SeismicSource/requake/compare/v0.6...v0.7

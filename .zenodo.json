@@ -1,6 +1,6 @@
 {
   "title": "Requake: Repeating earthquakes search and analysis",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Requake is an open-source command-line application for detecting, searching, and analyzing repeating earthquakes using seismic event catalogs and waveform data streams. It provides researchers with tools to identify repeating-event families, examine waveform similarity, and study earthquake recurrence patterns in a reproducible workflow.",
   "upload_type": "software",
   "license": "GPL-3.0-or-later",
