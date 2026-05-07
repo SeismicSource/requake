@@ -14,4 +14,8 @@ from .generic_printer import generic_printer  # noqa
 # The config object is created in config.py and needs to be populated
 # when using requake from command line, this is done by the configure()
 # function in rq_setup.py
-from .config import config  # noqa
+from .config import (  # noqa
+    config,
+    to_picklable_config_dict,
+    from_picklable_config_dict,
+)

@@ -2,17 +2,29 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Unit tests for configuration object pickling."""
 
+import multiprocessing as mp
 import pickle
 import unittest
 from argparse import Namespace
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+from requake.config import (
+    from_picklable_config_dict,
+    to_picklable_config_dict,
+)
 from requake.config.config import Config
 from requake.config.utils import (
     parse_configspec,
     read_config,
     validate_config,
 )
+
+
+def _worker_read_snapshot(cfg_dict):
+    """Worker-side function for multiprocessing smoke tests."""
+    cfg = from_picklable_config_dict(cfg_dict)
+    return cfg.args.action, cfg.cc_min
 
 
 class TestConfigPickle(unittest.TestCase):
@@ -71,6 +83,86 @@ class TestConfigPickle(unittest.TestCase):
         self.assertEqual(loaded.args.action, 'print_catalog')
         self.assertEqual(loaded.args.configfile, str(config_file))
         self.assertIsNone(loaded.inventory)
+
+    def test_picklable_snapshot_strips_runtime_clients(self):
+        """Snapshot helper must drop runtime clients and stay pickleable."""
+        repo_root = Path(__file__).resolve().parents[2]
+        config_file = (
+            repo_root / 'tests' / 'integration' /
+            'test_fdsnws' / 'requake.conf'
+        )
+
+        cfg = self._build_runtime_config(config_file)
+        cfg.station_client = lambda: None
+        cfg.dataselect_client = lambda: None
+        cfg.catalog_fdsn_event_clients = [lambda: None]
+
+        with self.assertRaises(Exception):
+            pickle.dumps(cfg)
+
+        snapshot = to_picklable_config_dict(cfg)
+        blob = pickle.dumps(snapshot)
+        loaded = pickle.loads(blob)
+
+        self.assertNotIn('station_client', loaded)
+        self.assertNotIn('dataselect_client', loaded)
+        self.assertNotIn('catalog_fdsn_event_clients', loaded)
+        self.assertIsInstance(loaded['args'], dict)
+        self.assertEqual(loaded['args']['action'], 'print_catalog')
+
+    def test_picklable_snapshot_can_drop_inventory(self):
+        """Inventory can be excluded explicitly when workers do not need it."""
+        repo_root = Path(__file__).resolve().parents[2]
+        config_file = (
+            repo_root / 'tests' / 'integration' /
+            'test_fdsnws' / 'requake.conf'
+        )
+
+        cfg = self._build_runtime_config(config_file)
+        cfg.inventory = {'k': 'v'}
+
+        snapshot = to_picklable_config_dict(cfg, drop_inventory=True)
+        self.assertNotIn('inventory', snapshot)
+
+    def test_config_can_be_rebuilt_from_snapshot(self):
+        """Snapshot can be rebuilt to Config with args as Namespace."""
+        repo_root = Path(__file__).resolve().parents[2]
+        config_file = (
+            repo_root / 'tests' / 'integration' /
+            'test_fdsnws' / 'requake.conf'
+        )
+
+        cfg = self._build_runtime_config(config_file)
+        snapshot = to_picklable_config_dict(cfg)
+        rebuilt = from_picklable_config_dict(snapshot)
+
+        self.assertIsInstance(rebuilt, Config)
+        self.assertIsInstance(rebuilt.args, Namespace)
+        self.assertEqual(rebuilt.args.action, cfg.args.action)
+        self.assertEqual(
+            rebuilt.catalog_fdsn_event_url,
+            cfg.catalog_fdsn_event_url,
+        )
+
+    def test_process_pool_can_consume_picklable_snapshot(self):
+        """Snapshot can be sent to a spawned process and reconstructed."""
+        repo_root = Path(__file__).resolve().parents[2]
+        config_file = (
+            repo_root / 'tests' / 'integration' /
+            'test_fdsnws' / 'requake.conf'
+        )
+
+        cfg = self._build_runtime_config(config_file)
+        cfg.station_client = lambda: None
+        snapshot = to_picklable_config_dict(cfg)
+
+        mp_context = mp.get_context('spawn')
+        with ProcessPoolExecutor(max_workers=1, mp_context=mp_context) as pool:
+            future = pool.submit(_worker_read_snapshot, snapshot)
+            action, cc_min = future.result(timeout=15)
+
+        self.assertEqual(action, 'print_catalog')
+        self.assertEqual(cc_min, cfg.cc_min)
 
 
 if __name__ == '__main__':
