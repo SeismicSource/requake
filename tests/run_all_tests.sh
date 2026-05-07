@@ -7,10 +7,17 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Require either 'run' or 'clean' option
+# Require action and optional suite selector
 if [ -z "$1" ] || { [ "$1" != "run" ] && [ "$1" != "clean" ]; }; then
     echo "Error: You must specify either 'run' or 'clean' option"
-    echo "Usage: $0 {run|clean}"
+    echo "Usage: $0 {run|clean} [all|unit|integration]"
+    exit 1
+fi
+
+SUITE="${2:-all}"
+if [ "$SUITE" != "all" ] && [ "$SUITE" != "unit" ] && [ "$SUITE" != "integration" ]; then
+    echo "Error: suite must be one of: all, unit, integration"
+    echo "Usage: $0 {run|clean} [all|unit|integration]"
     exit 1
 fi
 
@@ -18,73 +25,110 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Counters
-TOTAL_TESTS=0
-PASSED_TESTS=0
-FAILED_TESTS=0
-
-# Find all test directories containing run_test.sh
-TEST_DIRS=()
-while IFS= read -r line; do
-    TEST_DIRS+=("$line")
-done < <(find . -maxdepth 2 -name "run_test.sh" -type f -exec dirname {} \; | sort -u)
-
-if [ ${#TEST_DIRS[@]} -eq 0 ]; then
-    echo -e "${RED}Error: No test directories found${NC}"
-    exit 1
-fi
-
-# Handle clean option
-if [ "$1" == "clean" ]; then
+run_unit_tests() {
     echo -e "${BLUE}========================================"
-    echo "Cleaning all tests"
-    echo "========================================${NC}"
+    echo "Running unit tests"
+    echo -e "========================================${NC}"
+    python -m unittest discover -s unit -p "test_*.py" -v
+    echo -e "${GREEN}✓ Unit tests passed${NC}"
+    echo ""
+}
+
+find_integration_test_dirs() {
+    find integration -maxdepth 3 -name "run_test.sh" -type f -exec dirname {} \; | sort -u
+}
+
+run_integration_tests() {
+    local test_dirs=()
+    while IFS= read -r line; do
+        test_dirs+=("$line")
+    done < <(find_integration_test_dirs)
+
+    if [ ${#test_dirs[@]} -eq 0 ]; then
+        echo -e "${RED}Error: No integration test directories found${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}========================================"
+    echo "Running integration tests"
+    echo -e "========================================${NC}"
     echo ""
 
-    for test_dir in "${TEST_DIRS[@]}"; do
+    local total_tests=0
+    local passed_tests=0
+    local failed_tests=0
+
+    for test_dir in "${test_dirs[@]}"; do
+        total_tests=$((total_tests + 1))
+        local test_name
+        test_name=$(basename "$test_dir")
+
+        echo -e "${BLUE}>>> Running integration test in $test_dir${NC}"
+        if (cd "$test_dir" && bash run_test.sh run); then
+            passed_tests=$((passed_tests + 1))
+            echo -e "${GREEN}✓ Integration test $test_name passed${NC}"
+        else
+            failed_tests=$((failed_tests + 1))
+            echo -e "${RED}✗ Integration test $test_name failed${NC}"
+        fi
+        echo ""
+    done
+
+    echo -e "${BLUE}========================================"
+    echo "Integration Test Summary"
+    echo -e "========================================${NC}"
+    echo "Total tests: $total_tests"
+    echo -e "${GREEN}Passed: $passed_tests${NC}"
+    if [ $failed_tests -gt 0 ]; then
+        echo -e "${RED}Failed: $failed_tests${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}Failed: $failed_tests${NC}"
+    echo -e "${GREEN}✓ Integration tests succeeded!${NC}"
+    echo ""
+}
+
+clean_integration_tests() {
+    local test_dirs=()
+    while IFS= read -r line; do
+        test_dirs+=("$line")
+    done < <(find_integration_test_dirs)
+
+    if [ ${#test_dirs[@]} -eq 0 ]; then
+        echo -e "${RED}Error: No integration test directories found${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}========================================"
+    echo "Cleaning integration tests"
+    echo -e "========================================${NC}"
+    echo ""
+
+    for test_dir in "${test_dirs[@]}"; do
         echo -e "${BLUE}>>> Cleaning $test_dir${NC}"
         (cd "$test_dir" && bash run_test.sh clean)
         echo ""
     done
 
-    echo -e "${GREEN}✓ All tests cleaned!${NC}"
+    echo -e "${GREEN}✓ Integration tests cleaned${NC}"
+}
+
+if [ "$1" == "clean" ]; then
+    if [ "$SUITE" == "all" ] || [ "$SUITE" == "integration" ]; then
+        clean_integration_tests
+    fi
+    if [ "$SUITE" == "unit" ]; then
+        echo "No unit test artifacts to clean."
+    fi
     exit 0
 fi
 
-echo -e "${BLUE}========================================"
-echo "Running all tests"
-echo "========================================${NC}"
-echo ""
-
-# Run each test
-for test_dir in "${TEST_DIRS[@]}"; do
-    TOTAL_TESTS=$((TOTAL_TESTS + 1))
-    TEST_NAME=$(basename "$test_dir")
-
-    echo -e "${BLUE}>>> Running test in $test_dir${NC}"
-
-    if (cd "$test_dir" && bash run_test.sh run); then
-        PASSED_TESTS=$((PASSED_TESTS + 1))
-        echo -e "${GREEN}✓ Test $TEST_NAME passed${NC}"
-    else
-        FAILED_TESTS=$((FAILED_TESTS + 1))
-        echo -e "${RED}✗ Test $TEST_NAME failed${NC}"
-    fi
-
-    echo ""
-done
-
-# Summary
-echo -e "${BLUE}========================================"
-echo "Test Summary"
-echo "========================================${NC}"
-echo "Total tests: $TOTAL_TESTS"
-echo -e "${GREEN}Passed: $PASSED_TESTS${NC}"
-if [ $FAILED_TESTS -gt 0 ]; then
-    echo -e "${RED}Failed: $FAILED_TESTS${NC}"
-    exit 1
-else
-    echo -e "${GREEN}Failed: $FAILED_TESTS${NC}"
-    echo ""
-    echo -e "${GREEN}✓ All tests succeeded!${NC}"
+if [ "$SUITE" == "all" ] || [ "$SUITE" == "unit" ]; then
+    run_unit_tests
 fi
+
+if [ "$SUITE" == "all" ] || [ "$SUITE" == "integration" ]; then
+    run_integration_tests
+fi
+
+echo -e "${GREEN}✓ Selected test suites succeeded${NC}"
