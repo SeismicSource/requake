@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-A minimal setup script for Requake
+A minimal setup script for Requake.
 
 This script ensures compatibility with versioneer
 and dynamically generates a README for correctly displaying images on PyPI.
