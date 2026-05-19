@@ -46,7 +46,14 @@ jobs:
         run: python -m pip install .
 
       - name: Run Unit Tests
-        run: bash tests/run_all_tests.sh run unit
+        run: |
+          set -euo pipefail
+          bash tests/run_all_tests.sh run unit 2>&1 | tee unit-tests.log
+          grep -q "test_catalog_roundtrip" unit-tests.log
+          grep -q "test_pairs_schema" unit-tests.log
+          grep -q "test_families_schema" unit-tests.log
+          grep -q "test_flag_family" unit-tests.log
+          grep -q "test_template_catalog_schema" unit-tests.log
 
   integration-tests:
     name: Run Integration Tests
@@ -70,7 +77,11 @@ jobs:
         run: python -m pip install .
 
       - name: Run Integration Tests
-        run: bash tests/run_all_tests.sh run integration
+        run: |
+          set -euo pipefail
+          bash tests/run_all_tests.sh run integration 2>&1 | tee integration-tests.log
+          grep -q "integration/test_baseline" integration-tests.log
+          grep -q "integration/test_template_scan_baseline" integration-tests.log
 
       - name: Clean Integration Test Outputs
         if: always()
