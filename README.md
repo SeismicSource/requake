@@ -101,6 +101,15 @@ You can keep your local Requake repository updated by running `git pull`
 from times to times. Thanks to `pip`'s "editable mode", you don't need to
 reinstall Requake after each update.
 
+If you want the repository style rules to run locally before each commit,
+enable the included git hook once per clone:
+
+    scripts/setup_local_hooks.sh
+
+You can also run the local style checks manually with:
+
+    scripts/check_style.sh
+
 ## Running
 
 ### Command line arguments
