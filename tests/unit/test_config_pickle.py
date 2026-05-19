@@ -59,13 +59,15 @@ class TestConfigPickle(unittest.TestCase):
         cfg.inventory = None
         return cfg
 
+    def _get_reference_config_file(self):
+        """Return the integration config used by pickle tests."""
+        return Path(__file__).resolve().parents[2].joinpath(
+            'tests', 'integration', 'test_fdsnws', 'requake.conf'
+        )
+
     def test_config_loaded_from_file_is_pickleable(self):
         """A Config from a real config file survives pickle round-trip."""
-        repo_root = Path(__file__).resolve().parents[2]
-        config_file = (
-            repo_root / 'tests' / 'integration' /
-            'test_fdsnws' / 'requake.conf'
-        )
+        config_file = self._get_reference_config_file()
 
         cfg = self._build_runtime_config(config_file)
         blob = pickle.dumps(cfg)
@@ -86,11 +88,7 @@ class TestConfigPickle(unittest.TestCase):
 
     def test_picklable_snapshot_strips_runtime_clients(self):
         """Snapshot helper must drop runtime clients and stay pickleable."""
-        repo_root = Path(__file__).resolve().parents[2]
-        config_file = (
-            repo_root / 'tests' / 'integration' /
-            'test_fdsnws' / 'requake.conf'
-        )
+        config_file = self._get_reference_config_file()
 
         cfg = self._build_runtime_config(config_file)
         cfg.station_client = lambda: None
@@ -112,11 +110,7 @@ class TestConfigPickle(unittest.TestCase):
 
     def test_picklable_snapshot_can_drop_inventory(self):
         """Inventory can be excluded explicitly when workers do not need it."""
-        repo_root = Path(__file__).resolve().parents[2]
-        config_file = (
-            repo_root / 'tests' / 'integration' /
-            'test_fdsnws' / 'requake.conf'
-        )
+        config_file = self._get_reference_config_file()
 
         cfg = self._build_runtime_config(config_file)
         cfg.inventory = {'k': 'v'}
@@ -126,11 +120,7 @@ class TestConfigPickle(unittest.TestCase):
 
     def test_config_can_be_rebuilt_from_snapshot(self):
         """Snapshot can be rebuilt to Config with args as Namespace."""
-        repo_root = Path(__file__).resolve().parents[2]
-        config_file = (
-            repo_root / 'tests' / 'integration' /
-            'test_fdsnws' / 'requake.conf'
-        )
+        config_file = self._get_reference_config_file()
 
         cfg = self._build_runtime_config(config_file)
         snapshot = to_picklable_config_dict(cfg)
@@ -146,11 +136,7 @@ class TestConfigPickle(unittest.TestCase):
 
     def test_process_pool_can_consume_picklable_snapshot(self):
         """Snapshot can be sent to a spawned process and reconstructed."""
-        repo_root = Path(__file__).resolve().parents[2]
-        config_file = (
-            repo_root / 'tests' / 'integration' /
-            'test_fdsnws' / 'requake.conf'
-        )
+        config_file = self._get_reference_config_file()
 
         cfg = self._build_runtime_config(config_file)
         cfg.station_client = lambda: None
