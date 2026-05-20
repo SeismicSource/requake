@@ -92,6 +92,7 @@ def _setup_tqdm_logging(logger_root):
 
     class TqdmLoggingHandler(logging.Handler):
         """A logging handler that writes to tqdm."""
+
         def __init__(self, level=logging.NOTSET):
             super().__init__(level)
 
@@ -184,9 +185,7 @@ def _connect_station_dataselect():
 
 
 def _connect_sds():
-    """
-    Connect to a local SeisComP Data Structure (SDS) archive.
-    """
+    """Connect to a local SeisComP Data Structure (SDS) archive."""
     from obspy.clients.filesystem.sds import Client as SDSClient
     _client = SDSClient(config.sds_data_path)
     all_nslc = _client.get_all_nslc()
@@ -273,23 +272,26 @@ def configure(args):
     config.template_dir = os.path.join(
         config.args.outdir, 'templates'
     )
-    if (
-        args.action == 'read_catalog' and
-        not args.append and
-        not write_ok(config.scan_catalog_file, args.force)
-    ):
+    should_write_catalog = (
+        args.action == 'read_catalog'
+        and not args.append
+        and not write_ok(config.scan_catalog_file, args.force)
+    )
+    if should_write_catalog:
         print('Exiting now.')
         sys.exit(0)
-    if (
-        args.action == 'scan_catalog' and
-        not write_ok(config.scan_catalog_pairs_file, args.force)
-    ):
+    should_write_pairs = (
+        args.action == 'scan_catalog'
+        and not write_ok(config.scan_catalog_pairs_file, args.force)
+    )
+    if should_write_pairs:
         print('Exiting now.')
         sys.exit(0)
-    if (
-        args.action == 'build_families' and
-        not write_ok(config.build_families_outfile, args.force)
-    ):
+    should_write_families = (
+        args.action == 'build_families'
+        and not write_ok(config.build_families_outfile, args.force)
+    )
+    if should_write_families:
         print('Exiting now.')
         sys.exit(0)
     # config.inventory needs to exist

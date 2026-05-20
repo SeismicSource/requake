@@ -50,9 +50,7 @@ def _build_template(family):
 
 
 def build_templates():
-    """
-    Build waveform templates for one or more event families.
-    """
+    """Build waveform templates for one or more event families."""
     try:
         families = read_selected_families()
     except FamilyNotFoundError as msg:

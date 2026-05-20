@@ -25,7 +25,7 @@ def _nadeau_and_johnson_1998(moment):
     :returns: slip in cm
     :rtype: float
     """
-    return (10**(-2.36))*(moment**(0.17))
+    return (10 ** (-2.36)) * (moment ** 0.17)
 
 
 def _beeler_et_al_2001(moment, stress_drop, rigidity, strain_hardening):
@@ -45,14 +45,14 @@ def _beeler_et_al_2001(moment, stress_drop, rigidity, strain_hardening):
     """
     rigidity *= 1e3  # Convert GPa to MPa
     return stress_drop * (
-        1/(1.81*rigidity)*(moment/stress_drop)**(1/3) + 1/strain_hardening
+        1 / (1.81 * rigidity) * (moment / stress_drop) ** (1 / 3)
+        + 1 / strain_hardening
     )
 
 
 def _eshelby_1957(moment, stress_drop, rigidity):
     """
-    Compute slip from seismic moment using the Eshelby (1957)
-    circular crack model.
+    Compute slip from seismic moment using the Eshelby (1957) model.
 
     :param moment: moment in N.m
     :type moment: float
@@ -65,9 +65,9 @@ def _eshelby_1957(moment, stress_drop, rigidity):
     """
     rigidity *= 1e3  # Convert GPa to MPa
     # radius in cm (since stress_drop is in MPa)
-    radius = (7/16 * moment/stress_drop)**(1/3)
+    radius = (7 / 16 * moment / stress_drop) ** (1 / 3)
     # slip in cm (since rigidity is in MPa and radius is in cm)
-    return moment/(np.pi*rigidity*radius**2)
+    return moment / (np.pi * rigidity * radius ** 2)
 
 
 def mag_to_slip_in_cm(magnitude):

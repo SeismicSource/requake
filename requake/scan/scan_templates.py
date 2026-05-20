@@ -51,7 +51,7 @@ def _build_event(tr, template, p_arrival_absolute_time):
     ev.depth = ev_depth
     ev.trace_id = tr.id
     ev.evid = generate_evid(orig_time)
-    ev.author = f"requake{get_versions()['version']}"
+    ev.author = f'requake{get_versions()["version"]}'
     return ev
 
 
@@ -88,7 +88,7 @@ def _scan_family_template(template, catalog_file, t0, t1):
     # We use the time_chunk length as max shift
     config.cc_max_shift = config.time_chunk
     _lag, lag_sec, cc_max, cc_mad = cc_waveform_pair(tr, template, mode='scan')
-    cc_peak = cc_max/cc_mad
+    cc_peak = cc_max / cc_mad
     if cc_peak > config.min_cc_mad_ratio:
         cc_max, p_arrival_absolute_time = _cc_detection(tr, template, lag_sec)
         ev = _build_event(tr, template, p_arrival_absolute_time)
@@ -97,9 +97,7 @@ def _scan_family_template(template, catalog_file, t0, t1):
 
 
 def _read_template_from_file():
-    """
-    Read a template from a file provided by the user.
-    """
+    """Read a template from a file provided by the user."""
     families = read_families()
     try:
         family_number = sorted(f.number for f in families)[-1] + 1
@@ -117,6 +115,8 @@ def _read_template_from_file():
 
 def _read_templates():
     """
+    Read templates from the template directory or a user-provided file.
+
     Read templates from files in the template directory or from a file
     provided by the user.
     """
@@ -167,9 +167,7 @@ def _template_catalog_files(templates):
 
 
 def scan_templates():
-    """
-    Scan a continuous waveform stream using one or more templates.
-    """
+    """Scan a continuous waveform stream using one or more templates."""
     try:
         templates = _read_templates()
     except (FileNotFoundError, FamilyNotFoundError) as msg:

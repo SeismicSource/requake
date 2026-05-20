@@ -19,8 +19,7 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 def _guess_field_names(input_fields):
     """
-    Guess the field names corresponding to origin time, latitude, longitude,
-    depth, magnitude and magnitude type.
+    Guess field names for origin time, location, depth, and magnitude.
 
     :param input_fields: list of field names
     :type input_fields: list of str
@@ -80,9 +79,8 @@ def _guess_field_names(input_fields):
     # make a list of duplicated fields, which have been matched more than once
     duplicated_fields = [
         (key, value, output_field_scores[key])
-        for key, value in output_fields.items() if
-        value is not None and
-        list(output_fields.values()).count(value) > 1
+        for key, value in output_fields.items()
+        if value is not None and list(output_fields.values()).count(value) > 1
     ]
     # if there are duplicated fields, keep the one with the highest score
     for _key, value, score in duplicated_fields:
@@ -167,7 +165,7 @@ def read_catalog_from_csv(filename):
         nrows -= 1  # first row is the header
         cat = RequakeCatalog()
         for n, row in enumerate(reader):
-            print(f'reading row {n+1}/{nrows}\r', end='')
+            print(f'reading row {n + 1}/{nrows}\r', end='')
             if fields['orig_time'] is None:
                 # try build a date-time field from year, month, day, hour,
                 # minute and seconds fields
@@ -195,7 +193,7 @@ def read_catalog_from_csv(filename):
                         )
                     except ValueError:
                         logger.error(
-                            f'Unable to parse origin time at row {n+2}: '
+                            f'Unable to parse origin time at row {n + 2}: '
                             f'"{orig_time_str}"')
                         continue
             row[None] = None

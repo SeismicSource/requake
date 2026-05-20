@@ -66,7 +66,7 @@ def run():
 
 
 def main():
-    """Main entry point for Requake."""
+    """Run the main entry point for Requake."""
     try:
         run()
     # pylint: disable=broad-except

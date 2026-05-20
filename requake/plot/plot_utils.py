@@ -22,9 +22,7 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def format_time_axis(ax, which='xaxis', grid=True):
-    """
-    Format the time axis of a Matplotlib plot.
-    """
+    """Format the time axis of a Matplotlib plot."""
     if which == 'both':
         axes = [ax.xaxis, ax.yaxis]
     elif which == 'xaxis':
@@ -35,15 +33,15 @@ def format_time_axis(ax, which='xaxis', grid=True):
         raise ValueError(f'Invalid value for "which": {which}')
     for axis in axes:
         dmin, dmax = axis.get_view_interval()
-        timespan = dmax-dmin
-        if timespan > 2*365:
+        timespan = dmax - dmin
+        if timespan > 2 * 365:
             _major_locator = mdates.YearLocator()   # every year
             _major_fmt = mdates.DateFormatter('%Y')
             _minor_locator = mdates.MonthLocator()  # every month
         else:
             _major_locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
             _major_fmt = mdates.ConciseDateFormatter(_major_locator)
-            if timespan > 365/2:
+            if timespan > 365 / 2:
                 _minor_locator = mdates.MonthLocator()  # every month
             else:
                 _minor_locator = mdates.DayLocator()  # every day
@@ -187,7 +185,7 @@ def duration_string(family):
     :return: Duration string
     :rtype: str
     """
-    duration = (family.endtime - family.starttime)/(365*24*60*60)
+    duration = (family.endtime - family.starttime) / (365 * 24 * 60 * 60)
     duration, units = _duration_units(duration)
     return f'{duration:.1f} {_short_units[units]}'
 
@@ -195,6 +193,7 @@ def duration_string(family):
 def _minmax(values):
     """
     Return the min and max values of a list of values.
+
     Use the range parameter if specified.
 
     :param values: List of values
@@ -292,9 +291,9 @@ def _family_color_number_of_events(families, cmap):
     :rtype: list, matplotlib.colors.Normalize, matplotlib.cm.ScalarMappable
     """
     values = [len(family) for family in families]
-    boundaries = np.arange(min(values), max(values)+1)
+    boundaries = np.arange(min(values), max(values) + 1)
     if len(boundaries) % 2 == 0:
-        boundaries = np.append(boundaries, max(values)+1)
+        boundaries = np.append(boundaries, max(values) + 1)
     boundaries = boundaries - 0.5
     norm = colors.BoundaryNorm(boundaries, cmap.N)
     return [cmap(norm(value)) for value in values], norm, cmap
@@ -314,11 +313,11 @@ def _family_colors_duration(families, cmap):
     durations = [family.duration for family in families]
     min_duration, max_duration = _minmax(durations)
     max_duration_new_units, units = _duration_units(max_duration)
-    multiplier = max_duration_new_units/max_duration
-    min_duration_new_units = min_duration*multiplier
+    multiplier = max_duration_new_units / max_duration
+    min_duration_new_units = min_duration * multiplier
     norm = colors.Normalize(
         vmin=min_duration_new_units, vmax=max_duration_new_units)
-    fcolors = [cmap(norm(duration*multiplier)) for duration in durations]
+    fcolors = [cmap(norm(duration * multiplier)) for duration in durations]
     cmap.label = f'{cmap.label} ({units})'
     return fcolors, norm, cmap
 

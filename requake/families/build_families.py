@@ -92,18 +92,18 @@ def _build_families_from_upgma(events, cc_min):
     # We use min_correlation for pairs for which no correlation is available
     evids = sorted(set(events.keys()))
     distances = {
-        k: 1-correlations.get(k, min_correlation)
+        k: 1 - correlations.get(k, min_correlation)
         for k in combinations(evids, 2)
     }
     # Build pairwise distance matrix, then the linkage matrix,
     # then the clusters
     pairwise_distances = [distances[k] for k in sorted(distances.keys())]
     linkage_matrix = average(pairwise_distances)
-    clusters = fcluster(linkage_matrix, 1-cc_min, criterion='distance')
+    clusters = fcluster(linkage_matrix, 1 - cc_min, criterion='distance')
     # Build families
     families = [Family(number=n) for n in range(max(clusters))]
     for evid, cluster in zip(evids, clusters):
-        families[cluster-1].append(events[evid])
+        families[cluster - 1].append(events[evid])
     # Remove families with only one event
     families = [f for f in families if len(f) > 1]
     return families
@@ -143,9 +143,7 @@ def _write_families(families):
 
 
 def build_families():
-    """
-    Build families of repeating earthquakes from a catalog of pairs.
-    """
+    """Build families of repeating earthquakes from a catalog of pairs."""
     try:
         _check_options()
     except ValueError as msg:

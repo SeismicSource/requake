@@ -27,9 +27,9 @@ def mag_to_moment(magnitude, unit='N.m'):
     if magnitude is None:
         return 0
     if unit == 'N.m':
-        moment = 10**(3/2*(magnitude+6.07))
+        moment = 10 ** (3 / 2 * (magnitude + 6.07))
     elif unit == 'dyne.cm':
-        moment = 10**(3/2*(magnitude+10.7))
+        moment = 10 ** (3 / 2 * (magnitude + 10.7))
     else:
         raise ValueError(f'Wrong unit for seismic moment: {unit}')
     return moment

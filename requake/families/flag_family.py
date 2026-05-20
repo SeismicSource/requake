@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def flag_family():
-    """
-    Flag a family of repeating earthquakes as valid or not valid.
-    """
+    """Flag a family of repeating earthquakes as valid or not valid."""
     family_number = config.args.family_number
     true_words = ['True', 'true', 'True', 't', 'T']
     false_words = ['False', 'false', 'FALSE', 'f', 'F']

@@ -19,9 +19,8 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 class RequakeEventPair:
-    """
-    A pair of events.
-    """
+    """A pair of events."""
+
     def __init__(self, event1, event2, trace_id, lag_samples, lag_sec, cc_max):
         """
         Initialize a pair of events.
@@ -57,6 +56,7 @@ class RequakeEventPair:
         self.cc_max = cc_max
 
     def __repr__(self):
+        """Return the debug representation of the pair."""
         return (
             f'RequakeEventPair(event1={self.event1}, event2={self.event2}, '
             f'trace_id={self.trace_id}, '
@@ -65,6 +65,7 @@ class RequakeEventPair:
         )
 
     def __str__(self):
+        """Return a compact string representation of the pair."""
         return (
             f'RequakeEventPair: {self.event1.evid} - {self.event2.evid}, '
             f'trace_id={self.trace_id}, '

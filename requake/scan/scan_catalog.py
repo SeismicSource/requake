@@ -34,7 +34,8 @@ def _pair_ok(pair):
 
 def _fix_trace_id(stats):
     """
-    Fix trace_id in a ObsPy stats object by replacing dots with underscores.
+    Fix trace_id in an ObsPy stats object by replacing dots.
+
     This makes trace_id compliant with the FDSN standard.
 
     The fixes are done in place.
@@ -106,9 +107,7 @@ def _process_pairs(fp_out, catalog):
 
 
 def scan_catalog():
-    """
-    Perform cross-correlation on catalog events.
-    """
+    """Perform cross-correlation on catalog events."""
     try:
         catalog = read_stored_catalog()
     except (ValueError, FileNotFoundError) as msg:

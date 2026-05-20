@@ -56,7 +56,7 @@ class CachedTiler():
         if not os.path.exists(tile_fname):
             response = requests.get(
                 self._image_url(tile), stream=True, timeout=30)
-            with open(tile_fname, "wb") as fh:
+            with open(tile_fname, 'wb') as fh:
                 for chunk in response:
                     fh.write(chunk)
         with open(tile_fname, 'rb') as fh:

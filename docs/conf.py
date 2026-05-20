@@ -61,13 +61,13 @@ bibtex_bibfiles = ['refs.bib']
 bibtex_reference_style = 'author_year'
 bibtex_default_style = 'unsrt'
 
-latex_macros = r"""
+latex_macros = r'''
     \def \Nm                {\mathrm{N}\cdot\mathrm{m}}
     \def \dynecm            {\mathrm{dyne}\cdot\mathrm{cm}}
     \def \cm                {\mathrm{cm}}
     \def \MPa               {\mathrm{MPa}}
     \def \MPacm             {\mathrm{MPa/cm}}
-"""
+'''
 
 # Translate LaTeX macros to KaTeX and add to options for HTML builder
 katex_macros = katex.latex_defs_to_katex_macros(latex_macros)

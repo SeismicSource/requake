@@ -85,7 +85,7 @@ def get_waveform_from_client(traceid, starttime, endtime):
 def _get_arrivals_and_distance(
         trace_lat, trace_lon, ev_lat, ev_lon, ev_depth, orig_time):
     """
-    Get arrivals and distance for a given trace and event
+    Get arrivals and distance for a given trace and event.
 
     :param trace_lat: latitude of the trace
     :type trace_lat: float
@@ -117,8 +117,7 @@ def _get_arrivals_and_distance(
 
 def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
     """
-    Get a waveform for a given event and traceid through
-    an FDSN or SDS client.
+    Get a waveform for a given event and trace id via a waveform client.
 
     :param evid: event id
     :type evid: str
@@ -150,8 +149,7 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
 
 def _get_event_waveform_from_event_data_path(evid, traceid):
     """
-    Get a waveform for a given event and traceid by selecting a pre-cut
-    trace from the event_data_path defined in the config.
+    Get a waveform for an event by selecting a pre-cut local trace.
 
     :param evid: event id
     :type evid: str
@@ -199,8 +197,7 @@ def _get_event_waveform_from_event_data_path(evid, traceid):
 
 def get_event_waveform(ev):
     """
-    Get waveform for a given event and for trace_id defined in the config
-    or passed as a command line argument.
+    Get waveform for an event using the configured or requested trace id.
 
     :param ev: an event
     :type ev: RequakeEvent
@@ -343,11 +340,11 @@ def cc_waveform_pair(tr1, tr2, mode='events'):
             rq_exit(1)
     tr1 = process_waveforms(tr1)
     tr2 = process_waveforms(tr2)
-    shift = int(config.cc_max_shift/dt1)
+    shift = int(config.cc_max_shift / dt1)
     cc = correlate(tr1, tr2, shift)
     abs_max = bool(config.cc_allow_negative)
     lag, cc_max = xcorr_max(cc, abs_max)
-    lag_sec = lag*dt1
+    lag_sec = lag * dt1
     if mode != 'scan':
         return lag, lag_sec, cc_max
     # compute median absolute deviation for the non-zero portion of cc
@@ -379,7 +376,7 @@ def align_pair(tr1, tr2):
 
 def align_traces(st):
     """
-    Align traces in stream using cross-correlation.
+    Align traces in a stream using cross-correlation.
 
     :param st: stream of traces
     :type st: obspy.Stream
@@ -417,7 +414,7 @@ def _stack_traces(st):
             data /= abs(tr.max())
         # make sure that the two traces have the same length
         if len(data) < len(tr_stack.data):
-            data = np.pad(data, (0, len(tr_stack.data)-len(data)))
+            data = np.pad(data, (0, len(tr_stack.data) - len(data)))
         elif len(data) > len(tr_stack.data):
             data = data[:len(tr_stack.data)]
         tr_stack.data += data
@@ -436,7 +433,7 @@ def _stack_traces(st):
 
 def build_template(st, family):
     """
-    Build template by averaging traces.
+    Build a template by averaging traces.
 
     Assumes that the stream is realigned.
     """

@@ -73,7 +73,8 @@ class TestTemplateCatalogSchema(unittest.TestCase):
         self._assert_filename_pattern(file_3)
 
     def test_template_catalog_row_contract(self):
-        """Verify each row is fdsn_text|cc_max and can be parsed.
+        """
+        Verify each row is fdsn_text|cc_max and can be parsed.
 
         Format: evid|orig_time|lat|lon|depth|author|...|location_name|cc_max.
         """

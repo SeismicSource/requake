@@ -59,10 +59,10 @@ def _plot_family(family):
         # and theoretical P arrival
         p_arrival = tr0.stats.P_arrival_time - tr0.stats.starttime
         t0_p = p_arrival - 1
-        t0_env = times[env > 0.1*env_max][0]
+        t0_env = times[env > 0.1 * env_max][0]
         t0 = min(t0_p, t0_env)
     if t1 is None:
-        t1 = times[env > 0.3*env_max][-1]
+        t1 = times[env > 0.3 * env_max][-1]
 
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
     tracelines = []
@@ -79,13 +79,18 @@ def _plot_family(family):
         tr.data *= 0.5
         # substract t0, so that time axis starts at 0
         color = '#cc8800' if average_trace else 'black'
-        l, = ax.plot(tr.times()-t0, tr.data+n, color=color, linewidth=0.5)
+        l, = ax.plot(
+            tr.times() - t0,
+            tr.data + n,
+            color=color,
+            linewidth=0.5,
+        )
         tracelines.append(l)
         p_arrival = tr.stats.P_arrival_time - tr.stats.starttime - t0
         s_arrival = tr.stats.S_arrival_time - tr.stats.starttime - t0
         hh = 0.15  # pick line half-height
-        p_bar, = ax.plot((p_arrival, p_arrival), (n-hh, n+hh), color='g')
-        s_bar, = ax.plot((s_arrival, s_arrival), (n-hh, n+hh), color='r')
+        p_bar, = ax.plot((p_arrival, p_arrival), (n - hh, n + hh), color='g')
+        s_bar, = ax.plot((s_arrival, s_arrival), (n - hh, n + hh), color='r')
         p_bars.append(p_bar)
         s_bars.append(s_bar)
         trans = ax.get_yaxis_transform()
@@ -110,14 +115,14 @@ def _plot_family(family):
             -0.01, n, y_label, transform=trans, ha='right', va='center',
             color=color, fontsize=8, linespacing=1.5)
         txt = ax.text(
-            0.01, n+0.2, info_text, transform=trans,
+            0.01, n + 0.2, info_text, transform=trans,
             color=color, fontsize=8, linespacing=1.5)
         txt.set_path_effects(
             [PathEffects.withStroke(linewidth=3, foreground='w')])
         if not average_trace:
             text = f'CC mean {tr.stats.cc_mean:.2f}'
             txt = ax.text(
-                0.98, n+0.2, text, ha='right',
+                0.98, n + 0.2, text, ha='right',
                 color=color, transform=trans, fontsize=8)
             txt.set_path_effects(
                 [PathEffects.withStroke(linewidth=3, foreground='w')])
@@ -130,9 +135,9 @@ def _plot_family(family):
     ax.minorticks_on()
     ax.tick_params(which='both', top=True, labeltop=False)
     ax.tick_params(axis='x', which='both', direction='in')
-    ax.set_xlim(0, t1-t0)
+    ax.set_xlim(0, t1 - t0)
     ax.set_xlabel('Time (s)')
-    title = f'Family {family.number} | {len(st)-1} events'
+    title = f'Family {family.number} | {len(st) - 1} events'
     ax.set_title(title, loc='left')
     fig.canvas.manager.set_window_title(title)
     title = (
@@ -149,23 +154,23 @@ def _plot_family(family):
         for line in tracelines:
             ydata = line.get_ydata()
             ymean = ydata.mean()
-            ydata = (ydata-ymean)*zoom_level + ymean
+            ydata = (ydata - ymean) * zoom_level + ymean
             line.set_ydata(ydata)
         fig.canvas.draw_idle()
 
     def _time_zoom(ax, zoom_level):
         xmin, xmax = ax.get_xlim()
-        xmean = 0.5*(xmin+xmax)
-        xspan = xmax-xmin
+        xmean = 0.5 * (xmin + xmax)
+        xspan = xmax - xmin
         xspan *= zoom_level
-        xmin = xmean - 0.5*xspan
-        xmax = xmean + 0.5*xspan
+        xmin = xmean - 0.5 * xspan
+        xmax = xmean + 0.5 * xspan
         ax.set_xlim(xmin, xmax)
         fig.canvas.draw_idle()
 
     def _pan_plot(ax, amount):
         xlim = ax.get_xlim()
-        ax.set_xlim(xlim[0]+amount, xlim[1]+amount)
+        ax.set_xlim(xlim[0] + amount, xlim[1] + amount)
         fig.canvas.draw_idle()
 
     def _toggle_arrivals():
@@ -198,8 +203,8 @@ def _plot_family(family):
             _keypress.time_zoom_level *= 2
             _time_zoom(ax, 2)
         elif event.key == '0':
-            _zoom_lines(1./_keypress.zoom_level)
-            _time_zoom(ax, 1./_keypress.time_zoom_level)
+            _zoom_lines(1.0 / _keypress.zoom_level)
+            _time_zoom(ax, 1.0 / _keypress.time_zoom_level)
             _pan_plot(ax, -_keypress.pan_amount)
             _keypress.zoom_level = 1
             _keypress.time_zoom_level = 1
@@ -215,9 +220,7 @@ def _plot_family(family):
 
 
 def plot_families():
-    """"
-    Plot traces for one or more event families.
-    """
+    """Plot traces for one or more event families."""
     try:
         families = read_selected_families()
     except (FileNotFoundError, FamilyNotFoundError) as msg:

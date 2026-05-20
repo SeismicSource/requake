@@ -58,9 +58,7 @@ def _get_pair():
 
 
 def plot_pair():
-    """
-    Download and plot traces for an event pair.
-    """
+    """Download and plot traces for an event pair."""
     waveform_pair = WaveformPair()
     try:
         pair = _get_pair()

@@ -36,9 +36,8 @@ class InvalidFamilyError(Exception):
 
 
 class Family(list):
-    """
-    A list of events belonging to the same family.
-    """
+    """A list of events belonging to the same family."""
+
     def __init__(self, number=-1):
         """
         Initialize a family.
@@ -62,6 +61,7 @@ class Family(list):
         self.trace_id = None
 
     def __str__(self):
+        """Return a compact string representation of the family."""
         return (
             f'{self.number:2d} {len(self):2d} '
             f'{self.lon:8.4f} {self.lat:8.4f} {self.depth:7.3f} '
@@ -99,8 +99,8 @@ class Family(list):
             if self.starttime else ev.orig_time
         self.endtime = max(ev.orig_time, self.endtime)\
             if self.endtime else ev.orig_time
-        year = 365*24*60*60
-        self.duration = (self.endtime - self.starttime)/year
+        year = 365 * 24 * 60 * 60
+        self.duration = (self.endtime - self.starttime) / year
         if ev.mag is not None:
             self._mag_quantities(ev)
 
@@ -120,7 +120,9 @@ class Family(list):
         ev_first = sorted(self)[0]
         ev_first_slip = mag_to_slip_in_cm(ev_first.mag)
         d_slip = self.cumul_slip - ev_first_slip
-        self.slip_rate = np.inf if self.duration == 0 else d_slip/self.duration
+        self.slip_rate = (
+            np.inf if self.duration == 0 else d_slip / self.duration
+        )
         if self.cumul_moment is None:
             self.cumul_moment = 0
         self.cumul_moment += mag_to_moment(ev.mag)
@@ -149,7 +151,7 @@ class Family(list):
         :rtype: float
         """
         distance, _, _ = gps2dist_azimuth(self.lat, self.lon, lat, lon)
-        return distance/1e3
+        return distance / 1e3
 
 
 def _read_families_from_catalog_scan():
@@ -223,8 +225,7 @@ def _read_families_from_template_scan():
 
 def read_families():
     """
-    Read families from the catalog scan output or from the template scan
-    output.
+    Read families from the catalog scan output or template scan output.
 
     :return: List of families.
     :rtype: list of Family
@@ -236,8 +237,7 @@ def read_families():
 
 def read_selected_families():
     """
-    Read and select families based on family number, validity, length
-    and number of events.
+    Read and select families by number, validity, length, and size.
 
     :return: List of families.
     :rtype: list of Family
@@ -317,7 +317,7 @@ def get_family_waveforms(family):
     for n, ev in enumerate(family):
         sys.stdout.write(
             f'{clear_line}Family {family.number}: '
-            f'reading waveform for event {ev.evid}: {n+1}/{nevs}')
+            f'reading waveform for event {ev.evid}: {n + 1}/{nevs}')
         try:
             st += get_event_waveform(ev)
         except NoWaveformError as msg:

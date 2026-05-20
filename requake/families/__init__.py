@@ -1,8 +1,9 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Modules and functions for building and analyzing families of repeating
-earthquakes.
+Modules and functions for building and analyzing repeating families.
+
+Families can be built, printed, filtered, and converted into templates.
 
 :copyright:
     2021-2026 Claudio Satriano <satriano@ipgp.fr>

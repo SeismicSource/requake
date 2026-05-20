@@ -45,8 +45,7 @@ def int_or_none(string):
 
 def field_match_score(field, field_list):
     """
-    Return the length of the longest substring of field that matches any of
-    the field names in field_list.
+    Return the longest matching substring length for a field name.
 
     :param field: field name
     :type field: str
@@ -73,8 +72,7 @@ def field_match_score(field, field_list):
 
 def guess_field_names(input_fields, field_guesses):
     """
-    Guess the field names corresponding to origin time, latitude, longitude,
-    depth, magnitude and magnitude type.
+    Guess field names for origin time, location, depth, and magnitude.
 
     :param input_fields: list of field names
     :type input_fields: list of str

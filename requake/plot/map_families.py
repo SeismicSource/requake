@@ -107,9 +107,7 @@ def _make_basemap():
 
 
 def map_families():
-    """
-    Plot families on a map.
-    """
+    """Plot families on a map."""
     try:
         families = read_selected_families()
     except (FileNotFoundError, FamilyNotFoundError) as msg:

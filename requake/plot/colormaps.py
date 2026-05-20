@@ -3,7 +3,6 @@
 """
 Colormaps for Requake.
 
-
 :copyright:
     2021-2026 Claudio Satriano <satriano@ipgp.fr>
 :license:

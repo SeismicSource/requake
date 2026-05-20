@@ -29,6 +29,7 @@ class WaveformPair:
     """
 
     def __init__(self):
+        """Initialize the waveform-pair helper and its caches."""
         self.model = TauPyModel(model='ak135')
         self.evid1 = None
         self.skipped_evids_traceids = []

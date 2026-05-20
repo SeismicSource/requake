@@ -18,9 +18,8 @@ from .._version import get_versions
 
 
 class NewlineHelpFormatter(argparse.HelpFormatter):
-    """
-    Custom help formatter that preserves newlines in help messages.
-    """
+    """Custom help formatter that preserves newlines in help messages."""
+
     def _split_lines(self, text, width):
         lines = []
         for line in text.splitlines():  # Split the text by newlines first
@@ -36,11 +35,11 @@ class NewlineHelpFormatter(argparse.HelpFormatter):
 
 class SubcommandHelpFormatter(argparse.RawDescriptionHelpFormatter):
     """
-    Custom help formatter that removes the list of subcommands from the help
-    message.
+    Custom help formatter that removes the subcommand list from help.
 
     See: https://stackoverflow.com/a/13429281/2021880
     """
+
     def _format_action(self, action):
         parts = super(
             argparse.RawDescriptionHelpFormatter, self
@@ -130,7 +129,7 @@ def parse_arguments(progname='requake'):
             '- CSV\n'
             '- Space-separated text files.\n\n'
             'For CSV or space-separated formats, the file must include '
-            'at least one column for the event\'s origin time '
+            "at least one column for the event's origin time "
             'and may contain additional columns for event ID, longitude, '
             'latitude, depth, and magnitude. Column names '
             'must be specified in the first row.\n\n'
@@ -472,8 +471,8 @@ def parse_arguments(progname='requake'):
         pass
     except ValueError:
         sys.stderr.write(
-            f"{progname} {args.action}: "
-            "error: argument -l/--longerthan: "
+            f'{progname} {args.action}: '
+            'error: argument -l/--longerthan: '
             f"invalid value: '{args.longerthan}'\n"
         )
         sys.exit(2)
@@ -483,8 +482,8 @@ def parse_arguments(progname='requake'):
         pass
     except ValueError:
         sys.stderr.write(
-            f"{progname} {args.action}: "
-            "error: argument -S/--shorterthan: "
+            f'{progname} {args.action}: '
+            'error: argument -S/--shorterthan: '
             f"invalid value: '{args.shorterthan}'\n"
         )
         sys.exit(2)
@@ -513,13 +512,13 @@ def _timespec_to_sec(timespec):
     elif suffix == 'm':
         time_in_seconds *= 60
     elif suffix == 'h':
-        time_in_seconds *= 24*60
+        time_in_seconds *= 24 * 60
     elif suffix == 'd':
-        time_in_seconds *= 24*60*60
+        time_in_seconds *= 24 * 60 * 60
     elif suffix == 'M':
-        time_in_seconds *= 30*24*60*60
+        time_in_seconds *= 30 * 24 * 60 * 60
     elif suffix == 'y':
-        time_in_seconds *= 365*24*60*60
+        time_in_seconds *= 365 * 24 * 60 * 60
     else:
-        raise ValueError(f"Invalid time specification: {timespec}")
+        raise ValueError(f'Invalid time specification: {timespec}')
     return time_in_seconds

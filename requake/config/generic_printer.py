@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 def generic_printer(rows, headers_fmt, print_headers=True):
     """
-    A generic printer function for Requake.
+    Print rows using the configured output format.
 
     :param rows: Rows to print.
     :type rows: list of rows

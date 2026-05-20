@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def print_pairs():
-    """
-    Print pairs to screen.
-    """
+    """Print pairs to screen."""
     headers_fmt = [
         ('evid1', None),
         ('evid2', None),

@@ -54,8 +54,7 @@ def _read_catalog_from_file():
 
 def _filter_catalog(catalog):
     """
-    Filter an event catalog, based on the criteria specified
-    in the configuration.
+    Filter an event catalog using the configured selection criteria.
 
     :param catalog: Event catalog.
     :type catalog: requake.catalog.RequakeCatalog

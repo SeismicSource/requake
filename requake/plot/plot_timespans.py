@@ -38,9 +38,7 @@ ylabels = {
 
 
 def _plot_family_timespans(family, ax, sort_by, lon0, lat0, color):
-    """
-    Plot the timespan of a single family.
-    """
+    """Plot the timespan of a single family."""
     fn = family.number
     nevents = len(family)
     duration_str = duration_string(family)
@@ -71,9 +69,7 @@ def _plot_family_timespans(family, ax, sort_by, lon0, lat0, color):
 
 
 def plot_timespans():
-    """
-    Plot family timespans.
-    """
+    """Plot family timespans."""
     try:
         families = read_selected_families()
     except (FileNotFoundError, FamilyNotFoundError) as msg:

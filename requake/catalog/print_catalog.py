@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def print_catalog():
-    """
-    Print the event catalog to screen.
-    """
+    """Print the event catalog to screen."""
     try:
         catalog = read_stored_catalog()
     except (ValueError, FileNotFoundError) as msg:

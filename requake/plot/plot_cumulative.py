@@ -30,9 +30,7 @@ mpl.rcParams['pdf.fonttype'] = 42
 
 
 def _get_arrays(families):
-    """
-    Get arrays of times, cumulative quantities, and labels for families.
-    """
+    """Get arrays of times, cumulative quantities, and labels."""
     times = [
         [ev.orig_time.matplotlib_date for ev in family]
         for family in families
@@ -49,7 +47,7 @@ def _get_arrays(families):
         ]
     elif config.args.quantity == 'number':
         cumuls = [
-            np.arange(1, len(family)+1)
+            np.arange(1, len(family) + 1)
             for family in families
         ]
     else:
@@ -66,9 +64,7 @@ def _get_arrays(families):
 
 
 def _format_axes(ax, times, cumuls):
-    """
-    Format axes for cumulative plot.
-    """
+    """Format axes for the cumulative plot."""
     ax.tick_params(which='both', top=True, labeltop=True)
     ax.tick_params(axis='x', which='both', direction='in')
     ax.callbacks.connect('xlim_changed', format_time_axis)
@@ -76,7 +72,7 @@ def _format_axes(ax, times, cumuls):
     max_time = max(max(times) for times in times)
     timespan = max_time - min_time
     padding = timespan * 0.05
-    ax.set_xlim(min_time-padding, max_time+padding)
+    ax.set_xlim(min_time - padding, max_time + padding)
     min_cumul = min(min(c) for c in cumuls)
     max_cumul = max(max(c) for c in cumuls)
     cumulspan = max_cumul - min_cumul
@@ -110,9 +106,7 @@ def _format_axes(ax, times, cumuls):
 
 
 def plot_cumulative():
-    """
-    Cumulative plot for one or more families.
-    """
+    """Plot cumulative quantities for one or more families."""
     try:
         families = read_selected_families()
     except (FileNotFoundError, FamilyNotFoundError) as msg:

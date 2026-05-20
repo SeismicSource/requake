@@ -61,10 +61,26 @@ repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || die \
     "Not inside a git repository"
 cd "$repo_root"
 
+is_vendored_configobj_path() {
+    local path="$1"
+    [[ "$path" == requake/config/configobj/* ]]
+}
+
 if [[ $# -eq 0 ]]; then
     flake8_targets=(.)
 else
-    flake8_targets=("$@")
+    flake8_targets=()
+    for path in "$@"; do
+        if is_vendored_configobj_path "$path"; then
+            continue
+        fi
+        flake8_targets+=("$path")
+    done
+fi
+
+if [[ ${#flake8_targets[@]} -eq 0 ]]; then
+    echo 'No non-vendored Python paths to check.'
+    exit 0
 fi
 
 flake8 "${flake8_targets[@]}"

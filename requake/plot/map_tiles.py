@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Map tilers
+Map tilers.
 
 :copyright:
     2024-2026 Claudio Satriano <satriano@ipgp.fr>
@@ -15,13 +15,13 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 class StamenTerrain(GoogleWTS):
-    """
-    Retrieves Stamen Terrain tiles from stadiamaps.com.
-    """
+    """Retrieve Stamen Terrain tiles from stadiamaps.com."""
+
     def __init__(self,
                  apikey,
                  cache=False):
-        super().__init__(cache=cache, desired_tile_form="RGBA")
+        """Initialize the terrain tiler."""
+        super().__init__(cache=cache, desired_tile_form='RGBA')
         self.apikey = apikey
 
     def _image_url(self, tile):
@@ -33,13 +33,13 @@ class StamenTerrain(GoogleWTS):
 
 
 class EsriHillshade(GoogleWTS):
-    """
-    Retrieves Esri Hillshade tiles from argisonline.com.
-    """
+    """Retrieve Esri Hillshade tiles from argisonline.com."""
+
     def __init__(self,
                  apikey=None,
                  cache=False):
-        super().__init__(cache=cache, desired_tile_form="RGBA")
+        """Initialize the hillshade tiler."""
+        super().__init__(cache=cache, desired_tile_form='RGBA')
         self.apikey = apikey
 
     def _image_url(self, tile):
@@ -57,13 +57,13 @@ class EsriHillshade(GoogleWTS):
 
 
 class EsriHillshadeDark(GoogleWTS):
-    """
-    Retrieves Esri Hillshade Dark tiles from argisonline.com.
-    """
+    """Retrieve Esri Hillshade Dark tiles from argisonline.com."""
+
     def __init__(self,
                  apikey=None,
                  cache=False):
-        super().__init__(cache=cache, desired_tile_form="RGBA")
+        """Initialize the dark hillshade tiler."""
+        super().__init__(cache=cache, desired_tile_form='RGBA')
         self.apikey = apikey
 
     def _image_url(self, tile):
@@ -81,13 +81,13 @@ class EsriHillshadeDark(GoogleWTS):
 
 
 class EsriOcean(GoogleWTS):
-    """
-    Retrieves Esri Ocean tiles from argisonline.com.
-    """
+    """Retrieve Esri Ocean tiles from argisonline.com."""
+
     def __init__(self,
                  apikey=None,
                  cache=False):
-        super().__init__(cache=cache, desired_tile_form="RGBA")
+        """Initialize the ocean tiler."""
+        super().__init__(cache=cache, desired_tile_form='RGBA')
         self.apikey = apikey
 
     def _image_url(self, tile):
@@ -105,13 +105,13 @@ class EsriOcean(GoogleWTS):
 
 
 class EsriImagery(GoogleWTS):
-    """
-    Retrieves Esri Imagery tiles from argisonline.com.
-    """
+    """Retrieve Esri Imagery tiles from argisonline.com."""
+
     def __init__(self,
                  apikey=None,
                  cache=False):
-        super().__init__(cache=cache, desired_tile_form="RGBA")
+        """Initialize the imagery tiler."""
+        super().__init__(cache=cache, desired_tile_form='RGBA')
         self.apikey = apikey
 
     def _image_url(self, tile):
@@ -129,13 +129,13 @@ class EsriImagery(GoogleWTS):
 
 
 class WorldStreetMap(GoogleWTS):
-    """
-    Retrieves World Street Map tiles from argisonline.com.
-    """
+    """Retrieve World Street Map tiles from argisonline.com."""
+
     def __init__(self,
                  apikey=None,
                  cache=False):
-        super().__init__(cache=cache, desired_tile_form="RGBA")
+        """Initialize the street-map tiler."""
+        super().__init__(cache=cache, desired_tile_form='RGBA')
         self.apikey = apikey
 
     def _image_url(self, tile):

@@ -77,7 +77,7 @@ def _print_family_list(families, duration_units, duration_multiplier):
             family.depth,
             family.starttime,
             family.endtime,
-            family.duration*duration_multiplier,
+            family.duration * duration_multiplier,
             family.slip_rate,
             family.magmin,
             family.magmax
@@ -87,9 +87,7 @@ def _print_family_list(families, duration_units, duration_multiplier):
 
 
 def print_families():
-    """
-    Print families to screen.
-    """
+    """Print families to screen."""
     try:
         families = read_selected_families()
     except (FileNotFoundError, FamilyNotFoundError) as msg:
@@ -105,7 +103,7 @@ def print_families():
     elif 1 < avg_duration_in_days < 30:
         duration_multiplier = 365
         duration_units = 'days'
-    elif 1/24 < avg_duration_in_days < 1:
+    elif 1 / 24 < avg_duration_in_days < 1:
         duration_multiplier = 365 * 24
         duration_units = 'hours'
     else:

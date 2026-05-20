@@ -28,6 +28,7 @@ class RequakeEvent():
                  depth=None, mag_type=None, mag=None, author=None,
                  catalog=None, contributor=None, contributor_id=None,
                  mag_author=None, location_name=None, trace_id=None):
+        """Initialize an event container."""
         self.evid = evid
         self.orig_time = orig_time
         self.lon = lon
@@ -45,24 +46,31 @@ class RequakeEvent():
         self.correlations = {}
 
     def __eq__(self, other):
+        """Return True when two events have the same identity."""
         return self.evid == other.evid and self.trace_id == other.trace_id
 
     def __gt__(self, other):
+        """Compare events by origin time."""
         return self.orig_time > other.orig_time
 
     def __ge__(self, other):
+        """Compare events by origin time."""
         return self.orig_time >= other.orig_time
 
     def __lt__(self, other):
+        """Compare events by origin time."""
         return self.orig_time < other.orig_time
 
     def __le__(self, other):
+        """Compare events by origin time."""
         return self.orig_time <= other.orig_time
 
     def __hash__(self):
+        """Return the event hash."""
         return self.evid.__hash__()
 
     def __str__(self):
+        """Return a compact string representation of the event."""
         return (
             f'{self.evid} {self.orig_time} '
             f'{self.lon} {self.lat} {self.depth} {self.mag_type} {self.mag}'
@@ -308,9 +316,9 @@ def _base26(val):
     :rtype: str
     """
     chars = [
-      'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
-      'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
-      'u', 'v', 'w', 'x', 'y', 'z'
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
+        'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+        'u', 'v', 'w', 'x', 'y', 'z'
     ]
     base = len(chars)
     ret = ''
@@ -337,7 +345,7 @@ def generate_evid(orig_time):
     orig_year = UTCDateTime(year=year, month=1, day=1)
     val = int(orig_time - orig_year)
     # normalize val between 0 (aaaaaa) and 26**6-1 (zzzzzz)
-    maxval = 366*24*3600  # max number of seconds in leap year
-    normval = int(val/maxval * (26**6-1))
+    maxval = 366 * 24 * 3600  # max number of seconds in leap year
+    normval = int(val / maxval * (26 ** 6 - 1))
     ret = _base26(normval)
     return f'{prefix}{year}{ret}'
