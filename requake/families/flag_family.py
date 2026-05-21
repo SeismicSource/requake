@@ -10,35 +10,22 @@ Flag a family of repeating earthquakes as valid or not valid.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
-import csv
-import shutil
-from tempfile import NamedTemporaryFile
 from ..config import config
+from ..database.families import update_family_valid
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def flag_family():
     """Flag a family of repeating earthquakes as valid or not valid."""
     family_number = config.args.family_number
-    true_words = ['True', 'true', 'True', 't', 'T']
-    false_words = ['False', 'false', 'FALSE', 'f', 'F']
-    is_valid = config.args.is_valid
-    if is_valid not in true_words + false_words:
+    is_valid = str(config.args.is_valid).strip().lower()
+    if is_valid not in {'true', 't', 'false', 'f'}:
         logger.error(
-            f'Invalid choice for "is_valid": "{is_valid}". '
+            f'Invalid choice for "is_valid": "{config.args.is_valid}". '
             'Enter either "true" ("t") or "false" ("f")'
         )
-    is_valid = is_valid in true_words
-    with open(config.build_families_outfile, 'r', encoding='utf-8') as csvfile:
-        with NamedTemporaryFile(mode='w', delete=False) as tmpfile:
-            reader = csv.DictReader(csvfile)
-            fieldnames = reader.fieldnames
-            writer = csv.DictWriter(tmpfile, fieldnames=fieldnames)
-            writer.writeheader()
-            for row in reader:
-                if row['family_number'] == family_number:
-                    row['valid'] = is_valid
-                writer.writerow(row)
-    shutil.move(tmpfile.name, config.build_families_outfile)
+        return
+    is_valid = is_valid in {'true', 't'}
+    update_family_valid(config, family_number, is_valid)
     text = {True: 'valid', False: 'not valid'}
     logger.info(f'Family "{family_number}" flagged as {text[is_valid]}')

@@ -17,6 +17,7 @@ import logging
 import signal
 import tqdm
 from .._version import get_versions
+from ..database.db import get_db_path
 from .config import config
 from .utils import (
     parse_configspec, read_config, validate_config, write_sample_config,
@@ -260,9 +261,6 @@ def configure(args):
     # update config with the contents of config_obj
     config.update(config_obj)
     config.args = args
-    config.scan_catalog_file = os.path.join(
-        config.args.outdir, 'requake.catalog.txt'
-    )
     config.scan_catalog_pairs_file = os.path.join(
         config.args.outdir, 'requake.event_pairs.csv'
     )
@@ -275,23 +273,9 @@ def configure(args):
     should_write_catalog = (
         args.action == 'read_catalog'
         and not args.append
-        and not write_ok(config.scan_catalog_file, args.force)
+        and not write_ok(get_db_path(config), args.force)
     )
     if should_write_catalog:
-        print('Exiting now.')
-        sys.exit(0)
-    should_write_pairs = (
-        args.action == 'scan_catalog'
-        and not write_ok(config.scan_catalog_pairs_file, args.force)
-    )
-    if should_write_pairs:
-        print('Exiting now.')
-        sys.exit(0)
-    should_write_families = (
-        args.action == 'build_families'
-        and not write_ok(config.build_families_outfile, args.force)
-    )
-    if should_write_families:
         print('Exiting now.')
         sys.exit(0)
     # config.inventory needs to exist

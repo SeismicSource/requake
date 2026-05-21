@@ -11,14 +11,11 @@ Family classes and functions.
 """
 import sys
 import logging
-import csv
-import os
-from glob import glob
 import numpy as np
-from obspy import UTCDateTime, Stream
+from obspy import Stream
 from obspy.geodetics import gps2dist_azimuth
 from ..config import config
-from ..formulas import float_or_none, mag_to_slip_in_cm, mag_to_moment
+from ..formulas import mag_to_slip_in_cm, mag_to_moment
 from ..catalog import RequakeEvent
 from ..waveforms import (
     load_inventory, get_event_waveform, align_traces, build_template,
@@ -161,34 +158,8 @@ def _read_families_from_catalog_scan():
     :return: List of families.
     :rtype: list of Family
     """
-    with open(config.build_families_outfile, 'r', encoding='utf-8') as fp:
-        reader = csv.DictReader(fp)
-        old_family_number = -1
-        families = []
-        family = None
-        for row in reader:
-            ev = RequakeEvent()
-            ev.evid = row['evid']
-            ev.orig_time = UTCDateTime(row['orig_time'])
-            ev.lon = float_or_none(row['lon'])
-            ev.lat = float_or_none(row['lat'])
-            ev.depth = float_or_none(row['depth_km'])
-            ev.mag_type = row['mag_type']
-            ev.mag = float_or_none(row['mag'])
-            ev.trace_id = row['trace_id']
-            family_number = int(row['family_number'])
-            if family_number != old_family_number:
-                if family is not None:
-                    families.append(family)
-                family = Family()
-                family.number = family_number
-                old_family_number = family_number
-            family.append(ev)
-            family.valid = row['valid'] in ['True', 'true']
-        # append last family
-        if family is not None:
-            families.append(family)
-    return families
+    from ..database.families import read_families as read_families_from_db
+    return read_families_from_db(config)
 
 
 def _read_families_from_template_scan():
@@ -198,29 +169,10 @@ def _read_families_from_template_scan():
     :return: List of families.
     :rtype: list of Family
     """
-    template_catalogs = glob(
-        f'{config.args.outdir}/template_catalogs/catalog*.txt'
+    from ..database.templates import (
+        read_template_families as read_template_families_from_db,
     )
-    families = []
-    for template_catalog in template_catalogs:
-        fname = os.path.basename(template_catalog)
-        catalog_name = fname.split('.')[0]
-        trace_id = fname.lstrip(f'{catalog_name}.').rstrip('.txt')
-        family_number = int(catalog_name.lstrip('catalog'))
-        family = Family(family_number)
-        with open(template_catalog, 'r', encoding='utf-8') as fp:
-            for row in fp:
-                fields = row.split('|')
-                ev = RequakeEvent()
-                ev.evid = fields[0].strip()
-                ev.orig_time = UTCDateTime(fields[1].strip())
-                ev.lon = float(fields[2].strip())
-                ev.lat = float(fields[3].strip())
-                ev.depth = float(fields[4].strip())
-                ev.trace_id = trace_id
-                family.append(ev)
-        families.append(family)
-    return families
+    return read_template_families_from_db(config)
 
 
 def read_families():
@@ -355,10 +307,8 @@ def _build_family_number_list():
     """Build a list of family numbers from config option."""
     family_numbers = config.args.family_numbers
     if family_numbers == 'all':
-        with open(config.build_families_outfile, 'r', encoding='utf-8') as fp:
-            reader = csv.DictReader(fp)
-            fn = sorted({int(row['family_number']) for row in reader})
-        return fn
+        families = read_families()
+        return sorted({family.number for family in families})
     try:
         if ',' in family_numbers:
             fn = list(map(int, family_numbers.split(',')))

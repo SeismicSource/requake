@@ -11,12 +11,14 @@ Catalog-based repeater scan for Requake.
 """
 import sys
 import logging
-import csv
 from itertools import combinations
 from tqdm import tqdm
 from obspy.geodetics import gps2dist_azimuth
 from ..config import config, rq_exit
+from ..database.db import get_db_path
 from ..catalog import fix_non_locatable_events, read_stored_catalog
+from ..families.pairs import RequakeEventPair
+from ..database.pairs import write_pairs as write_pairs_to_db
 from ..waveforms import (
     WaveformPair, cc_waveform_pair,
     NoWaveformError, NoMetadataError, MetadataMismatchError
@@ -49,17 +51,9 @@ def _fix_trace_id(stats):
     stats.channel = stats.channel.replace('.', '_')
 
 
-def _process_pairs(fp_out, catalog):
+def _process_pairs(catalog):
     """Process event pairs."""
-    fieldnames = [
-        'evid1', 'evid2', 'trace_id',
-        'orig_time1', 'lon1', 'lat1', 'depth_km1', 'mag_type1', 'mag1',
-        'orig_time2', 'lon2', 'lat2', 'depth_km2', 'mag_type2', 'mag2',
-        'lag_samples', 'lag_sec', 'cc_max'
-    ]
-    writer = csv.writer(fp_out)
-    writer.writerow(fieldnames)
-    fp_out.flush()
+    write_pairs_to_db([], config, append=False)
     logger.info('Precomputing valid event pairs...')
     valid_pairs = [
         pair for pair in combinations(catalog, 2) if _pair_ok(pair)
@@ -74,6 +68,7 @@ def _process_pairs(fp_out, catalog):
     )
     waveform_pair = WaveformPair()
     n_success = 0
+    batch_of_pairs = []
     for pair in valid_pairs:
         if pbar is not None:
             pbar.update()
@@ -85,17 +80,20 @@ def _process_pairs(fp_out, catalog):
             stats2 = tr2.stats
             _fix_trace_id(stats1)
             _fix_trace_id(stats2)
-            writer.writerow([
-                stats1.evid, stats2.evid, tr1.id,
-                stats1.orig_time, stats1.ev_lon, stats1.ev_lat,
-                stats1.ev_depth, stats1.mag_type, stats1.mag,
-                stats2.orig_time, stats2.ev_lon, stats2.ev_lat,
-                stats2.ev_depth, stats2.mag_type, stats2.mag,
-                lag, lag_sec, cc_max
-            ])
+            batch_of_pairs.append(
+                RequakeEventPair(
+                    pair[0],
+                    pair[1],
+                    tr1.id,
+                    lag,
+                    lag_sec,
+                    cc_max,
+                )
+            )
             n_success += 1
-            if n_success % 10 == 0:
-                fp_out.flush()
+            if len(batch_of_pairs) >= 100:
+                write_pairs_to_db(batch_of_pairs, config, append=True)
+                batch_of_pairs = []
         except (NoMetadataError, MetadataMismatchError) as msg:
             logger.error(msg)
             rq_exit(1)
@@ -103,6 +101,8 @@ def _process_pairs(fp_out, catalog):
             # Do not print empty messages
             if str(msg):
                 logger.warning(msg)
+    if batch_of_pairs:
+        write_pairs_to_db(batch_of_pairs, config, append=True)
     return npairs
 
 
@@ -124,10 +124,11 @@ def scan_catalog():
             'Not enough events in catalog. '
             'You need at least 2 events to run the scan 😉')
         rq_exit(1)
-    logger.info(f'{nevents} events read from catalog file')
+    logger.info(
+        f'{nevents} events read from db file {get_db_path(config)}'
+    )
     logger.info('Building event pairs...')
     logger.info('Computing waveform cross-correlation...')
-    with open(config.scan_catalog_pairs_file, 'w', encoding='utf-8') as fp_out:
-        npairs = _process_pairs(fp_out, catalog)
+    npairs = _process_pairs(catalog)
     logger.info(f'Processed {npairs:n} event pairs')
-    logger.info(f'Done! Output written to {config.scan_catalog_pairs_file}')
+    logger.info(f'Done! Output written to {get_db_path(config)}')

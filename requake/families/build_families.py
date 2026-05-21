@@ -10,10 +10,11 @@ Build families of repeating earthquakes from a catalog of pairs.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
-import csv
 from itertools import combinations
 from scipy.cluster.hierarchy import average, fcluster
 from ..config import config, rq_exit
+from ..database.db import get_db_path
+from ..database.families import write_families as write_families_to_db
 from .pairs import read_events_from_pairs_file
 from .families import Family
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -111,7 +112,7 @@ def _build_families_from_upgma(events, cc_min):
 
 def _write_families(families):
     """
-    Write families to file.
+    Write families to the SQLite database.
 
     :param families: list of families
     :type families: list
@@ -126,20 +127,11 @@ def _write_families(families):
         'distance_from': lambda f: f.distance_from(lon0, lat0)
     }
     families = sorted(families, key=sort_keys[sort_by])
-    with open(config.build_families_outfile, 'w', encoding='utf-8') as fp_out:
-        fieldnames = [
-            'evid', 'trace_id', 'orig_time', 'lon', 'lat', 'depth_km',
-            'mag_type', 'mag', 'family_number', 'valid'
-        ]
-        writer = csv.writer(fp_out)
-        writer.writerow(fieldnames)
-        valid = True  # families are valid by default
-        for number, family in enumerate(families):
-            for ev in family:
-                writer.writerow([
-                    ev.evid, ev.trace_id, ev.orig_time, ev.lon, ev.lat,
-                    ev.depth, ev.mag_type, ev.mag, number, valid
-                ])
+    valid = True  # families are valid by default
+    for number, family in enumerate(families):
+        family.number = number
+        family.valid = valid
+    write_families_to_db(families, config)
 
 
 def build_families():
@@ -150,12 +142,15 @@ def build_families():
         logger.error(msg)
         rq_exit(1)
     try:
-        logger.info('Reading events from pairs file...')
+        logger.info(
+            'Reading events from event pairs in '
+            f'db file {get_db_path(config)}...'
+        )
         events = read_events_from_pairs_file()
     except FileNotFoundError:
         logger.error(
-            'Unable to find event pairs file: '
-            f'{config.scan_catalog_pairs_file}'
+            'Unable to find event pairs in database: '
+            f'{get_db_path(config)}'
         )
         rq_exit(1)
     if config.clustering_algorithm == 'shared':
@@ -165,4 +160,4 @@ def build_families():
         logger.info('Building families using UPGMA...')
         families = _build_families_from_upgma(events, config.cc_min)
     _write_families(families)
-    logger.info(f'Done! Output written to: {config.build_families_outfile}')
+    logger.info(f'Done! Output written to: {get_db_path(config)}')

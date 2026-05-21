@@ -1,56 +1,34 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Unit tests for event pairs CSV schema and types."""
+"""
+Unit tests for event pairs CSV schema and types.
+
+:copyright:
+    2021-2026 Claudio Satriano <satriano@ipgp.fr>
+:license:
+    GNU General Public License v3.0 or later
+    (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
+"""
 
 import unittest
 import tempfile
 import os
-import csv
+from argparse import Namespace
+from unittest.mock import patch
 from obspy import UTCDateTime
-from requake.families.pairs import read_pairs_file
+from requake.config import config
+from requake.families.pairs import RequakeEventPair, read_pairs_file
+from requake.catalog import RequakeEvent
+from requake.database.pairs import write_pairs
 
 
 class TestPairsSchema(unittest.TestCase):
-    """Test event pairs CSV schema and types."""
+    """Test stored event pairs schema and types."""
 
     def setUp(self):
         """Create a temporary directory for test outputs."""
         self.test_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.test_dir.cleanup)
-
-        # Mock config for reading pairs
-        from requake import config as config_module
-        self.original_config = config_module.config.copy()
-        self.addCleanup(self._restore_config)
-
-    def _restore_config(self):
-        """Restore original config."""
-        from requake import config as config_module
-        config_module.config.clear()
-        config_module.config.update(self.original_config)
-
-    def _write_synthetic_pairs_csv(self, pairs_data):
-        """
-        Write synthetic pairs CSV file.
-
-        :param pairs_data: list of dictionaries with pair data
-        :type pairs_data: list
-        :return: path to CSV file
-        :rtype: str
-        """
-        csv_path = os.path.join(self.test_dir.name, 'test_pairs.csv')
-        fieldnames = [
-            'evid1', 'evid2', 'trace_id',
-            'orig_time1', 'lon1', 'lat1', 'depth_km1', 'mag_type1', 'mag1',
-            'orig_time2', 'lon2', 'lat2', 'depth_km2', 'mag_type2', 'mag2',
-            'lag_samples', 'lag_sec', 'cc_max'
-        ]
-        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            for pair in pairs_data:
-                writer.writerow(pair)
-        return csv_path
 
     def _get_synthetic_pairs_data(self, n_pairs=3):
         """
@@ -61,29 +39,39 @@ class TestPairsSchema(unittest.TestCase):
         :return: list of pair dictionaries
         :rtype: list
         """
-        return [
-            {
-                'evid1': f'ev_{i:03d}_a',
-                'evid2': f'ev_{i:03d}_b',
-                'trace_id': 'XX.TEST.00.BHZ',
-                'orig_time1': '2020-01-01T00:00:00',
-                'lon1': 10.0 + i * 0.1,
-                'lat1': 45.0 + i * 0.1,
-                'depth_km1': 10.0,
-                'mag_type1': 'Mw',
-                'mag1': 4.0,
-                'orig_time2': '2020-01-01T01:00:00',
-                'lon2': 10.0 + i * 0.1,
-                'lat2': 45.0 + i * 0.1,
-                'depth_km2': 10.0,
-                'mag_type2': 'Mw',
-                'mag2': 4.1,
-                'lag_samples': 100,
-                'lag_sec': 2.5,
-                'cc_max': 0.85
-            }
-            for i in range(n_pairs)
-        ]
+        pairs = []
+        for i in range(n_pairs):
+            event1 = RequakeEvent(
+                evid=f'ev_{i:03d}_a',
+                orig_time=UTCDateTime('2020-01-01T00:00:00'),
+                lon=10.0 + i * 0.1,
+                lat=45.0 + i * 0.1,
+                depth=10.0,
+                mag_type='Mw',
+                mag=4.0,
+                trace_id='XX.TEST.00.BHZ',
+            )
+            event2 = RequakeEvent(
+                evid=f'ev_{i:03d}_b',
+                orig_time=UTCDateTime('2020-01-01T01:00:00'),
+                lon=10.0 + i * 0.1,
+                lat=45.0 + i * 0.1,
+                depth=10.0,
+                mag_type='Mw',
+                mag=4.1,
+                trace_id='XX.TEST.00.BHZ',
+            )
+            pairs.append(
+                RequakeEventPair(
+                    event1,
+                    event2,
+                    'XX.TEST.00.BHZ',
+                    100,
+                    2.5,
+                    0.85,
+                )
+            )
+        return pairs
 
     def _assert_pair_types(self, pair):
         """Assert types and ranges for one RequakeEventPair."""
@@ -99,41 +87,36 @@ class TestPairsSchema(unittest.TestCase):
         self.assertGreaterEqual(
             pair.lag_sec, 0.0, 'lag_sec should be non-negative')
 
-    def _read_triplets(self, csv_path):
-        """Read (evid1, evid2, trace_id) triplets from a CSV file."""
-        with open(csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            return [
-                (row['evid1'], row['evid2'], row['trace_id'])
-                for row in reader
-            ]
+    def _patch_runtime_config(self):
+        """Return a patch that points the global config to a temp database."""
+        args = Namespace(outdir=self.test_dir.name)
+        return patch.dict(
+            config,
+            {
+                'args': args,
+                'outdir': self.test_dir.name,
+                'scan_catalog_pairs_file': os.path.join(
+                    self.test_dir.name, 'requake.event_pairs.csv'
+                ),
+            },
+            clear=False,
+        )
 
-    def test_pairs_csv_headers(self):
-        """
-        Assert exact ordered header list after _process_pairs().
-
-        The expected header order is:
-        evid1, evid2, trace_id, orig_time1, lon1, lat1, depth_km1, mag_type1,
-        mag1, orig_time2, lon2, lat2, depth_km2, mag_type2, mag2, lag_samples,
-        lag_sec, cc_max
-        """
+    def test_pairs_roundtrip_preserves_fields(self):
+        """Stored pairs should preserve the same values when read back."""
         pairs_data = self._get_synthetic_pairs_data(2)
-        csv_path = self._write_synthetic_pairs_csv(pairs_data)
 
-        # Read and verify headers
-        with open(csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            expected_headers = [
-                'evid1', 'evid2', 'trace_id',
-                'orig_time1', 'lon1', 'lat1', 'depth_km1', 'mag_type1', 'mag1',
-                'orig_time2', 'lon2', 'lat2', 'depth_km2', 'mag_type2', 'mag2',
-                'lag_samples', 'lag_sec', 'cc_max'
-            ]
-            self.assertEqual(
-                reader.fieldnames,
-                expected_headers,
-                'CSV headers do not match expected order'
-            )
+        with self._patch_runtime_config():
+            write_pairs(pairs_data, config, append=False)
+            pairs = list(read_pairs_file())
+
+        self.assertEqual(len(pairs), 2)
+        self.assertEqual(pairs[0].event1.evid, pairs_data[0].event1.evid)
+        self.assertEqual(pairs[0].event2.evid, pairs_data[0].event2.evid)
+        self.assertEqual(pairs[0].trace_id, pairs_data[0].trace_id)
+        self.assertEqual(pairs[0].lag_samples, pairs_data[0].lag_samples)
+        self.assertEqual(pairs[0].lag_sec, pairs_data[0].lag_sec)
+        self.assertEqual(pairs[0].cc_max, pairs_data[0].cc_max)
 
     def test_pairs_row_types(self):
         """
@@ -146,14 +129,10 @@ class TestPairsSchema(unittest.TestCase):
         - orig_time1/orig_time2 are valid UTC datetimes
         """
         pairs_data = self._get_synthetic_pairs_data(2)
-        csv_path = self._write_synthetic_pairs_csv(pairs_data)
 
-        # Mock config
-        from requake import config as config_module
-        config_module.config.scan_catalog_pairs_file = csv_path
-
-        # Read pairs using read_pairs_file
-        pairs = list(read_pairs_file())
+        with self._patch_runtime_config():
+            write_pairs(pairs_data, config, append=False)
+            pairs = list(read_pairs_file())
 
         self.assertEqual(len(pairs), 2, 'Should have 2 pairs')
 
@@ -167,53 +146,53 @@ class TestPairsSchema(unittest.TestCase):
         Create pairs with potential duplicates and ensure each unique
         tuple appears only once.
         """
+        event1 = RequakeEvent(
+            evid='ev_a',
+            orig_time=UTCDateTime('2020-01-01T00:00:00'),
+            lon=10.0,
+            lat=45.0,
+            depth=10.0,
+            mag_type='Mw',
+            mag=4.0,
+            trace_id='XX.TEST.00.BHZ',
+        )
+        event2 = RequakeEvent(
+            evid='ev_b',
+            orig_time=UTCDateTime('2020-01-01T01:00:00'),
+            lon=10.0,
+            lat=45.0,
+            depth=10.0,
+            mag_type='Mw',
+            mag=4.1,
+            trace_id='XX.TEST.00.BHZ',
+        )
         pairs_data = [
-            {
-                'evid1': 'ev_a',
-                'evid2': 'ev_b',
-                'trace_id': 'XX.TEST.00.BHZ',
-                'orig_time1': '2020-01-01T00:00:00',
-                'lon1': 10.0,
-                'lat1': 45.0,
-                'depth_km1': 10.0,
-                'mag_type1': 'Mw',
-                'mag1': 4.0,
-                'orig_time2': '2020-01-01T01:00:00',
-                'lon2': 10.0,
-                'lat2': 45.0,
-                'depth_km2': 10.0,
-                'mag_type2': 'Mw',
-                'mag2': 4.1,
-                'lag_samples': 100,
-                'lag_sec': 2.5,
-                'cc_max': 0.85
-            },
-            {
-                'evid1': 'ev_a',
-                'evid2': 'ev_b',
-                'trace_id': 'XX.TEST.00.BHZ',
-                'orig_time1': '2020-01-01T00:00:00',
-                'lon1': 10.0,
-                'lat1': 45.0,
-                'depth_km1': 10.0,
-                'mag_type1': 'Mw',
-                'mag1': 4.0,
-                'orig_time2': '2020-01-01T01:00:00',
-                'lon2': 10.0,
-                'lat2': 45.0,
-                'depth_km2': 10.0,
-                'mag_type2': 'Mw',
-                'mag2': 4.1,
-                'lag_samples': 100,
-                'lag_sec': 2.5,
-                'cc_max': 0.86  # Different cc_max but same triplet
-            }
+            RequakeEventPair(
+                event1,
+                event2,
+                'XX.TEST.00.BHZ',
+                100,
+                2.5,
+                0.85,
+            ),
+            RequakeEventPair(
+                event1,
+                event2,
+                'XX.TEST.00.BHZ',
+                100,
+                2.5,
+                0.86,
+            ),
         ]
-        csv_path = self._write_synthetic_pairs_csv(pairs_data)
 
-        triplets = self._read_triplets(csv_path)
-        self.assertEqual(len(triplets), 2)
-        self.assertEqual(len(set(triplets)), 1)
+        with self._patch_runtime_config():
+            write_pairs(pairs_data, config, append=False)
+            pairs = list(read_pairs_file())
+
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual(pairs[0].event1.evid, 'ev_a')
+        self.assertEqual(pairs[0].event2.evid, 'ev_b')
+        self.assertEqual(pairs[0].cc_max, 0.86)
 
 
 if __name__ == '__main__':

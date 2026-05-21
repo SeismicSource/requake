@@ -43,6 +43,22 @@ def parse_configspec():
     return read_config(configspec_file)
 
 
+def confirm_action(prompt, default=False):
+    """
+    Ask for yes/no confirmation and return True for yes.
+
+    :param prompt: Prompt shown to the user.
+    :type prompt: str
+    :param default: Default answer when user provides empty input.
+    :type default: bool
+    :return: True if user confirms, False otherwise.
+    :rtype: bool
+    """
+    suffix = '[Y/n] ' if default else '[y/N] '
+    answer = input(f'{prompt} {suffix}').strip()
+    return answer.lower() in {'y', 'yes'} if answer else default
+
+
 def write_ok(filepath, force=False):
     """
     Check if a file can be written.
@@ -58,10 +74,9 @@ def write_ok(filepath, force=False):
     if force:
         return True
     if os.path.exists(filepath):
-        ans = input(
-            f'"{filepath}" already exists. Do you want to overwrite it? [y/N] '
+        return confirm_action(
+            f'"{filepath}" already exists. Do you want to overwrite it?'
         )
-        return ans in ['y', 'Y']
     return True
 
 
@@ -153,11 +168,11 @@ def update_config_file(config_file, configspec):
     mod_time = datetime.fromtimestamp(os.path.getmtime(config_file))
     mod_time_str = mod_time.strftime('%Y%m%d_%H%M%S')
     config_file_old = f'{config_file}.{mod_time_str}'
-    ans = input(
-        f'Ok to update {config_file}? [y/N]\n'
-        f'(Old file will be saved as {config_file_old}) '
+    should_update = confirm_action(
+        f'Ok to update {config_file}?\n'
+        f'(Old file will be saved as {config_file_old})'
     )
-    if ans not in ['y', 'Y']:
+    if not should_update:
         sys.exit(0)
     config_new = ConfigObj(configspec=configspec, default_encoding='utf8')
     config_new = read_config(None, configspec)

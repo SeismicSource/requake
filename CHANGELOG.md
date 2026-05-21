@@ -4,6 +4,15 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+This release introduces a major storage change.
+
+Requake now stores scan-related data (catalog, event pairs, and families) in a
+SQLite database instead of CSV files. This improves storage efficiency and
+data access performance, especially for large catalogs.
+
+This change is not backward compatible at the data format level. The
+high-level behavior of the command-line interface remains unchanged.
+
 ## [0.7.3] - 2026-04-14
 
 This release is intended to validate the new release workflow.

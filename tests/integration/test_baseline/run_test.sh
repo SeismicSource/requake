@@ -30,6 +30,9 @@ if [ -d "requake_out" ]; then
     exit 1
 fi
 
+# Database filename
+DB_FILE="requake_out/requake.sqlite"
+
 # Total number of steps
 TOTAL_STEPS=3
 
@@ -52,23 +55,39 @@ echo "✓ Catalog printed"
 echo "----------------------------------------"
 echo ""
 
-# Step 3: Verify catalog file exists and contains expected data
+# Step 3: Verify catalog database exists and contains expected data
 echo "[3/$TOTAL_STEPS] Validating baseline invariants..."
-if [ ! -f "requake_out/requake.catalog.txt" ]; then
-    echo "FAILED: requake.catalog.txt not found in requake_out"
+if [ ! -f "$DB_FILE" ]; then
+    echo "FAILED: $DB_FILE not found"
     exit 1
 fi
 
-# Count lines in catalog (should be 3 events + comments)
-CATALOG_LINES=$(grep -v '^#' "requake_out/requake.catalog.txt" | grep -v '^$' | wc -l)
+CATALOG_ROWS=$(python - <<PY
+import sqlite3
+
+conn = sqlite3.connect('$DB_FILE')
+try:
+    row_count = conn.execute('SELECT COUNT(*) FROM catalog').fetchone()[0]
+    evids = [row[0] for row in conn.execute(
+        'SELECT evid FROM catalog ORDER BY evid'
+    ).fetchall()]
+finally:
+    conn.close()
+
+print(row_count)
+print('\n'.join(evids))
+PY
+)
+
+CATALOG_LINES=$(printf '%s\n' "$CATALOG_ROWS" | head -n 1)
 if [ "$CATALOG_LINES" -ne 3 ]; then
     echo "FAILED: Expected 3 events in catalog, got $CATALOG_LINES"
     exit 1
 fi
 
-# Verify output includes all expected event IDs
+# Verify database includes all expected event IDs
 for EVID in "ev_baseline_001" "ev_baseline_002" "ev_baseline_003"; do
-    if ! grep -q "$EVID" "requake_out/requake.catalog.txt"; then
+    if ! printf '%s\n' "$CATALOG_ROWS" | tail -n +2 | grep -q "$EVID"; then
         echo "FAILED: Expected event $EVID not found in catalog"
         exit 1
     fi

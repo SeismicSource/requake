@@ -191,11 +191,11 @@ class RequakeCatalog(list):
                 fp.write(ev.fdsn_text() + '\n')
 
     def filter(
-            self, starttime=None, endtime=None,
-            minlatitude=None, maxlatitude=None,
-            minlongitude=None, maxlongitude=None,
-            mindepth=None, maxdepth=None,
-            minmagnitude=None, maxmagnitude=None
+        self, starttime=None, endtime=None,
+        minlatitude=None, maxlatitude=None,
+        minlongitude=None, maxlongitude=None,
+        mindepth=None, maxdepth=None,
+        minmagnitude=None, maxmagnitude=None
     ):
         """
         Filter the catalog, based on the specified criteria.
@@ -228,60 +228,47 @@ class RequakeCatalog(list):
         """
         outcat = RequakeCatalog()
         for ev in self:
-            if ev.orig_time is not None:
-                if starttime is not None and ev.orig_time < starttime:
-                    continue
-                if endtime is not None and ev.orig_time > endtime:
-                    continue
-            if ev.lat is not None:
-                if minlatitude is not None and ev.lat < minlatitude:
-                    continue
-                if maxlatitude is not None and ev.lat > maxlatitude:
-                    continue
-            if ev.lon is not None:
-                if minlongitude is not None and ev.lon < minlongitude:
-                    continue
-                if maxlongitude is not None and ev.lon > maxlongitude:
-                    continue
-            if ev.depth is not None:
-                if mindepth is not None and ev.depth < mindepth:
-                    continue
-                if maxdepth is not None and ev.depth > maxdepth:
-                    continue
-            if ev.mag is not None:
-                if minmagnitude is not None and ev.mag < minmagnitude:
-                    continue
-                if maxmagnitude is not None and ev.mag > maxmagnitude:
-                    continue
+            if _out_of_range(ev.orig_time, starttime, endtime):
+                continue
+            if _out_of_range(ev.lat, minlatitude, maxlatitude):
+                continue
+            if _out_of_range(ev.lon, minlongitude, maxlongitude):
+                continue
+            if _out_of_range(ev.depth, mindepth, maxdepth):
+                continue
+            if _out_of_range(ev.mag, minmagnitude, maxmagnitude):
+                continue
             outcat.append(ev)
         return outcat
 
 
+def _out_of_range(value, minimum, maximum):
+    """Return True when a value falls outside the requested bounds."""
+    if value is None:
+        return False
+    return (
+        (minimum is not None and value < minimum)
+        or (maximum is not None and value > maximum)
+    )
+
+
 def read_stored_catalog():
     """
-    Read the catalog stored in the output directory.
+    Read the catalog stored in the output database.
 
     :return: Catalog object.
     :rtype: RequakeCatalog
 
-    :raises ValueError: if error reading catalog file
-    :raises FileNotFoundError: if catalog file not found
+    :raises ValueError: if the stored catalog is empty
+    :raises FileNotFoundError: if the output database is not found
     """
-    try:
-        cat = RequakeCatalog()
-        cat.read(config.scan_catalog_file)
-        cat.sort()
-        if not cat:
-            raise ValueError('Empty catalog')
-        return cat
-    except ValueError as err:
-        raise ValueError(
-            f'Error reading catalog file {config.scan_catalog_file}: {err}'
-        ) from err
-    except (FileNotFoundError, NotADirectoryError) as err:
-        raise FileNotFoundError(
-            f'Catalog file {config.scan_catalog_file} not found'
-        ) from err
+    from ..database.catalog import read_catalog as read_catalog_from_db
+
+    cat = read_catalog_from_db(config)
+    cat.sort()
+    if not cat:
+        raise ValueError('Empty catalog')
+    return cat
 
 
 def fix_non_locatable_events(catalog):

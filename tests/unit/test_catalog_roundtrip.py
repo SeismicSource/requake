@@ -1,12 +1,25 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Unit tests for catalog round-trip (write/read) consistency."""
+"""
+Unit tests for catalog round-trip (write/read) consistency.
+
+:copyright:
+    2021-2026 Claudio Satriano <satriano@ipgp.fr>
+:license:
+    GNU General Public License v3.0 or later
+    (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
+"""
 
 import unittest
 import tempfile
 import os
+from argparse import Namespace
+from unittest.mock import patch
 from obspy import UTCDateTime
 from requake.catalog import RequakeEvent, RequakeCatalog
+from requake.config import config
+from requake.database.db import get_db_path
+from requake.database.catalog import read_catalog, write_catalog
 
 
 class TestCatalogRoundtrip(unittest.TestCase):
@@ -164,6 +177,38 @@ class TestCatalogRoundtrip(unittest.TestCase):
 
         # Assert empty
         self.assertEqual(len(cat_in), 0, 'Empty catalog should remain empty')
+
+    def test_stored_catalog_uses_sqlite_database(self):
+        """Stored catalog persistence round-trip."""
+        args = Namespace(outdir=self.test_dir.name)
+
+        cat_out = RequakeCatalog()
+        cat_out.extend(self._create_synthetic_events(3))
+
+        with patch.dict(config, {'args': args}, clear=False):
+            config.outdir = self.test_dir.name
+            write_catalog(cat_out, config)
+            self.assertTrue(os.path.exists(get_db_path(config)))
+
+            cat_in = read_catalog(config)
+
+        self.assertEqual(len(cat_in), 3)
+        ev_map_in = {ev.evid: ev for ev in cat_in}
+        ev_map_out = {ev.evid: ev for ev in cat_out}
+
+        self.assertEqual(set(ev_map_in.keys()), set(ev_map_out.keys()))
+        self._assert_events_equal(
+            ev_map_in['event_000'],
+            ev_map_out['event_000'],
+        )
+        self._assert_events_equal(
+            ev_map_in['event_001'],
+            ev_map_out['event_001'],
+        )
+        self._assert_events_equal(
+            ev_map_in['event_002'],
+            ev_map_out['event_002'],
+        )
 
 
 if __name__ == '__main__':

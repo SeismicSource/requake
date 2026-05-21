@@ -1,6 +1,14 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Unit tests for configuration object pickling."""
+"""
+Unit tests for configuration object pickling.
+
+:copyright:
+    2021-2026 Claudio Satriano <satriano@ipgp.fr>
+:license:
+    GNU General Public License v3.0 or later
+    (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
+"""
 
 import multiprocessing as mp
 import pickle
@@ -52,7 +60,6 @@ class TestConfigPickle(unittest.TestCase):
             outdir=str(outdir),
         )
         cfg.args = args
-        cfg.scan_catalog_file = str(outdir / 'requake.catalog.txt')
         cfg.scan_catalog_pairs_file = str(outdir / 'requake.event_pairs.csv')
         cfg.build_families_outfile = str(outdir / 'requake.event_families.csv')
         cfg.template_dir = str(outdir / 'templates')
