@@ -11,7 +11,7 @@ SQLite-backed catalog persistence.
 """
 import sqlite3
 from obspy import UTCDateTime
-from .db import get_db_connection, get_db_path
+from .db import execute_with_retry, get_db_connection, get_db_path
 
 CATALOG_TABLE = 'catalog'
 MISSING_CATALOG_TABLE = f'no such table: {CATALOG_TABLE}'
@@ -92,14 +92,20 @@ def write_catalog(catalog, config, db_path=None):
     try:
         cursor = conn.cursor()
         _ensure_catalog_table(cursor)
-        cursor.execute(f'DELETE FROM {CATALOG_TABLE}')
-        cursor.executemany(
-            f'''INSERT INTO {CATALOG_TABLE} (
-            evid, orig_time, lat, lon, depth_km, mag_type, mag,
-            mag_author, author, catalog, contributor, contributor_id,
-            location_name, trace_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (_event_row(event) for event in catalog),
+        execute_with_retry(
+            lambda: cursor.execute(f'DELETE FROM {CATALOG_TABLE}'),
+            'clear catalog table',
+        )
+        execute_with_retry(
+            lambda: cursor.executemany(
+                f'''INSERT INTO {CATALOG_TABLE} (
+                evid, orig_time, lat, lon, depth_km, mag_type, mag,
+                mag_author, author, catalog, contributor, contributor_id,
+                location_name, trace_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (_event_row(event) for event in catalog),
+            ),
+            'write catalog rows',
         )
         conn.commit()
     finally:

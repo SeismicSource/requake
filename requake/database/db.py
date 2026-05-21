@@ -10,19 +10,52 @@ SQLite connection and schema helpers.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import os
+import contextlib
+import random
 import sqlite3
+import time
 
 DB_VERSION = 1
 DB_FILENAME = 'requake.sqlite'
+BUSY_TIMEOUT_MS = 30000
+MAX_RETRIES = 6
+RETRY_BASE_DELAY = 0.05
+RETRY_MULTIPLIER = 2.0
+RETRY_DELAY_CAP = 1.0
+RETRY_JITTER = 0.2
+
+
+class DatabaseBusyError(RuntimeError):
+    """Raised when retries for transient SQLite lock errors are exhausted."""
 
 
 def get_db_path(config, db_path=None):
     """Return the SQLite path."""
     if db_path is not None:
         return db_path
-    outdir = getattr(config, 'outdir', None) or getattr(
-        getattr(config, 'args', None), 'outdir', None
-    )
+    args = None
+    with contextlib.suppress(KeyError, TypeError):
+        args = config['args']
+    if args is None:
+        args = getattr(config, 'args', None)
+    if args is None:
+        try:
+            args = config.get('args')
+        except AttributeError:
+            args = None
+    outdir = getattr(args, 'outdir', None)
+    if not outdir:
+        try:
+            outdir = config['outdir']
+        except (KeyError, TypeError):
+            outdir = None
+    if not outdir:
+        outdir = getattr(config, 'outdir', None)
+    if not outdir:
+        try:
+            outdir = config.get('outdir')
+        except AttributeError:
+            outdir = None
     if not outdir:
         raise ValueError('Output directory is not configured')
     return os.path.join(outdir, DB_FILENAME)
@@ -65,10 +98,57 @@ def initialize_database(cursor):
     set_db_version(cursor)
 
 
+def _configure_connection(conn):
+    """Configure connection pragmas for integrity and concurrency."""
+    conn.execute('PRAGMA foreign_keys = ON')
+    conn.execute(f'PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}')
+    conn.execute('PRAGMA journal_mode = WAL')
+
+
+def _is_retryable_sqlite_error(err):
+    """Return True when sqlite error is transient and retryable."""
+    message = str(err).lower()
+    return (
+        'database is locked' in message
+        or 'database is busy' in message
+        or 'database table is locked' in message
+    )
+
+
+def execute_with_retry(operation, operation_name):
+    """Run a sqlite operation with retries on transient lock errors."""
+    delay = RETRY_BASE_DELAY
+    start = time.time()
+    attempt = 0
+    while True:
+        try:
+            return operation()
+        except sqlite3.OperationalError as err:
+            if not _is_retryable_sqlite_error(err):
+                raise
+            if attempt >= MAX_RETRIES:
+                elapsed = time.time() - start
+                raise DatabaseBusyError(
+                    f'Operation "{operation_name}" failed after '
+                    f'{attempt + 1} attempts in {elapsed:.2f}s: {err}'
+                ) from err
+            jitter = random.uniform(1.0 - RETRY_JITTER, 1.0 + RETRY_JITTER)
+            time.sleep(min(delay, RETRY_DELAY_CAP) * jitter)
+            delay *= RETRY_MULTIPLIER
+            attempt += 1
+
+
+def initialize_database_if_needed(config, db_path=None):
+    """Initialize database schema version and pragmas if missing."""
+    conn = get_db_connection(config, initdb=True, db_path=db_path)
+    conn.close()
+
+
 def get_db_connection(config, initdb=False, db_path=None):
     """Open a SQLite connection for the configured database file."""
     db_path = check_db_exists(config, initdb=initdb, db_path=db_path)
     conn = sqlite3.connect(db_path)
+    _configure_connection(conn)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     if initdb:

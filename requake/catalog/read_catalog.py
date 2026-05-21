@@ -15,7 +15,7 @@ import contextlib
 from ..config import config, rq_exit
 from ..database.db import get_db_path
 from ..database.catalog import write_catalog as write_stored_catalog
-from .catalog import RequakeCatalog
+from .catalog import RequakeEvent, RequakeCatalog
 from .read_catalog_from_fdsnws import read_catalog_from_fdsnws
 from .read_catalog_from_quakeml import read_catalog_from_quakeml
 from .read_catalog_from_csv import read_catalog_from_csv
@@ -47,7 +47,16 @@ def _read_catalog_from_file():
     # try to read the catalog as a FDSN text file
     with contextlib.suppress(ValueError):
         cat = RequakeCatalog()
-        cat.read(catalog_file)
+        with open(catalog_file, 'r', encoding='utf8') as fp:
+            for line in fp:
+                if not line:
+                    continue
+                if line[0] == '#':
+                    continue
+                ev = RequakeEvent()
+                ev.from_fdsn_text(line)
+                cat.append(ev)
+        cat.deduplicate()
         return cat
     # try to read the catalog as a CSV file
     # raises ValueError in case of failure

@@ -18,6 +18,7 @@ from unittest.mock import patch
 from obspy import UTCDateTime
 from requake.catalog import RequakeEvent
 from requake.config import config
+from requake.database.catalog import write_catalog
 from requake.database.families import write_families
 from requake.families.families import Family, _read_families_from_catalog_scan
 
@@ -90,10 +91,19 @@ class TestFamiliesSchema(unittest.TestCase):
         self.assertIsInstance(ev.mag_type, str)
         self.assertIsInstance(ev.mag, float)
 
+    @staticmethod
+    def _seed_catalog_for_families(families_data):
+        """Write catalog rows required by family foreign-key constraints."""
+        write_catalog(
+            [event for family in families_data for event in family],
+            config,
+        )
+
     def test_families_roundtrip_preserves_fields(self):
         """Stored families should preserve values when read back."""
         with self._patch_runtime_config():
             families_data = self._get_synthetic_families_data(2, 2)
+            self._seed_catalog_for_families(families_data)
             write_families(families_data, config)
             families = _read_families_from_catalog_scan()
 
@@ -116,6 +126,7 @@ class TestFamiliesSchema(unittest.TestCase):
         """
         with self._patch_runtime_config():
             families_data = self._get_synthetic_families_data(2, 2)
+            self._seed_catalog_for_families(families_data)
             write_families(families_data, config)
             families = _read_families_from_catalog_scan()
 
@@ -140,6 +151,7 @@ class TestFamiliesSchema(unittest.TestCase):
     def test_families_empty_write_read(self):
         """Test that empty families round-trip produces empty list."""
         with self._patch_runtime_config():
+            write_catalog([], config)
             write_families([], config)
             families = _read_families_from_catalog_scan()
 

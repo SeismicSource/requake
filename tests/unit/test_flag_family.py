@@ -19,6 +19,7 @@ from argparse import Namespace
 from obspy import UTCDateTime
 from requake.catalog import RequakeEvent
 from requake.config import config
+from requake.database.catalog import write_catalog
 from requake.database.families import read_families, write_families
 from requake.families.families import Family
 from requake.families.flag_family import flag_family
@@ -38,11 +39,12 @@ class TestFlagFamily(unittest.TestCase):
     def _create_families(self, n_families=3, events_per_family=1):
         """Create synthetic families and persist them into a temp database."""
         families = []
+        catalog_rows = []
         for fam_num in range(n_families):
             family = Family(fam_num)
             family.valid = True
             for ev_num in range(events_per_family):
-                family.append(RequakeEvent(
+                event = RequakeEvent(
                     evid=f'ev_{fam_num:04d}_{ev_num:02d}',
                     trace_id='XX.TEST.00.BHZ',
                     orig_time=UTCDateTime(
@@ -53,8 +55,11 @@ class TestFlagFamily(unittest.TestCase):
                     depth=10.0,
                     mag_type='Mw',
                     mag=4.0,
-                ))
+                )
+                family.append(event)
+                catalog_rows.append(event)
             families.append(family)
+        write_catalog(catalog_rows, config)
         write_families(families, config)
 
     def _patch_runtime_config(self):

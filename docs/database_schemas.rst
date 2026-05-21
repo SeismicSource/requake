@@ -1,7 +1,8 @@
 Database Schemas
 ----------------
 
-Requake stores scan outputs in a SQLite database named ``requake.db`` inside
+Requake stores scan outputs in a SQLite database named ``requake.sqlite``
+inside
 the selected output directory.
 
 The database currently contains four domain tables:
@@ -16,6 +17,20 @@ Schema Version
 
 The SQLite ``PRAGMA user_version`` field is used to track schema version.
 The current version is ``1``.
+
+Connection and Concurrency Settings
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+At connection startup, Requake applies SQLite pragmas to improve integrity and
+concurrency:
+
+- ``PRAGMA foreign_keys = ON``
+- ``PRAGMA busy_timeout = 30000``
+- ``PRAGMA journal_mode = WAL``
+
+Write operations also use a bounded retry policy for transient lock errors
+(``SQLITE_BUSY`` and ``SQLITE_LOCKED`` style conditions), with exponential
+backoff and jitter.
 
 Catalog Table
 ^^^^^^^^^^^^^
@@ -69,6 +84,12 @@ The ``event_pairs`` table stores cross-correlation results from
      lag_samples     INTEGER,
      lag_sec         REAL,
      cc_max          REAL NOT NULL,
+     FOREIGN KEY (evid1)
+       REFERENCES catalog(evid)
+       ON UPDATE CASCADE ON DELETE RESTRICT,
+     FOREIGN KEY (evid2)
+       REFERENCES catalog(evid)
+       ON UPDATE CASCADE ON DELETE RESTRICT,
      UNIQUE (evid1, evid2, trace_id)
    )
 
@@ -96,6 +117,9 @@ The ``families`` table stores event-family assignments from
      mag             REAL,
      family_number   INTEGER NOT NULL,
      valid           INTEGER NOT NULL DEFAULT 1,
+     FOREIGN KEY (evid)
+       REFERENCES catalog(evid)
+       ON UPDATE CASCADE ON DELETE RESTRICT,
      PRIMARY KEY (evid, trace_id, family_number)
    )
 

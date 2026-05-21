@@ -11,7 +11,7 @@ SQLite-backed template detection persistence.
 """
 import sqlite3
 from obspy import UTCDateTime
-from .db import get_db_connection, get_db_path
+from .db import execute_with_retry, get_db_connection, get_db_path
 
 TEMPLATE_DETECTIONS_TABLE = 'template_detections'
 MISSING_TEMPLATE_DETECTIONS_TABLE = (
@@ -72,16 +72,24 @@ def write_template_detections(detections, config, append=True):
         cursor = conn.cursor()
         _ensure_template_detections_table(cursor)
         if not append:
-            cursor.execute(f'DELETE FROM {TEMPLATE_DETECTIONS_TABLE}')
+            execute_with_retry(
+                lambda: cursor.execute(
+                    f'DELETE FROM {TEMPLATE_DETECTIONS_TABLE}'
+                ),
+                'clear template detections table',
+            )
         if detections:
-            cursor.executemany(
-                f'''
-                INSERT OR REPLACE INTO {TEMPLATE_DETECTIONS_TABLE} (
-                  family_number, trace_id, evid, orig_time, lon, lat,
-                  depth_km, cc_max
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
-                (_detection_row(detection) for detection in detections),
+            execute_with_retry(
+                lambda: cursor.executemany(
+                    f'''
+                    INSERT OR REPLACE INTO {TEMPLATE_DETECTIONS_TABLE} (
+                      family_number, trace_id, evid, orig_time, lon, lat,
+                      depth_km, cc_max
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ''',
+                    (_detection_row(detection) for detection in detections),
+                ),
+                'write template detections',
             )
         conn.commit()
     finally:
@@ -94,7 +102,10 @@ def clear_template_detections(config):
     try:
         cursor = conn.cursor()
         _ensure_template_detections_table(cursor)
-        cursor.execute(f'DELETE FROM {TEMPLATE_DETECTIONS_TABLE}')
+        execute_with_retry(
+            lambda: cursor.execute(f'DELETE FROM {TEMPLATE_DETECTIONS_TABLE}'),
+            'clear template detections',
+        )
         conn.commit()
     finally:
         conn.close()

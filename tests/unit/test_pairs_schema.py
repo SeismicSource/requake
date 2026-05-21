@@ -19,6 +19,7 @@ from obspy import UTCDateTime
 from requake.config import config
 from requake.families.pairs import RequakeEventPair, read_pairs_file
 from requake.catalog import RequakeEvent
+from requake.database.catalog import write_catalog
 from requake.database.pairs import write_pairs
 
 
@@ -102,11 +103,21 @@ class TestPairsSchema(unittest.TestCase):
             clear=False,
         )
 
+    @staticmethod
+    def _seed_catalog_for_pairs(pairs_data):
+        """Write catalog rows required by pair foreign-key constraints."""
+        catalog_rows = {}
+        for pair in pairs_data:
+            catalog_rows[pair.event1.evid] = pair.event1
+            catalog_rows[pair.event2.evid] = pair.event2
+        write_catalog(list(catalog_rows.values()), config)
+
     def test_pairs_roundtrip_preserves_fields(self):
         """Stored pairs should preserve the same values when read back."""
         pairs_data = self._get_synthetic_pairs_data(2)
 
         with self._patch_runtime_config():
+            self._seed_catalog_for_pairs(pairs_data)
             write_pairs(pairs_data, config, append=False)
             pairs = list(read_pairs_file())
 
@@ -131,6 +142,7 @@ class TestPairsSchema(unittest.TestCase):
         pairs_data = self._get_synthetic_pairs_data(2)
 
         with self._patch_runtime_config():
+            self._seed_catalog_for_pairs(pairs_data)
             write_pairs(pairs_data, config, append=False)
             pairs = list(read_pairs_file())
 
@@ -186,6 +198,7 @@ class TestPairsSchema(unittest.TestCase):
         ]
 
         with self._patch_runtime_config():
+            self._seed_catalog_for_pairs(pairs_data)
             write_pairs(pairs_data, config, append=False)
             pairs = list(read_pairs_file())
 

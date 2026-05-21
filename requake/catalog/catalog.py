@@ -156,40 +156,6 @@ class RequakeCatalog(list):
         """
         self[:] = sorted(self, key=lambda ev: ev.orig_time)
 
-    def read(self, filename):
-        """
-        Read catalog from FDSN text file format.
-
-        Skips events already in the catalog.
-
-        :param filename: input filename
-        :type filename: str
-
-        :raises FileNotFoundError: if filename does not exist
-        :raises ValueError: if line is not in FDSN text file format
-        """
-        with open(filename, 'r', encoding='utf8') as fp:
-            for line in fp:
-                if not line:
-                    continue
-                if line[0] == '#':
-                    continue
-                ev = RequakeEvent()
-                ev.from_fdsn_text(line)
-                self.append(ev)
-        self.deduplicate()
-
-    def write(self, filename):
-        """
-        Write catalog in FDSN text file format.
-
-        :param filename: output filename
-        :type filename: str
-        """
-        with open(filename, 'w', encoding='utf8') as fp:
-            for ev in self:
-                fp.write(ev.fdsn_text() + '\n')
-
     def filter(
         self, starttime=None, endtime=None,
         minlatitude=None, maxlatitude=None,

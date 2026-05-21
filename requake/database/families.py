@@ -11,7 +11,7 @@ SQLite-backed family persistence.
 """
 import sqlite3
 from obspy import UTCDateTime
-from .db import get_db_connection, get_db_path
+from .db import execute_with_retry, get_db_connection, get_db_path
 
 FAMILIES_TABLE = 'families'
 MISSING_FAMILIES_TABLE = f'no such table: {FAMILIES_TABLE}'
@@ -29,6 +29,9 @@ FAMILIES_SCHEMA_STATEMENTS = [
       mag             REAL,
       family_number   INTEGER NOT NULL,
       valid           INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (evid)
+                REFERENCES catalog(evid)
+                ON UPDATE CASCADE ON DELETE RESTRICT,
       PRIMARY KEY (evid, trace_id, family_number)
     )
     ''',
@@ -67,19 +70,25 @@ def write_families(families, config):
     try:
         cursor = conn.cursor()
         _ensure_families_table(cursor)
-        cursor.execute(f'DELETE FROM {FAMILIES_TABLE}')
+        execute_with_retry(
+            lambda: cursor.execute(f'DELETE FROM {FAMILIES_TABLE}'),
+            'clear families table',
+        )
         families = list(families)
         if families:
-            cursor.executemany(
-                f'''INSERT INTO {FAMILIES_TABLE} (
-                evid, trace_id, orig_time, lon, lat, depth_km,
-                mag_type, mag, family_number, valid
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                (
-                    _family_row(family, event)
-                    for family in families
-                    for event in family
+            execute_with_retry(
+                lambda: cursor.executemany(
+                    f'''INSERT INTO {FAMILIES_TABLE} (
+                    evid, trace_id, orig_time, lon, lat, depth_km,
+                    mag_type, mag, family_number, valid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                    (
+                        _family_row(family, event)
+                        for family in families
+                        for event in family
+                    ),
                 ),
+                'write family rows',
             )
         conn.commit()
     finally:
@@ -144,12 +153,15 @@ def update_family_valid(config, family_number, is_valid):
     try:
         cursor = conn.cursor()
         try:
-            cursor.execute(
-                (
-                    f'UPDATE {FAMILIES_TABLE} '
-                    'SET valid = ? WHERE family_number = ?'
+            execute_with_retry(
+                lambda: cursor.execute(
+                    (
+                        f'UPDATE {FAMILIES_TABLE} '
+                        'SET valid = ? WHERE family_number = ?'
+                    ),
+                    (int(is_valid), int(family_number)),
                 ),
-                (int(is_valid), int(family_number)),
+                'update family valid flag',
             )
         except sqlite3.OperationalError as err:
             if MISSING_FAMILIES_TABLE in str(err):

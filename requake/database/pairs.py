@@ -11,7 +11,7 @@ SQLite-backed event pair persistence.
 """
 import sqlite3
 from obspy import UTCDateTime
-from .db import get_db_connection, get_db_path
+from .db import execute_with_retry, get_db_connection, get_db_path
 
 EVENT_PAIRS_TABLE = 'event_pairs'
 MISSING_EVENT_PAIRS_TABLE = f'no such table: {EVENT_PAIRS_TABLE}'
@@ -38,6 +38,12 @@ PAIRS_SCHEMA_STATEMENTS = [
       lag_samples     INTEGER,
       lag_sec         REAL,
       cc_max          REAL NOT NULL,
+            FOREIGN KEY (evid1)
+                REFERENCES catalog(evid)
+                ON UPDATE CASCADE ON DELETE RESTRICT,
+            FOREIGN KEY (evid2)
+                REFERENCES catalog(evid)
+                ON UPDATE CASCADE ON DELETE RESTRICT,
       UNIQUE (evid1, evid2, trace_id)
     )
     ''',
@@ -124,17 +130,26 @@ def write_pairs(pairs, config, append=True):
         cursor = conn.cursor()
         _ensure_pairs_table(cursor)
         if not append:
-            cursor.execute(f'DELETE FROM {EVENT_PAIRS_TABLE}')
+            execute_with_retry(
+                lambda: cursor.execute(f'DELETE FROM {EVENT_PAIRS_TABLE}'),
+                'clear event pairs table',
+            )
         if pairs:
-            cursor.executemany(
-                f'''
-                INSERT OR REPLACE INTO {EVENT_PAIRS_TABLE} (
-                  evid1, evid2, trace_id, orig_time1, lon1, lat1,
-                  depth_km1, mag_type1, mag1, orig_time2, lon2, lat2,
-                  depth_km2, mag_type2, mag2, lag_samples, lag_sec, cc_max
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
-                (_pair_values(pair) for pair in pairs),
+            execute_with_retry(
+                lambda: cursor.executemany(
+                    f'''
+                    INSERT OR REPLACE INTO {EVENT_PAIRS_TABLE} (
+                      evid1, evid2, trace_id, orig_time1, lon1, lat1,
+                      depth_km1, mag_type1, mag1, orig_time2, lon2, lat2,
+                      depth_km2, mag_type2, mag2, lag_samples, lag_sec, cc_max
+                                        ) VALUES (
+                                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                                            ?, ?, ?, ?, ?, ?
+                                        )
+                    ''',
+                    (_pair_values(pair) for pair in pairs),
+                ),
+                'write event pairs batch',
             )
         conn.commit()
     finally:

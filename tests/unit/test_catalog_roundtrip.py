@@ -30,6 +30,18 @@ class TestCatalogRoundtrip(unittest.TestCase):
         self.test_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.test_dir.cleanup)
 
+    def _patch_runtime_config(self):
+        """Return a patch that points the global config to a temp database."""
+        args = Namespace(outdir=self.test_dir.name)
+        return patch.dict(
+            config,
+            {
+                'args': args,
+                'outdir': self.test_dir.name,
+            },
+            clear=False,
+        )
+
     def _create_synthetic_events(self, n=5):
         """
         Create n synthetic RequakeEvent objects with deterministic values.
@@ -83,22 +95,17 @@ class TestCatalogRoundtrip(unittest.TestCase):
         """
         Test that writing and reading a catalog preserves event data.
 
-        Write N synthetic events with RequakeCatalog.write(), read back
-        with RequakeCatalog.read(), and assert field-by-field equality.
+        Write N synthetic events and read back from SQLite.
         """
-        # Create synthetic events
         n_events = 5
         events = self._create_synthetic_events(n_events)
 
-        # Write catalog
-        catalog_path = os.path.join(self.test_dir.name, 'test_catalog.txt')
+        with self._patch_runtime_config():
+            write_catalog(events, config)
+            cat_in = read_catalog(config)
+
         cat_out = RequakeCatalog()
         cat_out.extend(events)
-        cat_out.write(catalog_path)
-
-        # Read catalog
-        cat_in = RequakeCatalog()
-        cat_in.read(catalog_path)
 
         # Assert number of events
         self.assertEqual(
@@ -139,14 +146,9 @@ class TestCatalogRoundtrip(unittest.TestCase):
         # Create synthetic event
         events = self._create_synthetic_events(1)
 
-        # Write and read
-        catalog_path = os.path.join(self.test_dir.name, 'test_fdsn.txt')
-        cat_out = RequakeCatalog()
-        cat_out.extend(events)
-        cat_out.write(catalog_path)
-
-        cat_in = RequakeCatalog()
-        cat_in.read(catalog_path)
+        with self._patch_runtime_config():
+            write_catalog(events, config)
+            cat_in = read_catalog(config)
 
         # Check that all fields are present (not None)
         ev = cat_in[0]
@@ -166,27 +168,19 @@ class TestCatalogRoundtrip(unittest.TestCase):
 
     def test_catalog_empty_write_read(self):
         """Test that empty catalog round-trip produces empty catalog."""
-        # Write empty catalog
-        catalog_path = os.path.join(self.test_dir.name, 'test_empty.txt')
-        cat_out = RequakeCatalog()
-        cat_out.write(catalog_path)
-
-        # Read empty catalog
-        cat_in = RequakeCatalog()
-        cat_in.read(catalog_path)
+        with self._patch_runtime_config():
+            write_catalog([], config)
+            cat_in = read_catalog(config)
 
         # Assert empty
         self.assertEqual(len(cat_in), 0, 'Empty catalog should remain empty')
 
     def test_stored_catalog_uses_sqlite_database(self):
         """Stored catalog persistence round-trip."""
-        args = Namespace(outdir=self.test_dir.name)
-
         cat_out = RequakeCatalog()
         cat_out.extend(self._create_synthetic_events(3))
 
-        with patch.dict(config, {'args': args}, clear=False):
-            config.outdir = self.test_dir.name
+        with self._patch_runtime_config():
             write_catalog(cat_out, config)
             self.assertTrue(os.path.exists(get_db_path(config)))
 
