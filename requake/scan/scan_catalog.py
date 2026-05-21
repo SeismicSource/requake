@@ -67,7 +67,6 @@ def _process_pairs(catalog):
         else None
     )
     waveform_pair = WaveformPair()
-    n_success = 0
     batch_of_pairs = []
     for pair in valid_pairs:
         if pbar is not None:
@@ -90,7 +89,6 @@ def _process_pairs(catalog):
                     cc_max,
                 )
             )
-            n_success += 1
             if len(batch_of_pairs) >= 100:
                 write_pairs_to_db(batch_of_pairs, config, append=True)
                 batch_of_pairs = []
