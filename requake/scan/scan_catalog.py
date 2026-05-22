@@ -29,11 +29,11 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 EARTH_RADIUS_KM = 6371.0088
 
 
-def _candidate_pairs(catalog):
-    """Return candidate index pairs using a KD-tree on unit sphere."""
+def _build_spatial_index(catalog):
+    """Build and return KD-tree spatial index inputs."""
     range_km = config.catalog_search_range
     if range_km <= 0:
-        return np.empty((0, 2), dtype=np.int64)
+        return None, None, None
     lats = np.array([ev.lat for ev in catalog], dtype=float)
     lons = np.array([ev.lon for ev in catalog], dtype=float)
     lat_rad = np.radians(lats)
@@ -49,17 +49,43 @@ def _candidate_pairs(catalog):
     tree = cKDTree(coords)
     angular_dist = range_km / EARTH_RADIUS_KM
     chord_dist = 2.0 * math.sin(angular_dist / 2.0)
-    return tree.query_pairs(chord_dist, output_type='ndarray')
+    return coords, tree, chord_dist
 
 
 def _build_valid_pair_indices(catalog):
-    """Build and return valid event-pair index array."""
-    candidates = _candidate_pairs(catalog)
-    return (
-        np.empty((0, 2), dtype=np.int64)
-        if len(candidates) == 0
-        else candidates
-    )
+    """Build grouped event-pair indices using int32 storage."""
+    nevents = len(catalog)
+    coords, tree, chord_dist = _build_spatial_index(catalog)
+    if coords is None:
+        return np.empty((0, 2), dtype=np.int32)
+    logger.info('Grouping valid pairs while building the spatial index...')
+    counts = np.empty(nevents, dtype=np.int32)
+    grouped_seconds = []
+    npairs = 0
+    for idx, coord in enumerate(coords):
+        neighbors = np.asarray(
+            tree.query_ball_point(coord, chord_dist),
+            dtype=np.int32
+        )
+        neighbors = neighbors[neighbors > idx]
+        grouped_seconds.append(neighbors)
+        n_neighbors = len(neighbors)
+        counts[idx] = n_neighbors
+        npairs += n_neighbors
+    if npairs == 0:
+        return np.empty((0, 2), dtype=np.int32)
+    pair_idx = np.empty((npairs, 2), dtype=np.int32)
+    offsets = np.empty(nevents + 1, dtype=np.int64)
+    offsets[0] = 0
+    np.cumsum(counts, out=offsets[1:])
+    for idx, neighbors in enumerate(grouped_seconds):
+        if counts[idx] == 0:
+            continue
+        start = offsets[idx]
+        stop = offsets[idx + 1]
+        pair_idx[start:stop, 0] = idx
+        pair_idx[start:stop, 1] = neighbors
+    return pair_idx
 
 
 def _progress_summary(current, total, start_time):
@@ -71,6 +97,37 @@ def _progress_summary(current, total, start_time):
         f'{current:n}/{total:n} ({percent:.1f}%) '
         f'[{rate:,.0f} pairs/s]'
     )
+
+
+def _log_pair_grouping_stats(valid_pair_idx):
+    """Log whether pairs are grouped by first event."""
+    npairs = len(valid_pair_idx)
+    if npairs == 0:
+        logger.info('Pair grouping: no pairs to verify')
+        return
+    first = valid_pair_idx[:, 0]
+    if npairs == 1:
+        logger.info('Pair grouping: single pair, grouping is trivial')
+        return
+    monotonic = bool(np.all(first[:-1] <= first[1:]))
+    boundaries = np.flatnonzero(first[1:] != first[:-1]) + 1
+    run_lengths = np.diff(np.concatenate(([0], boundaries, [npairs])))
+    logger.info(
+        'Pair grouping: '
+        f'monotonic_first={monotonic}, '
+        f'first-event groups={len(run_lengths):n}, '
+        f'avg consecutive pairs per first event='
+        f'{run_lengths.mean():.1f}, '
+        f'median consecutive pairs per first event='
+        f'{np.median(run_lengths):.1f}, '
+        f'max consecutive pairs per first event='
+        f'{run_lengths.max():n}'
+    )
+    if not monotonic:
+        logger.warning(
+            'Pairs are not grouped by first event; waveform reuse may be '
+            'degraded.'
+        )
 
 
 def _log_timing_split(start_time, waveform_fetch_time, crosscorr_time):
@@ -214,15 +271,11 @@ def _process_pairs(catalog):
     logger.info('Building valid event pairs...')
     valid_pair_idx = _build_valid_pair_indices(catalog)
     npairs = len(valid_pair_idx)
-    # Group pairs by first event to reuse already-fetched waveforms.
-    if npairs > 1:
-        logger.info('Grouping pairs by first event to use waveform cache...')
-        pair_order = np.lexsort((valid_pair_idx[:, 1], valid_pair_idx[:, 0]))
-        valid_pair_idx = valid_pair_idx[pair_order]
     ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
     logger.info(f'Initial pairs: {initial_npairs:n}')
     logger.info(f'Final pairs: {npairs:n}')
     logger.info(f'Pair ratio: {ratio:.6f} ({ratio:.2%})')
+    _log_pair_grouping_stats(valid_pair_idx)
     logger.info(f'Processing {npairs:n} event pairs')
     _process_valid_pair_indices(catalog, valid_pair_idx, npairs)
     return npairs
