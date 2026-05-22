@@ -11,7 +11,7 @@ These rules apply to AI agents working in this repository.
   finalizing (re-read modified files, simplify where possible, and
   re-run checks).
 - Run `flake8` on the changed Python files before finalizing work.
-- Run `sourcery review .` before finalizing work.
+- Run `sourcery review` on the modified files before finalizing work.
 - Fix reported issues locally instead of relying on CI to catch them.
 
 For local enforcement, use `scripts/setup_local_hooks.sh` once per clone.
