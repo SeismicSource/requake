@@ -158,7 +158,9 @@ def _log_cache_stats(waveform_pair):
         f'misses={stats["sorted_trace_ids_cache_misses"]:n}, '
         f'hit rate={stats["sorted_trace_ids_cache_hit_rate"]:.1%}, '
         f'skipped-pair hits={stats["skipped_trace_hits"]:n}, '
-        f'cache clears={stats["trace_cache_clears"]:n}'
+        f'cache evictions={stats["trace_cache_evictions"]:n}, '
+        f'cache size={stats["trace_cache_size"]:n}/'
+        f'{stats["max_trace_cache_size"]:n}'
     )
 
 

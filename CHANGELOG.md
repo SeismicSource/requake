@@ -6,6 +6,9 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 - Dramatic speedup of event pairs building by using a KD-tree
   spatial index and approximate geodetic distance calculations.
+- Dramatic speedup of waveform fetching by improving the caching mechanism.
+  A new config option `catalog_waveform_cache_size` allows to set the maximum
+  number of waveforms to cache.
 - `scan_catalog`: when running as a batch jon, log a progress
   report every minute, instead of showing the progress bar.
 

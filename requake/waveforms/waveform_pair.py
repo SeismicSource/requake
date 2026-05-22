@@ -10,7 +10,7 @@ Classes to handle waveform pairs for Requake.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from obspy import Stream
 from obspy.geodetics import gps2dist_azimuth
 from obspy.taup import TauPyModel
@@ -32,8 +32,12 @@ class WaveformPair:
         """Initialize the waveform-pair helper and its caches."""
         self.model = TauPyModel(model='ak135')
         self.evid1 = None
-        self.skipped_evids_traceids = []
-        self.tr_cache = {}
+        self.max_trace_cache_size = max(
+            int(getattr(config, 'catalog_waveform_cache_size', 5000)),
+            2,
+        )
+        self.skipped_evids_traceids = set()
+        self.tr_cache = OrderedDict()
         self.trace_id_attempts = defaultdict(list)
         self.sorted_trace_ids_cache = {}
         self.trace_cache_hits = 0
@@ -42,6 +46,23 @@ class WaveformPair:
         self.sorted_trace_ids_cache_misses = 0
         self.skipped_trace_hits = 0
         self.trace_cache_clears = 0
+        self.trace_cache_evictions = 0
+
+    def _cache_get(self, cache_key):
+        """Get trace from LRU cache and mark as recently used."""
+        tr = self.tr_cache.get(cache_key)
+        if tr is None:
+            return None
+        self.tr_cache.move_to_end(cache_key)
+        return tr
+
+    def _cache_put(self, cache_key, tr):
+        """Store trace in LRU cache and evict oldest if needed."""
+        self.tr_cache[cache_key] = tr
+        self.tr_cache.move_to_end(cache_key)
+        if len(self.tr_cache) > self.max_trace_cache_size:
+            self.tr_cache.popitem(last=False)
+            self.trace_cache_evictions += 1
 
     def get_cache_stats(self):
         """Return cache hit/miss statistics."""
@@ -69,6 +90,9 @@ class WaveformPair:
             ),
             'skipped_trace_hits': self.skipped_trace_hits,
             'trace_cache_clears': self.trace_cache_clears,
+            'trace_cache_evictions': self.trace_cache_evictions,
+            'trace_cache_size': len(self.tr_cache),
+            'max_trace_cache_size': self.max_trace_cache_size,
         }
 
     def _get_sorted_trace_ids(self, ev):
@@ -146,26 +170,23 @@ class WaveformPair:
         :raises NoWaveformError: if no waveform data is available
         """
         st = Stream()
-        ev1 = True
         for ev in pair:
             cache_key = f'{ev.evid}_{ev.trace_id}'
             if cache_key in self.skipped_evids_traceids:
                 self.skipped_trace_hits += 1
                 continue
-            if cache_key in self.tr_cache:
+            tr = self._cache_get(cache_key)
+            if tr is not None:
                 self.trace_cache_hits += 1
-                st.append(self.tr_cache[cache_key])
+                st.append(tr)
                 continue
             self.trace_cache_misses += 1
             try:
                 tr = get_event_waveform(ev)
-                if ev1:
-                    # only cache the first trace since the second one
-                    # will be different at each iteration
-                    self.tr_cache[cache_key] = tr
+                self._cache_put(cache_key, tr)
                 st.append(tr)
             except NoWaveformError as err:
-                self.skipped_evids_traceids.append(cache_key)
+                self.skipped_evids_traceids.add(cache_key)
                 msg = str(err).replace('\n', ' ')
                 logger.warning(
                     f'No waveform data for event {ev.evid} and trace_id '
@@ -173,7 +194,6 @@ class WaveformPair:
                     'event and trace_id.'
                     f'Error message: {msg}'
                 )
-            ev1 = False
         if len(st) < 2:
             raise NoWaveformError('Unable to get waveform data for pair')
         return st
@@ -195,11 +215,6 @@ class WaveformPair:
         ev1, ev2 = pair
         # clear trace_id_attempts
         self.trace_id_attempts.clear()
-        # purge cache if event1 is different from previous event1
-        if self.evid1 != ev1.evid:
-            self.tr_cache.clear()
-            self.trace_cache_clears += 1
-            self.evid1 = ev1.evid
 
         ev1.trace_id = ev2.trace_id = self._get_trace_id(ev1)
         st = None
