@@ -73,6 +73,60 @@ def _progress_summary(current, total, start_time):
     )
 
 
+def _log_timing_split(start_time, waveform_fetch_time, crosscorr_time):
+    """Log cumulative timing split for waveform fetch and correlation."""
+    elapsed = max(time.monotonic() - start_time, 1e-9)
+    timed = waveform_fetch_time + crosscorr_time
+    other_time = max(elapsed - timed, 0.0)
+    logger.info(
+        'Timing split: '
+        f'fetch={waveform_fetch_time:.1f}s '
+        f'({waveform_fetch_time / elapsed:.1%}), '
+        f'cc={crosscorr_time:.1f}s '
+        f'({crosscorr_time / elapsed:.1%}), '
+        f'other={other_time:.1f}s '
+        f'({other_time / elapsed:.1%})'
+    )
+
+
+def _log_noninteractive_progress(
+        processed, npairs, start_time, next_log_time,
+        waveform_fetch_time, crosscorr_time):
+    """Log non-interactive progress periodically and return next log time."""
+    if time.monotonic() < next_log_time:
+        return next_log_time
+    logger.info(
+        'Processing pairs: '
+        f'{_progress_summary(processed, npairs, start_time)}'
+    )
+    _log_timing_split(start_time, waveform_fetch_time, crosscorr_time)
+    return next_log_time + 60.0
+
+
+def _process_pair(pair, waveform_pair):
+    """Process a single pair and return result plus timing."""
+    t_fetch_start = time.monotonic()
+    pair_st = waveform_pair.get_waveform_pair(pair)
+    waveform_fetch_dt = time.monotonic() - t_fetch_start
+    tr1, tr2 = pair_st.traces
+    t_cc_start = time.monotonic()
+    lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
+    crosscorr_dt = time.monotonic() - t_cc_start
+    stats1 = tr1.stats
+    stats2 = tr2.stats
+    _fix_trace_id(stats1)
+    _fix_trace_id(stats2)
+    pair_out = RequakeEventPair(
+        pair[0],
+        pair[1],
+        tr1.id,
+        lag,
+        lag_sec,
+        cc_max,
+    )
+    return pair_out, waveform_fetch_dt, crosscorr_dt
+
+
 def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
     """Process valid pairs from index pairs."""
     logger.info('Computing waveform cross-correlation...')
@@ -80,6 +134,8 @@ def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
     batch_of_pairs = []
     start_time = time.monotonic()
     next_log_time = start_time + 60.0
+    waveform_fetch_time = 0.0
+    crosscorr_time = 0.0
     show_pbar = sys.stderr.isatty()
     if show_pbar:
         pbar = tqdm(
@@ -91,33 +147,25 @@ def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
     else:
         pbar = None
     for processed, (idx1, idx2) in enumerate(valid_pair_idx, start=1):
-        if not show_pbar and time.monotonic() >= next_log_time:
-            logger.info(
-                'Processing pairs: '
-                f'{_progress_summary(processed, npairs, start_time)}'
+        if not show_pbar:
+            next_log_time = _log_noninteractive_progress(
+                processed,
+                npairs,
+                start_time,
+                next_log_time,
+                waveform_fetch_time,
+                crosscorr_time,
             )
-            next_log_time += 60.0
         pair = (catalog[idx1], catalog[idx2])
         if pbar is not None:
             pbar.update()
         try:
-            pair_st = waveform_pair.get_waveform_pair(pair)
-            tr1, tr2 = pair_st.traces
-            lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
-            stats1 = tr1.stats
-            stats2 = tr2.stats
-            _fix_trace_id(stats1)
-            _fix_trace_id(stats2)
-            batch_of_pairs.append(
-                RequakeEventPair(
-                    pair[0],
-                    pair[1],
-                    tr1.id,
-                    lag,
-                    lag_sec,
-                    cc_max,
-                )
+            pair_out, fetch_dt, crosscorr_dt = _process_pair(
+                pair, waveform_pair
             )
+            waveform_fetch_time += fetch_dt
+            crosscorr_time += crosscorr_dt
+            batch_of_pairs.append(pair_out)
             if len(batch_of_pairs) >= 100:
                 write_pairs_to_db(batch_of_pairs, config, append=True)
                 batch_of_pairs = []
@@ -137,6 +185,8 @@ def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
             'Processing pairs: '
             f'{_progress_summary(npairs, npairs, start_time)}'
         )
+    if npairs > 0:
+        _log_timing_split(start_time, waveform_fetch_time, crosscorr_time)
 
 
 def _fix_trace_id(stats):
@@ -164,6 +214,11 @@ def _process_pairs(catalog):
     logger.info('Building valid event pairs...')
     valid_pair_idx = _build_valid_pair_indices(catalog)
     npairs = len(valid_pair_idx)
+    # Group pairs by first event to reuse already-fetched waveforms.
+    if npairs > 1:
+        logger.info('Grouping pairs by first event to use waveform cache...')
+        pair_order = np.lexsort((valid_pair_idx[:, 1], valid_pair_idx[:, 0]))
+        valid_pair_idx = valid_pair_idx[pair_order]
     ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
     logger.info(f'Initial pairs: {initial_npairs:n}')
     logger.info(f'Final pairs: {npairs:n}')
