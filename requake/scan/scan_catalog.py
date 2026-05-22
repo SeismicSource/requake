@@ -75,6 +75,7 @@ def _progress_summary(current, total, start_time):
 
 def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
     """Process valid pairs from index pairs."""
+    logger.info('Computing waveform cross-correlation...')
     waveform_pair = WaveformPair()
     batch_of_pairs = []
     start_time = time.monotonic()
@@ -193,8 +194,6 @@ def scan_catalog():
     logger.info(
         f'{nevents} events read from db file {get_db_path(config)}'
     )
-    logger.info('Building event pairs...')
-    logger.info('Computing waveform cross-correlation...')
     npairs = _process_pairs(catalog)
     logger.info(f'Processed {npairs:n} event pairs')
     logger.info(f'Done! Output written to {get_db_path(config)}')
