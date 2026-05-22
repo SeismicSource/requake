@@ -325,7 +325,7 @@ def scan_catalog():
             'You need at least 2 events to run the scan 😉')
         rq_exit(1)
     logger.info(
-        f'{nevents} events read from db file {get_db_path(config)}'
+        f'{nevents:n} events read from db file {get_db_path(config)}'
     )
     npairs = _process_pairs(catalog)
     logger.info(f'Processed {npairs:n} event pairs')
