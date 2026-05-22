@@ -36,12 +36,50 @@ class WaveformPair:
         self.tr_cache = {}
         self.trace_id_attempts = defaultdict(list)
         self.sorted_trace_ids_cache = {}
+        self.trace_cache_hits = 0
+        self.trace_cache_misses = 0
+        self.sorted_trace_ids_cache_hits = 0
+        self.sorted_trace_ids_cache_misses = 0
+        self.skipped_trace_hits = 0
+        self.trace_cache_clears = 0
+
+    def get_cache_stats(self):
+        """Return cache hit/miss statistics."""
+        trace_cache_lookups = self.trace_cache_hits + self.trace_cache_misses
+        sorted_trace_id_lookups = (
+            self.sorted_trace_ids_cache_hits
+            + self.sorted_trace_ids_cache_misses
+        )
+        return {
+            'trace_cache_hits': self.trace_cache_hits,
+            'trace_cache_misses': self.trace_cache_misses,
+            'trace_cache_hit_rate': (
+                self.trace_cache_hits / trace_cache_lookups
+                if trace_cache_lookups > 0
+                else 0.0
+            ),
+            'sorted_trace_ids_cache_hits': self.sorted_trace_ids_cache_hits,
+            'sorted_trace_ids_cache_misses': (
+                self.sorted_trace_ids_cache_misses
+            ),
+            'sorted_trace_ids_cache_hit_rate': (
+                self.sorted_trace_ids_cache_hits / sorted_trace_id_lookups
+                if sorted_trace_id_lookups > 0
+                else 0.0
+            ),
+            'skipped_trace_hits': self.skipped_trace_hits,
+            'trace_cache_clears': self.trace_cache_clears,
+        }
 
     def _get_sorted_trace_ids(self, ev):
         """Return trace IDs for an event sorted by proximity."""
-        cache_key = (ev.evid, ev.orig_time, ev.lat, ev.lon)
+        cache_key = (
+            ev.evid, ev.orig_time, ev.lat, ev.lon
+        )
         if cache_key in self.sorted_trace_ids_cache:
+            self.sorted_trace_ids_cache_hits += 1
             return self.sorted_trace_ids_cache[cache_key]
+        self.sorted_trace_ids_cache_misses += 1
         ev_lat, ev_lon, orig_time = ev.lat, ev.lon, ev.orig_time
         try:
             traceid_coords = get_traceid_coords(orig_time)
@@ -112,10 +150,13 @@ class WaveformPair:
         for ev in pair:
             cache_key = f'{ev.evid}_{ev.trace_id}'
             if cache_key in self.skipped_evids_traceids:
+                self.skipped_trace_hits += 1
                 continue
             if cache_key in self.tr_cache:
+                self.trace_cache_hits += 1
                 st.append(self.tr_cache[cache_key])
                 continue
+            self.trace_cache_misses += 1
             try:
                 tr = get_event_waveform(ev)
                 if ev1:
@@ -157,6 +198,7 @@ class WaveformPair:
         # purge cache if event1 is different from previous event1
         if self.evid1 != ev1.evid:
             self.tr_cache.clear()
+            self.trace_cache_clears += 1
             self.evid1 = ev1.evid
 
         ev1.trace_id = ev2.trace_id = self._get_trace_id(ev1)

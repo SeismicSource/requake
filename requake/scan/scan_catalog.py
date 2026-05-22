@@ -146,9 +146,31 @@ def _log_timing_split(start_time, waveform_fetch_time, crosscorr_time):
     )
 
 
+def _log_cache_stats(waveform_pair):
+    """Log waveform cache hit-rate statistics."""
+    stats = waveform_pair.get_cache_stats()
+    logger.info(
+        'Cache stats: '
+        f'trace hits={stats["trace_cache_hits"]:n}, '
+        f'misses={stats["trace_cache_misses"]:n}, '
+        f'hit rate={stats["trace_cache_hit_rate"]:.1%}, '
+        f'sorted-trace-id hits={stats["sorted_trace_ids_cache_hits"]:n}, '
+        f'misses={stats["sorted_trace_ids_cache_misses"]:n}, '
+        f'hit rate={stats["sorted_trace_ids_cache_hit_rate"]:.1%}, '
+        f'skipped-pair hits={stats["skipped_trace_hits"]:n}, '
+        f'cache clears={stats["trace_cache_clears"]:n}'
+    )
+
+
 def _log_noninteractive_progress(
-        processed, npairs, start_time, next_log_time,
-        waveform_fetch_time, crosscorr_time):
+    processed,
+    npairs,
+    start_time,
+    next_log_time,
+    waveform_fetch_time,
+    crosscorr_time,
+    waveform_pair
+):
     """Log non-interactive progress periodically and return next log time."""
     if time.monotonic() < next_log_time:
         return next_log_time
@@ -157,6 +179,7 @@ def _log_noninteractive_progress(
         f'{_progress_summary(processed, npairs, start_time)}'
     )
     _log_timing_split(start_time, waveform_fetch_time, crosscorr_time)
+    _log_cache_stats(waveform_pair)
     return next_log_time + 60.0
 
 
@@ -212,6 +235,7 @@ def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
                 next_log_time,
                 waveform_fetch_time,
                 crosscorr_time,
+                waveform_pair
             )
         pair = (catalog[idx1], catalog[idx2])
         if pbar is not None:
@@ -244,6 +268,7 @@ def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
         )
     if npairs > 0:
         _log_timing_split(start_time, waveform_fetch_time, crosscorr_time)
+        _log_cache_stats(waveform_pair)
 
 
 def _fix_trace_id(stats):
