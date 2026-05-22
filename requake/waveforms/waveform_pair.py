@@ -35,6 +35,32 @@ class WaveformPair:
         self.skipped_evids_traceids = []
         self.tr_cache = {}
         self.trace_id_attempts = defaultdict(list)
+        self.sorted_trace_ids_cache = {}
+
+    def _get_sorted_trace_ids(self, ev):
+        """Return trace IDs for an event sorted by proximity."""
+        cache_key = (ev.evid, ev.orig_time, ev.lat, ev.lon)
+        if cache_key in self.sorted_trace_ids_cache:
+            return self.sorted_trace_ids_cache[cache_key]
+        ev_lat, ev_lon, orig_time = ev.lat, ev.lon, ev.orig_time
+        try:
+            traceid_coords = get_traceid_coords(orig_time)
+        except MetadataMismatchError as err:
+            logger.error(
+                f'No metadata available for event {ev.evid} at {orig_time}.'
+            )
+            raise NoWaveformError(
+                f'No valid trace_id available for event {ev.evid}'
+            ) from err
+        distances = {}
+        for trace_id, coords in traceid_coords.items():
+            distance, _, _ = gps2dist_azimuth(
+                coords['latitude'], coords['longitude'], ev_lat, ev_lon
+            )
+            distances[trace_id] = distance
+        sorted_trace_ids = tuple(sorted(distances, key=distances.get))
+        self.sorted_trace_ids_cache[cache_key] = sorted_trace_ids
+        return sorted_trace_ids
 
     def _get_trace_id(self, ev):
         """
@@ -52,7 +78,6 @@ class WaveformPair:
 
         :raises NoWaveformError: if no trace_id is available
         """
-        # TODO: SLOW! precompute event-to-station distances
         trace_ids = config.catalog_trace_id
         if len(trace_ids) == 1:
             # don't bother with distances
@@ -62,25 +87,7 @@ class WaveformPair:
                     f'No valid trace_id available for event {ev.evid}')
             self.trace_id_attempts[ev.evid].append(trace_id)
             return trace_id
-        ev_lat, ev_lon, orig_time = ev.lat, ev.lon, ev.orig_time
-        try:
-            traceid_coords = get_traceid_coords(orig_time)
-        except MetadataMismatchError as err:
-            logger.error(
-                f'No metadata available for event {ev.evid} at {orig_time}.'
-            )
-            raise NoWaveformError(
-                f'No valid trace_id available for event {ev.evid}'
-            ) from err
-        # Compute distances
-        distances = {}
-        for trace_id, coords in traceid_coords.items():
-            distance, _, _ = gps2dist_azimuth(
-                coords['latitude'], coords['longitude'], ev_lat, ev_lon
-            )
-            distances[trace_id] = distance
-        # Sort trace_ids by proximity
-        sorted_trace_ids = sorted(distances, key=distances.get)
+        sorted_trace_ids = self._get_sorted_trace_ids(ev)
         # Track attempts for this event
         for trace_id in sorted_trace_ids:
             if trace_id not in self.trace_id_attempts[ev.evid]:
