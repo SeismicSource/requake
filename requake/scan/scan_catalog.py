@@ -10,10 +10,11 @@ Catalog-based repeater scan for Requake.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import sys
+import math
 import logging
-from itertools import combinations
+import numpy as np
 from tqdm import tqdm
-from obspy.geodetics import gps2dist_azimuth
+from scipy.spatial import cKDTree
 from ..config import config, rq_exit
 from ..database.db import get_db_path
 from ..catalog import fix_non_locatable_events, read_stored_catalog
@@ -24,14 +25,40 @@ from ..waveforms import (
     NoWaveformError, NoMetadataError, MetadataMismatchError
 )
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
+EARTH_RADIUS_KM = 6371.0088
 
 
-def _pair_ok(pair):
-    """Check if events in pair are close enough."""
-    ev1, ev2 = pair
-    distance, _, _ = gps2dist_azimuth(ev1.lat, ev1.lon, ev2.lat, ev2.lon)
-    distance /= 1e3
-    return distance <= config.catalog_search_range
+def _candidate_pairs(catalog):
+    """Return candidate index pairs using a KD-tree on unit sphere."""
+    range_km = config.catalog_search_range
+    if range_km <= 0:
+        return np.empty((0, 2), dtype=np.int64)
+    lats = np.array([ev.lat for ev in catalog], dtype=float)
+    lons = np.array([ev.lon for ev in catalog], dtype=float)
+    lat_rad = np.radians(lats)
+    lon_rad = np.radians(lons)
+    cos_lat = np.cos(lat_rad)
+    coords = np.column_stack(
+        (
+            cos_lat * np.cos(lon_rad),
+            cos_lat * np.sin(lon_rad),
+            np.sin(lat_rad),
+        )
+    )
+    tree = cKDTree(coords)
+    angular_dist = range_km / EARTH_RADIUS_KM
+    chord_dist = 2.0 * math.sin(angular_dist / 2.0)
+    return tree.query_pairs(chord_dist, output_type='ndarray')
+
+
+def _build_valid_pair_indices(catalog):
+    """Build and return valid event-pair index array."""
+    candidates = _candidate_pairs(catalog)
+    return (
+        np.empty((0, 2), dtype=np.int64)
+        if len(candidates) == 0
+        else candidates
+    )
 
 
 def _fix_trace_id(stats):
@@ -54,21 +81,32 @@ def _fix_trace_id(stats):
 def _process_pairs(catalog):
     """Process event pairs."""
     write_pairs_to_db([], config, append=False)
-    logger.info('Precomputing valid event pairs...')
-    valid_pairs = [
-        pair for pair in combinations(catalog, 2) if _pair_ok(pair)
-    ]
-    npairs = len(valid_pairs)
-    logger.info(f'Processing {npairs:n} event pairs')
+    nevents = len(catalog)
+    initial_npairs = nevents * (nevents - 1) // 2
+    logger.info('Building valid event pairs...')
+    valid_pair_idx = _build_valid_pair_indices(catalog)
+    npairs = len(valid_pair_idx)
+    ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
+    logger.info(f'Initial pairs: {initial_npairs:n}')
+    logger.info(f'Final pairs: {npairs:n}')
+    logger.info(f'Pair ratio: {ratio:.6f} ({ratio:.2%})')
+    processing_msg = f'Processing {npairs:n} event pairs'
+    logger.info(processing_msg)
     # Only show progress bar if running in a terminal
     pbar = (
-        tqdm(total=npairs, unit='pairs', unit_scale=True)
+        tqdm(
+            total=npairs,
+            unit='pairs',
+            unit_scale=True,
+            desc=processing_msg
+        )
         if sys.stderr.isatty()
         else None
     )
     waveform_pair = WaveformPair()
     batch_of_pairs = []
-    for pair in valid_pairs:
+    for idx1, idx2 in valid_pair_idx:
+        pair = (catalog[idx1], catalog[idx2])
         if pbar is not None:
             pbar.update()
         try:
@@ -101,6 +139,8 @@ def _process_pairs(catalog):
                 logger.warning(msg)
     if batch_of_pairs:
         write_pairs_to_db(batch_of_pairs, config, append=True)
+    if pbar is not None:
+        pbar.close()
     return npairs
 
 

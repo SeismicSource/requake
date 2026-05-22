@@ -4,6 +4,9 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- Dramatic speedup of event pairs building by using a KD-tree
+  spatial index and approximate geodetic distance calculations.
+
 ## [0.8] - 2026-05-22
 
 This release introduces a major storage change.
