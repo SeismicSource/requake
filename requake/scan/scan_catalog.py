@@ -11,6 +11,7 @@ Catalog-based repeater scan for Requake.
 """
 import sys
 import math
+import time
 import logging
 import numpy as np
 from tqdm import tqdm
@@ -61,51 +62,40 @@ def _build_valid_pair_indices(catalog):
     )
 
 
-def _fix_trace_id(stats):
-    """
-    Fix trace_id in an ObsPy stats object by replacing dots.
-
-    This makes trace_id compliant with the FDSN standard.
-
-    The fixes are done in place.
-
-    :param stats: ObsPy stats object
-    :type stats: ObsPy AttribDict
-    """
-    stats.network = stats.network.replace('.', '_')
-    stats.station = stats.station.replace('.', '_')
-    stats.location = stats.location.replace('.', '_')
-    stats.channel = stats.channel.replace('.', '_')
+def _progress_summary(current, total, start_time):
+    """Return a compact progress summary string."""
+    elapsed = max(time.monotonic() - start_time, 1e-9)
+    rate = current / elapsed
+    percent = 100.0 * current / total if total else 0.0
+    return (
+        f'{current:n}/{total:n} ({percent:.1f}%) '
+        f'[{rate:,.0f} pairs/s]'
+    )
 
 
-def _process_pairs(catalog):
-    """Process event pairs."""
-    write_pairs_to_db([], config, append=False)
-    nevents = len(catalog)
-    initial_npairs = nevents * (nevents - 1) // 2
-    logger.info('Building valid event pairs...')
-    valid_pair_idx = _build_valid_pair_indices(catalog)
-    npairs = len(valid_pair_idx)
-    ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
-    logger.info(f'Initial pairs: {initial_npairs:n}')
-    logger.info(f'Final pairs: {npairs:n}')
-    logger.info(f'Pair ratio: {ratio:.6f} ({ratio:.2%})')
-    processing_msg = f'Processing {npairs:n} event pairs'
-    logger.info(processing_msg)
-    # Only show progress bar if running in a terminal
-    pbar = (
-        tqdm(
+def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
+    """Process valid pairs from index pairs."""
+    waveform_pair = WaveformPair()
+    batch_of_pairs = []
+    start_time = time.monotonic()
+    next_log_time = start_time + 60.0
+    show_pbar = sys.stderr.isatty()
+    if show_pbar:
+        pbar = tqdm(
             total=npairs,
             unit='pairs',
             unit_scale=True,
-            desc=processing_msg
+            desc=f'Processing {npairs:n} event pairs'
         )
-        if sys.stderr.isatty()
-        else None
-    )
-    waveform_pair = WaveformPair()
-    batch_of_pairs = []
-    for idx1, idx2 in valid_pair_idx:
+    else:
+        pbar = None
+    for processed, (idx1, idx2) in enumerate(valid_pair_idx, start=1):
+        if not show_pbar and time.monotonic() >= next_log_time:
+            logger.info(
+                'Processing pairs: '
+                f'{_progress_summary(processed, npairs, start_time)}'
+            )
+            next_log_time += 60.0
         pair = (catalog[idx1], catalog[idx2])
         if pbar is not None:
             pbar.update()
@@ -141,6 +131,44 @@ def _process_pairs(catalog):
         write_pairs_to_db(batch_of_pairs, config, append=True)
     if pbar is not None:
         pbar.close()
+    elif npairs > 0:
+        logger.info(
+            'Processing pairs: '
+            f'{_progress_summary(npairs, npairs, start_time)}'
+        )
+
+
+def _fix_trace_id(stats):
+    """
+    Fix trace_id in an ObsPy stats object by replacing dots.
+
+    This makes trace_id compliant with the FDSN standard.
+
+    The fixes are done in place.
+
+    :param stats: ObsPy stats object
+    :type stats: ObsPy AttribDict
+    """
+    stats.network = stats.network.replace('.', '_')
+    stats.station = stats.station.replace('.', '_')
+    stats.location = stats.location.replace('.', '_')
+    stats.channel = stats.channel.replace('.', '_')
+
+
+def _process_pairs(catalog):
+    """Process event pairs."""
+    write_pairs_to_db([], config, append=False)
+    nevents = len(catalog)
+    initial_npairs = nevents * (nevents - 1) // 2
+    logger.info('Building valid event pairs...')
+    valid_pair_idx = _build_valid_pair_indices(catalog)
+    npairs = len(valid_pair_idx)
+    ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
+    logger.info(f'Initial pairs: {initial_npairs:n}')
+    logger.info(f'Final pairs: {npairs:n}')
+    logger.info(f'Pair ratio: {ratio:.6f} ({ratio:.2%})')
+    logger.info(f'Processing {npairs:n} event pairs')
+    _process_valid_pair_indices(catalog, valid_pair_idx, npairs)
     return npairs
 
 

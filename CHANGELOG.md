@@ -6,6 +6,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 - Dramatic speedup of event pairs building by using a KD-tree
   spatial index and approximate geodetic distance calculations.
+- `scan_catalog`: when running as a batch jon, log a progress
+  report every minute, instead of showing the progress bar.
 
 ## [0.8] - 2026-05-22
 
