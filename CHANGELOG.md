@@ -9,6 +9,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 - Dramatic speedup of waveform fetching by improving the caching mechanism.
   A new config option `catalog_waveform_cache_size` allows to set the maximum
   number of waveforms to cache.
+- Add an optional disk cache, through the `catalog_waveform_disk_cache_enabled`
+  config option.
 - `scan_catalog`: when running as a batch jon, log a progress
   report every minute, instead of showing the progress bar.
 

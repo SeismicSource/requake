@@ -11,6 +11,7 @@ Functions for fetching and processing waveforms.
 """
 import logging
 from pathlib import Path
+import re
 import numpy as np
 from obspy import read
 from obspy import Stream, UTCDateTime
@@ -24,8 +25,111 @@ from .arrivals import get_arrivals
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
+WAVEFORM_CACHE_STATS = {
+    'disk_cache_hits': 0,
+    'disk_cache_misses': 0,
+    'disk_cache_writes': 0,
+    'disk_cache_read_errors': 0,
+    'disk_cache_write_errors': 0,
+}
+
+
 class NoWaveformError(Exception):
     """Exception raised for missing waveform data."""
+
+
+def _increment_waveform_cache_stat(stat_name):
+    """Increment a waveform cache statistic."""
+    WAVEFORM_CACHE_STATS[stat_name] += 1
+
+
+def get_waveform_cache_stats():
+    """Return global waveform disk-cache statistics."""
+    return dict(WAVEFORM_CACHE_STATS)
+
+
+def _get_waveform_disk_cache_dir():
+    """Return the directory used for persistent waveform cache."""
+    if not bool(getattr(config, 'catalog_waveform_disk_cache_enabled', True)):
+        return None
+    args = getattr(config, 'args', None)
+    outdir = getattr(args, 'outdir', None)
+    if outdir is None:
+        return None
+    cache_dir = Path(outdir) / 'waveform_cache'
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def _get_waveform_disk_cache_path(evid, traceid, starttime, endtime):
+    """Build the on-disk cache path for an event waveform window."""
+    cache_dir = _get_waveform_disk_cache_dir()
+    if cache_dir is None:
+        return None
+    cache_parts = (
+        str(evid),
+        traceid,
+        str(starttime),
+        str(endtime),
+    )
+    cache_stem = '__'.join(
+        re.sub(r'[^A-Za-z0-9._-]+', '_', part).strip('._')
+        for part in cache_parts
+    )
+    return cache_dir / f'{cache_stem}.mseed'
+
+
+def _read_waveform_from_disk_cache(evid, traceid, starttime, endtime):
+    """Read a waveform window from persistent cache when available."""
+    cache_path = _get_waveform_disk_cache_path(
+        evid, traceid, starttime, endtime
+    )
+    if cache_path is None:
+        return None
+    if not cache_path.exists():
+        _increment_waveform_cache_stat('disk_cache_misses')
+        return None
+    try:
+        st = read(str(cache_path))
+    except Exception as err:  # pylint: disable=broad-except
+        _increment_waveform_cache_stat('disk_cache_read_errors')
+        logger.warning(
+            f'Ignoring unreadable waveform cache file {cache_path}: {err}'
+        )
+        cache_path.unlink(missing_ok=True)
+        return None
+    if not st:
+        _increment_waveform_cache_stat('disk_cache_read_errors')
+        cache_path.unlink(missing_ok=True)
+        return None
+    _increment_waveform_cache_stat('disk_cache_hits')
+    return st[0]
+
+
+def _write_waveform_to_disk_cache(evid, traceid, starttime, endtime, tr):
+    """Persist a waveform window to disk cache."""
+    cache_path = _get_waveform_disk_cache_path(
+        evid, traceid, starttime, endtime
+    )
+    if cache_path is None or cache_path.exists():
+        return False
+    tmp_path = cache_path.with_suffix('.tmp')
+    tr_cache = tr.copy()
+    mseed_stats = getattr(tr_cache.stats, 'mseed', None)
+    if mseed_stats is not None:
+        mseed_stats.pop('encoding', None)
+    try:
+        tr_cache.write(str(tmp_path), format='MSEED')
+        tmp_path.replace(cache_path)
+    except Exception as err:  # pylint: disable=broad-except
+        _increment_waveform_cache_stat('disk_cache_write_errors')
+        logger.warning(
+            f'Unable to write waveform cache file {cache_path}: {err}'
+        )
+        tmp_path.unlink(missing_ok=True)
+        return False
+    _increment_waveform_cache_stat('disk_cache_writes')
+    return True
 
 
 def get_waveform_from_client(traceid, starttime, endtime):
@@ -77,9 +181,7 @@ def get_waveform_from_client(traceid, starttime, endtime):
             f'No waveform data for trace id: {traceid} '
             f'between {starttime} and {endtime}'
         )
-    tr = st[0]
-    tr.detrend(type='demean')
-    return tr
+    return st[0]
 
 
 def _get_arrivals_and_distance(
@@ -135,8 +237,11 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
     trace_length = config.cc_trace_length
     t0 = p_arrival_time - pre_p
     t1 = t0 + trace_length
+    tr = _read_waveform_from_disk_cache(evid, traceid, t0, t1)
+    if tr is not None:
+        return tr
     try:
-        return get_waveform_from_client(traceid, t0, t1)
+        tr = get_waveform_from_client(traceid, t0, t1)
     except NoWaveformError as err:
         msg = str(err).replace('\n', ' ')
         raise NoWaveformError(
@@ -145,6 +250,8 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
             'Skipping event.\n'
             f'Error message: {msg}'
         ) from err
+    _write_waveform_to_disk_cache(evid, traceid, t0, t1, tr)
+    return tr
 
 
 def _get_event_waveform_from_event_data_path(evid, traceid):
@@ -404,12 +511,13 @@ def _stack_traces(st):
     :rtype: obspy.Trace
     """
     tr_stack = st[0].copy()
+    tr_stack.data = tr_stack.data.astype(np.float64, copy=False)
     tr_stack.data *= 0.
     p_arrival = 0.
     s_arrival = 0.
     for tr in st:
         tr.detrend('demean')
-        data = tr.data
+        data = tr.data.astype(np.float64, copy=False)
         if config.normalize_traces_before_averaging:
             data /= abs(tr.max())
         # make sure that the two traces have the same length

@@ -162,6 +162,14 @@ def _log_cache_stats(waveform_pair):
         f'cache size={stats["trace_cache_size"]:n}/'
         f'{stats["max_trace_cache_size"]:n}'
     )
+    logger.info(
+        'Disk cache stats: '
+        f'hits={stats["disk_cache_hits"]:n}, '
+        f'misses={stats["disk_cache_misses"]:n}, '
+        f'writes={stats["disk_cache_writes"]:n}, '
+        f'read errors={stats["disk_cache_read_errors"]:n}, '
+        f'write errors={stats["disk_cache_write_errors"]:n}'
+    )
 
 
 def _log_noninteractive_progress(

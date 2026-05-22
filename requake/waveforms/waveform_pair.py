@@ -15,7 +15,11 @@ from obspy import Stream
 from obspy.geodetics import gps2dist_azimuth
 from obspy.taup import TauPyModel
 from ..config import config
-from .waveforms import get_event_waveform, NoWaveformError
+from .waveforms import (
+    get_event_waveform,
+    get_waveform_cache_stats,
+    NoWaveformError,
+)
 from .station_metadata import get_traceid_coords, MetadataMismatchError
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -47,6 +51,7 @@ class WaveformPair:
         self.skipped_trace_hits = 0
         self.trace_cache_clears = 0
         self.trace_cache_evictions = 0
+        self.initial_disk_cache_stats = get_waveform_cache_stats()
 
     def _cache_get(self, cache_key):
         """Get trace from LRU cache and mark as recently used."""
@@ -71,6 +76,7 @@ class WaveformPair:
             self.sorted_trace_ids_cache_hits
             + self.sorted_trace_ids_cache_misses
         )
+        disk_cache_stats = get_waveform_cache_stats()
         return {
             'trace_cache_hits': self.trace_cache_hits,
             'trace_cache_misses': self.trace_cache_misses,
@@ -93,6 +99,26 @@ class WaveformPair:
             'trace_cache_evictions': self.trace_cache_evictions,
             'trace_cache_size': len(self.tr_cache),
             'max_trace_cache_size': self.max_trace_cache_size,
+            'disk_cache_hits': (
+                disk_cache_stats['disk_cache_hits']
+                - self.initial_disk_cache_stats['disk_cache_hits']
+            ),
+            'disk_cache_misses': (
+                disk_cache_stats['disk_cache_misses']
+                - self.initial_disk_cache_stats['disk_cache_misses']
+            ),
+            'disk_cache_writes': (
+                disk_cache_stats['disk_cache_writes']
+                - self.initial_disk_cache_stats['disk_cache_writes']
+            ),
+            'disk_cache_read_errors': (
+                disk_cache_stats['disk_cache_read_errors']
+                - self.initial_disk_cache_stats['disk_cache_read_errors']
+            ),
+            'disk_cache_write_errors': (
+                disk_cache_stats['disk_cache_write_errors']
+                - self.initial_disk_cache_stats['disk_cache_write_errors']
+            ),
         }
 
     def _get_sorted_trace_ids(self, ev):
