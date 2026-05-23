@@ -17,7 +17,7 @@ from obspy import read
 from obspy import Stream, UTCDateTime
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.signal.cross_correlation import correlate, xcorr_max
-from obspy.clients.fdsn.header import FDSNNoDataException
+from obspy.clients.fdsn.header import FDSNException, FDSNNoDataException
 from scipy.stats import median_abs_deviation
 from ..config import config, rq_exit
 from .station_metadata import get_traceid_coords, MetadataMismatchError
@@ -170,6 +170,13 @@ def get_waveform_from_client(traceid, starttime, endtime):
         raise NoWaveformError(
             f'Timeout occurred while trying '
             f'to get waveform data for trace id: {traceid} '
+            f'between {starttime} and {endtime}\n'
+            f'Error message: {msg}'
+        ) from err
+    except FDSNException as err:
+        msg = str(err).replace('\n', ' ')
+        raise NoWaveformError(
+            f'Unable to get waveform data for trace id: {traceid} '
             f'between {starttime} and {endtime}\n'
             f'Error message: {msg}'
         ) from err

@@ -15,10 +15,11 @@ import unittest
 import warnings
 from argparse import Namespace
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 from obspy import Trace, UTCDateTime
+from obspy.clients.fdsn.header import FDSNBadGatewayException
 
 from requake.config import config
 from requake.waveforms import waveforms as waveform_module
@@ -124,6 +125,21 @@ class TestWaveformDiskCache(unittest.TestCase):
             self.assertTrue(written)
             self.assertFalse(
                 any('encoding specified' in str(w.message) for w in caught)
+            )
+
+    def test_client_bad_gateway_raises_no_waveform_error(self):
+        """Client HTTP 502 must be converted into NoWaveformError."""
+        client = Mock()
+        client.get_waveforms.side_effect = FDSNBadGatewayException(
+            'Service responds: Bad gateway '
+        )
+        config['dataselect_client'] = client
+
+        with self.assertRaises(waveform_module.NoWaveformError):
+            waveform_module.get_waveform_from_client(
+                'IV.ATFO..HHZ',
+                UTCDateTime('2020-01-01T00:00:00'),
+                UTCDateTime('2020-01-01T00:00:10'),
             )
 
 
