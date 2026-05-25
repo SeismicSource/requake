@@ -312,34 +312,41 @@ def _fix_trace_id(stats):
     stats.channel = stats.channel.replace('.', '_')
 
 
-def _canonical_pair_key(evid1, evid2):
-    """Return a canonical event-pair key, independent from event order."""
-    return (evid1, evid2) if evid1 <= evid2 else (evid2, evid1)
-
-
 def _filter_existing_pair_indices(catalog, valid_pair_idx):
     """Drop pairs already present in the database."""
     logger.info(
         'Resume mode: loading existing event-pair keys from the database. '
         'This extra step can take time for large scans.'
     )
-    existing_pairs = {
-        _canonical_pair_key(evid1, evid2)
-        for evid1, evid2 in read_pair_keys(config)
-    }
-    if not existing_pairs:
+    existing_pairs = read_pair_keys(config)
+    if not existing_pairs or len(valid_pair_idx) == 0:
         return valid_pair_idx, 0
     logger.info(
         'Resume mode: filtering candidate pairs against existing results...'
     )
-    keep = np.ones(len(valid_pair_idx), dtype=bool)
-    skipped = 0
-    for idx, (idx1, idx2) in enumerate(valid_pair_idx):
-        evid1 = catalog[idx1].evid
-        evid2 = catalog[idx2].evid
-        if _canonical_pair_key(evid1, evid2) in existing_pairs:
-            keep[idx] = False
-            skipped += 1
+    evid_to_idx = {
+        ev.evid: idx for idx, ev in enumerate(catalog)
+    }
+    nevents = np.uint64(len(catalog))
+    existing_ids = []
+    for evid1, evid2 in existing_pairs:
+        idx1 = evid_to_idx.get(evid1)
+        idx2 = evid_to_idx.get(evid2)
+        if idx1 is None or idx2 is None:
+            continue
+        first = min(idx1, idx2)
+        second = max(idx1, idx2)
+        pair_id = np.uint64(first) * nevents + np.uint64(second)
+        existing_ids.append(pair_id)
+    if not existing_ids:
+        return valid_pair_idx, 0
+    existing_ids = np.asarray(existing_ids, dtype=np.uint64)
+    candidate_ids = (
+        valid_pair_idx[:, 0].astype(np.uint64) * nevents
+        + valid_pair_idx[:, 1].astype(np.uint64)
+    )
+    keep = ~np.isin(candidate_ids, existing_ids)
+    skipped = int((~keep).sum())
     return valid_pair_idx[keep], skipped
 
 
