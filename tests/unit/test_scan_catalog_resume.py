@@ -12,11 +12,14 @@ Unit tests for scan_catalog restart/continue controls.
 
 import sys
 import unittest
+import importlib
 from unittest.mock import patch
 import numpy as np
 
 from requake.config.parse_arguments import parse_arguments
 from requake.scan.scan_catalog import _filter_existing_pair_indices
+
+SCAN_CATALOG_MODULE = importlib.import_module('requake.scan.scan_catalog')
 
 
 class _DummyEvent:
@@ -64,8 +67,9 @@ class TestScanCatalogResume(unittest.TestCase):
         catalog = [_DummyEvent('A'), _DummyEvent('B'), _DummyEvent('C')]
         valid_pair_idx = np.array([[0, 1], [0, 2], [1, 2]], dtype=np.int32)
         existing = {('B', 'A'), ('C', 'B')}
-        with patch(
-            'requake.scan.scan_catalog.read_pair_keys',
+        with patch.object(
+            SCAN_CATALOG_MODULE,
+            'read_pair_keys',
             return_value=existing,
         ):
             filtered, skipped = _filter_existing_pair_indices(
