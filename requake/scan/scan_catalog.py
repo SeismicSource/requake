@@ -20,7 +20,11 @@ from ..config import config, rq_exit
 from ..database.db import get_db_path
 from ..catalog import fix_non_locatable_events, read_stored_catalog
 from ..families.pairs import RequakeEventPair
-from ..database.pairs import write_pairs as write_pairs_to_db
+from ..database.pairs import (
+    count_pairs as count_pairs_in_db,
+    read_pair_keys,
+    write_pairs as write_pairs_to_db,
+)
 from ..waveforms import (
     WaveformPair, cc_waveform_pair,
     NoWaveformError, NoMetadataError, MetadataMismatchError
@@ -298,13 +302,93 @@ def _fix_trace_id(stats):
     stats.channel = stats.channel.replace('.', '_')
 
 
-def _process_pairs(catalog):
+def _canonical_pair_key(evid1, evid2):
+    """Return a canonical event-pair key, independent from event order."""
+    return (evid1, evid2) if evid1 <= evid2 else (evid2, evid1)
+
+
+def _filter_existing_pair_indices(catalog, valid_pair_idx):
+    """Drop pairs already present in the database."""
+    existing_pairs = {
+        _canonical_pair_key(evid1, evid2)
+        for evid1, evid2 in read_pair_keys(config)
+    }
+    if not existing_pairs:
+        return valid_pair_idx, 0
+    keep = np.ones(len(valid_pair_idx), dtype=bool)
+    skipped = 0
+    for idx, (idx1, idx2) in enumerate(valid_pair_idx):
+        evid1 = catalog[idx1].evid
+        evid2 = catalog[idx2].evid
+        if _canonical_pair_key(evid1, evid2) in existing_pairs:
+            keep[idx] = False
+            skipped += 1
+    return valid_pair_idx[keep], skipped
+
+
+def _ask_existing_pairs_action(npairs_in_db):
+    """Ask the user whether to overwrite or continue an existing scan."""
+    args = config.args
+    if args.force:
+        return 'overwrite'
+    if args.force_continue:
+        return 'continue'
+    if not sys.stdin.isatty():
+        logger.error(
+            f'Found {npairs_in_db:n} event pairs in db file '
+            f'{get_db_path(config)}.'
+        )
+        logger.error(
+            'Cannot prompt in non-interactive mode. '
+            'Use --force to overwrite or --force-continue to resume.'
+        )
+        rq_exit(1)
+    logger.warning(
+        f'Found {npairs_in_db:n} existing event pairs in db file '
+        f'{get_db_path(config)}.'
+    )
+    logger.warning(
+        'You can overwrite them and restart, or continue from where '
+        'the previous scan stopped.'
+    )
+    prompt = (
+        'Choose action: [o]verwrite, [c]ontinue, [a]bort '
+        '(default: abort): '
+    )
+    choices = {
+        'o': 'overwrite',
+        'overwrite': 'overwrite',
+        'c': 'continue',
+        'continue': 'continue',
+        'a': 'abort',
+        'abort': 'abort',
+    }
+    while True:
+        answer = input(prompt).strip().lower()
+        if not answer:
+            return 'abort'
+        action = choices.get(answer)
+        if action is not None:
+            return action
+        print('Invalid choice. Please type o, c, or a.')
+
+
+def _process_pairs(catalog, continue_scan=False):
     """Process event pairs."""
-    write_pairs_to_db([], config, append=False)
+    if not continue_scan:
+        write_pairs_to_db([], config, append=False)
     nevents = len(catalog)
     initial_npairs = nevents * (nevents - 1) // 2
     logger.info('Building valid event pairs...')
     valid_pair_idx = _build_valid_pair_indices(catalog)
+    if continue_scan:
+        valid_pair_idx, skipped_npairs = _filter_existing_pair_indices(
+            catalog, valid_pair_idx
+        )
+        logger.info(
+            f'Skipping {skipped_npairs:n} event pairs already present '
+            'in the database'
+        )
     npairs = len(valid_pair_idx)
     ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
     logger.info(f'Initial pairs: {initial_npairs:n}')
@@ -337,6 +421,14 @@ def scan_catalog():
     logger.info(
         f'{nevents:n} events read from db file {get_db_path(config)}'
     )
-    npairs = _process_pairs(catalog)
+    continue_scan = False
+    existing_pairs = count_pairs_in_db(config)
+    if existing_pairs > 0:
+        action = _ask_existing_pairs_action(existing_pairs)
+        if action == 'abort':
+            logger.info('Scan aborted by user')
+            rq_exit(0)
+        continue_scan = action == 'continue'
+    npairs = _process_pairs(catalog, continue_scan=continue_scan)
     logger.info(f'Processed {npairs:n} event pairs')
     logger.info(f'Done! Output written to {get_db_path(config)}')

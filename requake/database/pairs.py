@@ -64,6 +64,11 @@ def _ensure_pairs_table(cursor):
         cursor.execute(statement)
 
 
+def _is_missing_pairs_table_error(err):
+    """Return True when sqlite error means pairs table is missing."""
+    return MISSING_EVENT_PAIRS_TABLE in str(err)
+
+
 def _pair_values(pair):
     """Convert a RequakeEventPair into a row tuple."""
     return (
@@ -156,6 +161,45 @@ def write_pairs(pairs, config, append=True):
         conn.close()
 
 
+def count_pairs(config):
+    """Return the number of stored event pairs."""
+    conn = get_db_connection(config, initdb=False)
+    try:
+        cursor = conn.cursor()
+        try:
+            row = cursor.execute(
+                f'SELECT COUNT(*) AS npairs FROM {EVENT_PAIRS_TABLE}'
+            ).fetchone()
+        except sqlite3.OperationalError as err:
+            if _is_missing_pairs_table_error(err):
+                return 0
+            raise
+    finally:
+        conn.close()
+    return int(row['npairs'])
+
+
+def read_pair_keys(config):
+    """Read stored event-pair keys as (evid1, evid2) tuples."""
+    conn = get_db_connection(config, initdb=False)
+    try:
+        cursor = conn.cursor()
+        try:
+            rows = cursor.execute(
+                f'''
+                SELECT evid1, evid2
+                FROM {EVENT_PAIRS_TABLE}
+                '''
+            ).fetchall()
+        except sqlite3.OperationalError as err:
+            if _is_missing_pairs_table_error(err):
+                return set()
+            raise
+    finally:
+        conn.close()
+    return {(row['evid1'], row['evid2']) for row in rows}
+
+
 def read_pairs(config):
     """Read event pairs from SQLite."""
     conn = get_db_connection(config, initdb=False)
@@ -169,7 +213,7 @@ def read_pairs(config):
                 '''
             ).fetchall()
         except sqlite3.OperationalError as err:
-            if MISSING_EVENT_PAIRS_TABLE in str(err):
+            if _is_missing_pairs_table_error(err):
                 raise FileNotFoundError(
                     'Event pairs not found in db file '
                     f'{get_db_path(config)}'

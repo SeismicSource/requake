@@ -160,10 +160,22 @@ def parse_arguments(progname='requake'):
     )
     # ---
     # --- scan_catalog
-    subparser.add_parser(
+    scan_catalog = subparser.add_parser(
         'scan_catalog',
-        parents=[force],
         help='scan an existing catalog for earthquake pairs'
+    )
+    scan_catalog_mode = scan_catalog.add_mutually_exclusive_group()
+    scan_catalog_mode.add_argument(
+        '-f',
+        '--force',
+        action='store_true',
+        help='delete existing event pairs and restart the scan'
+    )
+    scan_catalog_mode.add_argument(
+        '-c',
+        '--force-continue',
+        action='store_true',
+        help='continue an interrupted scan and keep existing event pairs'
     )
     # ---
     # --- print_pairs

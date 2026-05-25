@@ -13,6 +13,10 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   config option.
 - `scan_catalog`: when running as a batch jon, log a progress
   report every minute, instead of showing the progress bar.
+- `scan_catalog`: if event pairs already exist in the database,
+  ask whether to overwrite or continue from an interrupted run.
+  Add `--force` to restart from scratch and `--force-continue`
+  (short `-c`) to resume without prompting.
 
 ## [0.8] - 2026-05-22
 
