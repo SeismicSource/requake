@@ -314,16 +314,9 @@ def _fix_trace_id(stats):
 
 def _filter_existing_pair_indices(catalog, valid_pair_idx):
     """Drop pairs already present in the database."""
-    logger.info(
-        'Resume mode: loading existing event-pair keys from the database. '
-        'This extra step can take time for large scans.'
-    )
     existing_pairs = read_pair_keys(config)
     if not existing_pairs or len(valid_pair_idx) == 0:
         return valid_pair_idx, 0
-    logger.info(
-        'Resume mode: filtering candidate pairs against existing results...'
-    )
     evid_to_idx = {
         ev.evid: idx for idx, ev in enumerate(catalog)
     }
@@ -410,27 +403,33 @@ def _process_pairs(catalog, continue_scan=False):
         valid_pair_idx, skipped_npairs = _filter_existing_pair_indices(
             catalog, valid_pair_idx
         )
-        logger.info(
-            f'Skipping {skipped_npairs:n} event pairs already present '
-            'in the database'
-        )
     already_processed = skipped_npairs
     npairs = len(valid_pair_idx)
+    total_valid_pairs = already_processed + npairs
     ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
     logger.info(f'Initial pairs: {initial_npairs:n}')
     logger.info(f'Final pairs: {npairs:n}')
     logger.info(f'Pair ratio: {ratio:.6f} ({ratio:.2%})')
+    if continue_scan:
+        logger.info(
+            'Resume mode: existing event-pair keys were loaded from '
+            'the database'
+        )
+        logger.info(
+            f'Skipping {skipped_npairs:n} event pairs already present '
+            'in the database'
+        )
     _log_pair_grouping_stats(valid_pair_idx)
     logger.info(
         f'Processing {npairs:n} event pairs '
-        f'({already_processed:n}/{initial_npairs:n} already processed)'
+        f'({already_processed:n}/{total_valid_pairs:n} already processed)'
     )
     _process_valid_pair_indices(
         catalog,
         valid_pair_idx,
         npairs,
         initial_processed=already_processed,
-        total_pairs=initial_npairs,
+        total_pairs=total_valid_pairs,
     )
     return npairs
 
