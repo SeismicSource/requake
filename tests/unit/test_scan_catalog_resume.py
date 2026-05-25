@@ -13,11 +13,14 @@ Unit tests for scan_catalog restart/continue controls.
 import sys
 import unittest
 import importlib
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 import numpy as np
 
 from requake.config.parse_arguments import parse_arguments
-from requake.scan.scan_catalog import _filter_existing_pair_indices
+from requake.scan.scan_catalog import (
+    _filter_existing_pair_indices,
+    _process_valid_pair_indices,
+)
 
 SCAN_CATALOG_MODULE = importlib.import_module('requake.scan.scan_catalog')
 
@@ -78,6 +81,66 @@ class TestScanCatalogResume(unittest.TestCase):
         expected = np.array([[0, 2]], dtype=np.int32)
         self.assertEqual(skipped, 2)
         np.testing.assert_array_equal(filtered, expected)
+
+    def test_noninteractive_progress_uses_total_pair_count(self):
+        """Resume progress log should use total pairs, not remaining."""
+        with patch.object(
+            SCAN_CATALOG_MODULE.sys.stderr,
+            'isatty',
+            return_value=False,
+        ), patch.object(
+            SCAN_CATALOG_MODULE,
+            '_log_noninteractive_progress',
+            return_value=1.0,
+        ) as log_progress, patch.object(
+            SCAN_CATALOG_MODULE,
+            '_process_pair',
+            side_effect=AssertionError('No pairs should be processed'),
+        ), patch.object(
+            SCAN_CATALOG_MODULE,
+            'WaveformPair',
+            return_value=MagicMock(),
+        ), patch.object(
+            SCAN_CATALOG_MODULE,
+            'write_pairs_to_db',
+        ):
+            _process_valid_pair_indices(
+                catalog=[],
+                valid_pair_idx=np.empty((0, 2), dtype=np.int32),
+                npairs=0,
+                initial_processed=7,
+                total_pairs=10,
+            )
+        self.assertFalse(log_progress.called)
+
+    def test_tqdm_uses_total_and_initial_on_resume(self):
+        """Resume progress bar should initialize with total and offset."""
+        with patch.object(
+            SCAN_CATALOG_MODULE.sys.stderr,
+            'isatty',
+            return_value=True,
+        ), patch.object(
+            SCAN_CATALOG_MODULE,
+            'tqdm',
+        ) as tqdm_mock, patch.object(
+            SCAN_CATALOG_MODULE,
+            'WaveformPair',
+            return_value=MagicMock(),
+        ), patch.object(
+            SCAN_CATALOG_MODULE,
+            'write_pairs_to_db',
+        ):
+            tqdm_mock.return_value = MagicMock()
+            _process_valid_pair_indices(
+                catalog=[],
+                valid_pair_idx=np.empty((0, 2), dtype=np.int32),
+                npairs=0,
+                initial_processed=12,
+                total_pairs=40,
+            )
+        kwargs = tqdm_mock.call_args.kwargs
+        self.assertEqual(kwargs['total'], 40)
+        self.assertEqual(kwargs['initial'], 12)
 
 
 if __name__ == '__main__':

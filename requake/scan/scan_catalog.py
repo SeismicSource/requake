@@ -221,7 +221,13 @@ def _process_pair(pair, waveform_pair):
     return pair_out, waveform_fetch_dt, crosscorr_dt
 
 
-def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
+def _process_valid_pair_indices(
+    catalog,
+    valid_pair_idx,
+    npairs,
+    initial_processed=0,
+    total_pairs=None,
+):
     """Process valid pairs from index pairs."""
     logger.info('Computing waveform cross-correlation...')
     waveform_pair = WaveformPair()
@@ -230,21 +236,25 @@ def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
     next_log_time = start_time + 60.0
     waveform_fetch_time = 0.0
     crosscorr_time = 0.0
+    if total_pairs is None:
+        total_pairs = npairs
     show_pbar = sys.stderr.isatty()
     if show_pbar:
         pbar = tqdm(
-            total=npairs,
+            total=total_pairs,
             unit='pairs',
             unit_scale=True,
-            desc=f'Processing {npairs:n} event pairs'
+            desc=f'Processing {total_pairs:n} event pairs',
+            initial=initial_processed,
         )
     else:
         pbar = None
     for processed, (idx1, idx2) in enumerate(valid_pair_idx, start=1):
+        processed_total = initial_processed + processed
         if not show_pbar:
             next_log_time = _log_noninteractive_progress(
-                processed,
-                npairs,
+                processed_total,
+                total_pairs,
                 start_time,
                 next_log_time,
                 waveform_fetch_time,
@@ -278,7 +288,7 @@ def _process_valid_pair_indices(catalog, valid_pair_idx, npairs):
     elif npairs > 0:
         logger.info(
             'Processing pairs: '
-            f'{_progress_summary(npairs, npairs, start_time)}'
+            f'{_progress_summary(total_pairs, total_pairs, start_time)}'
         )
     if npairs > 0:
         _log_timing_split(start_time, waveform_fetch_time, crosscorr_time)
@@ -381,6 +391,7 @@ def _process_pairs(catalog, continue_scan=False):
     initial_npairs = nevents * (nevents - 1) // 2
     logger.info('Building valid event pairs...')
     valid_pair_idx = _build_valid_pair_indices(catalog)
+    skipped_npairs = 0
     if continue_scan:
         valid_pair_idx, skipped_npairs = _filter_existing_pair_indices(
             catalog, valid_pair_idx
@@ -389,14 +400,24 @@ def _process_pairs(catalog, continue_scan=False):
             f'Skipping {skipped_npairs:n} event pairs already present '
             'in the database'
         )
+    already_processed = skipped_npairs
     npairs = len(valid_pair_idx)
     ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
     logger.info(f'Initial pairs: {initial_npairs:n}')
     logger.info(f'Final pairs: {npairs:n}')
     logger.info(f'Pair ratio: {ratio:.6f} ({ratio:.2%})')
     _log_pair_grouping_stats(valid_pair_idx)
-    logger.info(f'Processing {npairs:n} event pairs')
-    _process_valid_pair_indices(catalog, valid_pair_idx, npairs)
+    logger.info(
+        f'Processing {npairs:n} event pairs '
+        f'({already_processed:n}/{initial_npairs:n} already processed)'
+    )
+    _process_valid_pair_indices(
+        catalog,
+        valid_pair_idx,
+        npairs,
+        initial_processed=already_processed,
+        total_pairs=initial_npairs,
+    )
     return npairs
 
 
