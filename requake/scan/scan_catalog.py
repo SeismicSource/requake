@@ -319,12 +319,19 @@ def _canonical_pair_key(evid1, evid2):
 
 def _filter_existing_pair_indices(catalog, valid_pair_idx):
     """Drop pairs already present in the database."""
+    logger.info(
+        'Resume mode: loading existing event-pair keys from the database. '
+        'This extra step can take time for large scans.'
+    )
     existing_pairs = {
         _canonical_pair_key(evid1, evid2)
         for evid1, evid2 in read_pair_keys(config)
     }
     if not existing_pairs:
         return valid_pair_idx, 0
+    logger.info(
+        'Resume mode: filtering candidate pairs against existing results...'
+    )
     keep = np.ones(len(valid_pair_idx), dtype=bool)
     skipped = 0
     for idx, (idx1, idx2) in enumerate(valid_pair_idx):
