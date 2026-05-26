@@ -150,6 +150,29 @@ def _log_timing_split(start_time, waveform_fetch_time, crosscorr_time):
     )
 
 
+def _log_pair_timing_split(
+    pair_count,
+    elapsed,
+    waveform_fetch_time,
+    crosscorr_time,
+):
+    """Log average timing split per pair."""
+    if pair_count <= 0:
+        return
+    avg_elapsed = elapsed / pair_count
+    avg_fetch = waveform_fetch_time / pair_count
+    avg_crosscorr = crosscorr_time / pair_count
+    avg_other = max(avg_elapsed - avg_fetch - avg_crosscorr, 0.0)
+    logger.info(
+        'Timing split per pair: '
+        f'fetch={avg_fetch:.3f}s, '
+        f'cc={avg_crosscorr:.3f}s, '
+        f'other={avg_other:.3f}s '
+        f'(window={pair_count:n} pairs, '
+        f'{elapsed:.1f}s total)'
+    )
+
+
 def _log_cache_stats(waveform_pair):
     """Log waveform cache hit-rate statistics."""
     stats = waveform_pair.get_cache_stats()
@@ -179,10 +202,11 @@ def _log_cache_stats(waveform_pair):
 def _log_noninteractive_progress(
     processed,
     npairs,
-    start_time,
+    window_start_time,
     next_log_time,
-    waveform_fetch_time,
-    crosscorr_time,
+    window_pair_count,
+    window_fetch_time,
+    window_crosscorr_time,
     waveform_pair
 ):
     """Log non-interactive progress periodically and return next log time."""
@@ -190,9 +214,14 @@ def _log_noninteractive_progress(
         return next_log_time
     logger.info(
         'Processing pairs: '
-        f'{_progress_summary(processed, npairs, start_time)}'
+        f'{_progress_summary(processed, npairs, window_start_time)}'
     )
-    _log_timing_split(start_time, waveform_fetch_time, crosscorr_time)
+    _log_pair_timing_split(
+        window_pair_count,
+        time.monotonic() - window_start_time,
+        window_fetch_time,
+        window_crosscorr_time,
+    )
     _log_cache_stats(waveform_pair)
     return next_log_time + 60.0
 
@@ -237,6 +266,10 @@ def _init_pair_processing_state(npairs, initial_processed, total_pairs):
         'next_log_time': start_time + 60.0,
         'waveform_fetch_time': 0.0,
         'crosscorr_time': 0.0,
+        'window_start_time': start_time,
+        'window_pair_count': 0,
+        'window_fetch_time': 0.0,
+        'window_crosscorr_time': 0.0,
         'discarded_pairs': 0,
         'saved_pairs': 0,
         'initial_processed': initial_processed,
@@ -272,12 +305,17 @@ def _update_noninteractive_progress(
     state['next_log_time'] = _log_noninteractive_progress(
         processed_total,
         state['total_pairs'],
-        state['start_time'],
+        state['window_start_time'],
         state['next_log_time'],
-        state['waveform_fetch_time'],
-        state['crosscorr_time'],
+        state['window_pair_count'],
+        state['window_fetch_time'],
+        state['window_crosscorr_time'],
         waveform_pair,
     )
+    state['window_start_time'] = time.monotonic()
+    state['window_pair_count'] = 0
+    state['window_fetch_time'] = 0.0
+    state['window_crosscorr_time'] = 0.0
 
 
 def _process_and_store_pair(pair, waveform_pair, batch_of_pairs, state):
@@ -285,6 +323,9 @@ def _process_and_store_pair(pair, waveform_pair, batch_of_pairs, state):
     pair_out, fetch_dt, crosscorr_dt = _process_pair(pair, waveform_pair)
     state['waveform_fetch_time'] += fetch_dt
     state['crosscorr_time'] += crosscorr_dt
+    state['window_pair_count'] += 1
+    state['window_fetch_time'] += fetch_dt
+    state['window_crosscorr_time'] += crosscorr_dt
     if _should_save_pair(pair_out):
         batch_of_pairs.append(pair_out)
         state['saved_pairs'] += 1
@@ -318,8 +359,10 @@ def _finalize_pair_processing(
         )
     if npairs == 0:
         return
-    _log_timing_split(
-        state['start_time'],
+    total_elapsed = time.monotonic() - state['start_time']
+    _log_pair_timing_split(
+        npairs,
+        total_elapsed,
         state['waveform_fetch_time'],
         state['crosscorr_time'],
     )
