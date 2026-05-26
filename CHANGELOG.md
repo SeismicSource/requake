@@ -21,6 +21,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   (short `-c`) to resume without prompting.
 - `scan_catalog`: add `catalog_min_abs_cc_to_save` config option to
   save to database only event pairs with `abs(cc)` above a threshold.
+- `print_families`: add horizontal and vertical distance min/max values
+  to both summary and detailed (`-d`) outputs.
 
 ## [0.8] - 2026-05-22
 

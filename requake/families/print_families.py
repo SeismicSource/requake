@@ -11,9 +11,44 @@ Print families to screen.
 """
 import logging
 import numpy as np
+from obspy.geodetics import gps2dist_azimuth
 from ..config import config, generic_printer, rq_exit
 from .families import FamilyNotFoundError, read_selected_families
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
+
+
+def _family_distance_stats(family):
+    """
+    Compute horizontal/vertical distance statistics for one family.
+
+    Distances are computed from each event to the family centroid
+    (mean lon/lat/depth).
+
+    :param family: Family to process.
+    :type family: requake.families.Family
+    :return: hdist_min, hdist_max, vdist_min, vdist_max (all in km)
+    :rtype: tuple
+    """
+    hdist = []
+    if family.lon is not None and family.lat is not None:
+        hdist.extend(
+            gps2dist_azimuth(family.lat, family.lon, event.lat, event.lon)[0]
+            / 1e3
+            for event in family
+            if event.lon is not None and event.lat is not None
+        )
+    vdist = []
+    if family.depth is not None:
+        vdist.extend(
+            abs(event.depth - family.depth)
+            for event in family
+            if event.depth is not None
+        )
+    hdist_min = float(min(hdist)) if hdist else np.nan
+    hdist_max = float(max(hdist)) if hdist else np.nan
+    vdist_min = float(min(vdist)) if vdist else np.nan
+    vdist_max = float(max(vdist)) if vdist else np.nan
+    return hdist_min, hdist_max, vdist_min, vdist_max
 
 
 def _print_family_details(family, duration_units, duration_multiplier):
@@ -36,6 +71,18 @@ def _print_family_details(family, duration_units, duration_multiplier):
     print(f'End time: {family.endtime}')
     duration = family.duration * duration_multiplier
     print(f'Duration: {duration:.2f} {duration_units}')
+    hdist_min, hdist_max, vdist_min, vdist_max = _family_distance_stats(family)
+    if np.isnan(hdist_min) or np.isnan(hdist_max):
+        print('Horizontal distance range: n/a')
+    else:
+        print(
+            'Horizontal distance range: '
+            f'{hdist_min:.3f} - {hdist_max:.3f} km'
+        )
+    if np.isnan(vdist_min) or np.isnan(vdist_max):
+        print('Vertical distance range: n/a')
+    else:
+        print(f'Vertical distance range: {vdist_min:.3f} - {vdist_max:.3f} km')
     print(f'Slip rate: {family.slip_rate:.1f} cm/y')
     print(f'Magnitude range: {family.magmin:.1f} - {family.magmax:.1f}')
     print('Events:')
@@ -63,12 +110,19 @@ def _print_family_list(families, duration_units, duration_multiplier):
         ('start time', None),
         ('end time', None),
         (f'duration\n({duration_units})', '.2f'),
+        ('hdist\nmin (km)', '.3f'),
+        ('hdist\nmax (km)', '.3f'),
+        ('vdist\nmin (km)', '.3f'),
+        ('vdist\nmax (km)', '.3f'),
         ('slip rate\n(cm/y)', '.1f'),
         ('mag\nmin', '.1f'),
         ('mag\nmax', '.1f')
     ]
     rows = []
     for family in families:
+        hdist_min, hdist_max, vdist_min, vdist_max = _family_distance_stats(
+            family
+        )
         row = [
             family.number,
             len(family),
@@ -78,6 +132,10 @@ def _print_family_list(families, duration_units, duration_multiplier):
             family.starttime,
             family.endtime,
             family.duration * duration_multiplier,
+            hdist_min,
+            hdist_max,
+            vdist_min,
+            vdist_max,
             family.slip_rate,
             family.magmin,
             family.magmax
