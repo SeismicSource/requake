@@ -37,6 +37,9 @@ data access performance, especially for large catalogs.
 This change is not backward compatible at the data format level. The
 high-level behavior of the command-line interface remains unchanged.
 
+Note: further improvements based on this new storage system will be introduced
+throughout the 0.8.x release series.
+
 ## [0.7.3] - 2026-04-14
 
 This release is intended to validate the new release workflow.
