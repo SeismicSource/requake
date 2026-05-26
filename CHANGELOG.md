@@ -17,6 +17,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   ask whether to overwrite or continue from an interrupted run.
   Add `--force` to restart from scratch and `--force-continue`
   (short `-c`) to resume without prompting.
+- `scan_catalog`: add `catalog_min_abs_cc_to_save` config option to
+  save to database only event pairs with `abs(cc)` above a threshold.
 
 ## [0.8] - 2026-05-22
 

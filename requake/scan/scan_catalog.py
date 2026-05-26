@@ -221,6 +221,12 @@ def _process_pair(pair, waveform_pair):
     return pair_out, waveform_fetch_dt, crosscorr_dt
 
 
+def _should_save_pair(pair_out):
+    """Return True when pair should be saved according to config."""
+    threshold = config.catalog_min_abs_cc_to_save
+    return abs(pair_out.cc_max) >= threshold
+
+
 def _process_valid_pair_indices(
     catalog,
     valid_pair_idx,
@@ -236,6 +242,8 @@ def _process_valid_pair_indices(
     next_log_time = start_time + 60.0
     waveform_fetch_time = 0.0
     crosscorr_time = 0.0
+    discarded_pairs = 0
+    saved_pairs = 0
     if total_pairs is None:
         total_pairs = npairs
     show_pbar = sys.stderr.isatty()
@@ -270,7 +278,11 @@ def _process_valid_pair_indices(
             )
             waveform_fetch_time += fetch_dt
             crosscorr_time += crosscorr_dt
-            batch_of_pairs.append(pair_out)
+            if _should_save_pair(pair_out):
+                batch_of_pairs.append(pair_out)
+                saved_pairs += 1
+            else:
+                discarded_pairs += 1
             if len(batch_of_pairs) >= 100:
                 write_pairs_to_db(batch_of_pairs, config, append=True)
                 batch_of_pairs = []
@@ -293,6 +305,13 @@ def _process_valid_pair_indices(
     if npairs > 0:
         _log_timing_split(start_time, waveform_fetch_time, crosscorr_time)
         _log_cache_stats(waveform_pair)
+        logger.info(
+            'Pairs saved to db after |cc| filter: '
+            f'{saved_pairs:n}/{npairs:n}; '
+            f'discarded={discarded_pairs:n}; '
+            f'min_abs_cc_to_save='
+            f'{config.catalog_min_abs_cc_to_save:g}'
+        )
 
 
 def _fix_trace_id(stats):
