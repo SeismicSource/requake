@@ -23,6 +23,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   save to database only event pairs with `abs(cc)` above a threshold.
 - `print_families`: add horizontal and vertical distance min/max values
   to both summary and detailed (`-d`) outputs.
+- `print_families`: add `-f stats` output format for summary family
+  statistics.
 
 ## [0.8] - 2026-05-22
 

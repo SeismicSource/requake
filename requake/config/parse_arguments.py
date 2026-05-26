@@ -336,9 +336,14 @@ def parse_arguments(progname='requake'):
     print_families = subparser.add_parser(
         'print_families',
         parents=[
-            longerthan, shorterthan, minevents, family_numbers, print_format
+            longerthan, shorterthan, minevents, family_numbers
         ],
         help='print families to screen'
+    )
+    print_families.add_argument(
+        '-f', '--format', type=str, default='simple',
+        choices=['simple', 'markdown', 'csv', 'stats'],
+        help='format for the output (default: %(default)s)'
     )
     print_families.add_argument(
         '-d', '--detailed', action='store_true',

@@ -144,6 +144,75 @@ def _print_family_list(families, duration_units, duration_multiplier):
     generic_printer(rows, headers_fmt)
 
 
+def _print_family_stats(families):
+    """Print summary statistics for selected families."""
+    nevents = np.array([len(family) for family in families], dtype=float)
+    duration_days = np.array(
+        [family.duration * 365 for family in families], dtype=float
+    )
+    mags_min = np.array([family.magmin for family in families], dtype=float)
+    mags_max = np.array([family.magmax for family in families], dtype=float)
+    hdist_max = np.array(
+        [_family_distance_stats(family)[1] for family in families],
+        dtype=float,
+    )
+    vdist_max = np.array(
+        [_family_distance_stats(family)[3] for family in families],
+        dtype=float,
+    )
+
+    print('Family statistics:')
+    print(f'  Number of families: {len(families)}')
+    print(f'  Total number of events: {int(np.sum(nevents))}')
+    print(
+        '  Events per family (min / median / mean / max): '
+        f'{int(np.min(nevents))} / '
+        f'{np.median(nevents):.1f} / '
+        f'{np.mean(nevents):.1f} / '
+        f'{int(np.max(nevents))}'
+    )
+    print(
+        '  Family duration in days '
+        '(min / median / mean / max): '
+        f'{np.min(duration_days):.2f} / '
+        f'{np.median(duration_days):.2f} / '
+        f'{np.mean(duration_days):.2f} / '
+        f'{np.max(duration_days):.2f}'
+    )
+    print(
+        '  Family minimum magnitude '
+        '(min / median / mean / max): '
+        f'{np.nanmin(mags_min):.2f} / '
+        f'{np.nanmedian(mags_min):.2f} / '
+        f'{np.nanmean(mags_min):.2f} / '
+        f'{np.nanmax(mags_min):.2f}'
+    )
+    print(
+        '  Family maximum magnitude '
+        '(min / median / mean / max): '
+        f'{np.nanmin(mags_max):.2f} / '
+        f'{np.nanmedian(mags_max):.2f} / '
+        f'{np.nanmean(mags_max):.2f} / '
+        f'{np.nanmax(mags_max):.2f}'
+    )
+    print(
+        '  Horizontal distance max across families '
+        '(min / median / mean / max) [km]: '
+        f'{np.nanmin(hdist_max):.3f} / '
+        f'{np.nanmedian(hdist_max):.3f} / '
+        f'{np.nanmean(hdist_max):.3f} / '
+        f'{np.nanmax(hdist_max):.3f}'
+    )
+    print(
+        '  Vertical distance max across families '
+        '(min / median / mean / max) [km]: '
+        f'{np.nanmin(vdist_max):.3f} / '
+        f'{np.nanmedian(vdist_max):.3f} / '
+        f'{np.nanmean(vdist_max):.3f} / '
+        f'{np.nanmax(vdist_max):.3f}'
+    )
+
+
 def print_families():
     """Print families to screen."""
     try:
@@ -168,7 +237,9 @@ def print_families():
         duration_multiplier = 365 * 24 * 60
         duration_units = 'mins'
 
-    if config.args.detailed:
+    if config.args.format == 'stats':
+        _print_family_stats(families)
+    elif config.args.detailed:
         for family in families:
             _print_family_details(family, duration_units, duration_multiplier)
             print()
