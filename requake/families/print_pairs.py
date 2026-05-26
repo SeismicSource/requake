@@ -11,7 +11,7 @@ Print pairs to screen.
 """
 import logging
 from ..config import config, rq_exit, generic_printer
-from .pairs import read_pairs_file
+from ..database.pairs import PairsTableNotFoundError, read_pairs
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
@@ -37,13 +37,11 @@ def print_pairs():
         ('lag\n(sec)', '.2f'),
         ('cc\nmax', '.2f')
     ]
-    cc_min = config.args.cc_min if config.args.cc_min is not None else -1e99
-    cc_max = config.args.cc_max if config.args.cc_max is not None else 1e99
+    cc_min = config.args.cc_min
+    cc_max = config.args.cc_max
     try:
         print_headers = True
-        for pair in read_pairs_file():
-            if not cc_min <= pair.cc_max <= cc_max:
-                continue
+        for pair in read_pairs(config, cc_min=cc_min, cc_max=cc_max):
             rows = [
                 [
                     pair.event1.evid,
@@ -68,6 +66,6 @@ def print_pairs():
             ]
             generic_printer(rows, headers_fmt, print_headers)
             print_headers = False
-    except FileNotFoundError as msg:
+    except PairsTableNotFoundError as msg:
         logger.error(msg)
         rq_exit(1)

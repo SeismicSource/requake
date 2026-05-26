@@ -72,30 +72,22 @@ class RequakeEventPair:
         )
 
 
-def read_pairs_file():
-    """
-    Read stored event pairs. Generate a RequakeEventPair object for each row.
-
-    :return: generator of RequakeEventPair objects
-    :rtype: generator
-
-    :raises FileNotFoundError: if the stored pairs are not found
-    """
-    from ..database.pairs import read_pairs as read_pairs_from_db
-    yield from read_pairs_from_db(config)
-
-
-def read_events_from_pairs_file():
+def read_events_from_pairs(cc_min=None, cc_max=None):
     """
     Read events from stored event pairs.
 
+    :param cc_min: If given, only use pairs with cc_max >= cc_min.
+    :type cc_min: float or None
+    :param cc_max: If given, only use pairs with cc_max <= cc_max.
+    :type cc_max: float or None
     :return: dictionary of events
     :rtype: dict
 
-    :raises FileNotFoundError: if the stored pairs are not found
+    :raises PairsTableNotFoundError: if the stored pairs table is missing
     """
+    from ..database.pairs import read_pairs
     events = {}
-    for pair in read_pairs_file():
+    for pair in read_pairs(config, cc_min=cc_min, cc_max=cc_max):
         evid1 = pair.event1.evid
         try:
             ev1 = events[evid1]

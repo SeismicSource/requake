@@ -14,8 +14,9 @@ from itertools import combinations
 from scipy.cluster.hierarchy import average, fcluster
 from ..config import config, rq_exit
 from ..database.db import get_db_path
+from ..database.pairs import PairsTableNotFoundError
 from ..database.families import write_families as write_families_to_db
-from .pairs import read_events_from_pairs_file
+from .pairs import read_events_from_pairs
 from .families import Family
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -35,25 +36,20 @@ def _check_options():
             'are not specified')
 
 
-def _build_families_from_shared_events(events, cc_min):
+def _build_families_from_shared_events(events):
     """
     Build families by clustering all event pairs sharing an event.
-
-    Valid event pairs are those with a correlation above cc_min.
 
     :param events: dictionary of events
     :type events: dict
     :return: list of families
     :rtype: list
     """
-    # Build families from events with correlation above cc_min
     families = []
     for ev in events.values():
         new_family = Family()
         new_family.append(ev)
         for evid, cc in ev.correlations.items():
-            if cc < cc_min:
-                continue
             new_family.append(events[evid])
         if len(new_family) == 1:
             continue
@@ -146,8 +142,13 @@ def build_families():
             'Reading events from event pairs in '
             f'db file {get_db_path(config)}...'
         )
-        events = read_events_from_pairs_file()
-    except FileNotFoundError:
+        cc_min = (
+            config.cc_min
+            if config.clustering_algorithm == 'shared'
+            else None
+        )
+        events = read_events_from_pairs(cc_min=cc_min)
+    except PairsTableNotFoundError:
         logger.error(
             'Unable to find event pairs in database: '
             f'{get_db_path(config)}'
@@ -155,7 +156,7 @@ def build_families():
         rq_exit(1)
     if config.clustering_algorithm == 'shared':
         logger.info('Building families from shared events...')
-        families = _build_families_from_shared_events(events, config.cc_min)
+        families = _build_families_from_shared_events(events)
     elif config.clustering_algorithm == 'UPGMA':
         logger.info('Building families using UPGMA...')
         families = _build_families_from_upgma(events, config.cc_min)

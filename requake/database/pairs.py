@@ -16,6 +16,11 @@ from .db import execute_with_retry, get_db_connection, get_db_path
 EVENT_PAIRS_TABLE = 'event_pairs'
 MISSING_EVENT_PAIRS_TABLE = f'no such table: {EVENT_PAIRS_TABLE}'
 
+
+class PairsTableNotFoundError(LookupError):
+    """Raised when the event pairs table is missing from the database."""
+
+
 PAIRS_SCHEMA_STATEMENTS = [
     f'''
     CREATE TABLE IF NOT EXISTS {EVENT_PAIRS_TABLE} (
@@ -200,8 +205,29 @@ def read_pair_keys(config):
     return {(row['evid1'], row['evid2']) for row in rows}
 
 
-def read_pairs(config):
-    """Read event pairs from SQLite."""
+def read_pairs(config, cc_min=None, cc_max=None):
+    """
+    Read event pairs from SQLite, optionally filtering by cc_max.
+
+    :param config: Requake configuration object.
+    :param cc_min: If given, only return pairs with cc_max >= cc_min.
+    :type cc_min: float or None
+    :param cc_max: If given, only return pairs with cc_max <= cc_max.
+    :type cc_max: float or None
+    :return: list of RequakeEventPair objects
+    :rtype: list
+
+    :raise PairsTableNotFoundError: if the stored pairs table is missing
+    """
+    conditions = []
+    params = []
+    if cc_min is not None:
+        conditions.append('cc_max >= ?')
+        params.append(cc_min)
+    if cc_max is not None:
+        conditions.append('cc_max <= ?')
+        params.append(cc_max)
+    where = f'WHERE {" AND ".join(conditions)}' if conditions else ''
     conn = get_db_connection(config, initdb=False)
     try:
         cursor = conn.cursor()
@@ -209,13 +235,15 @@ def read_pairs(config):
             rows = cursor.execute(
                 f'''
                 SELECT * FROM {EVENT_PAIRS_TABLE}
+                {where}
                 ORDER BY orig_time1, orig_time2, evid1, evid2, trace_id
-                '''
+                ''',
+                params,
             ).fetchall()
         except sqlite3.OperationalError as err:
             if _is_missing_pairs_table_error(err):
-                raise FileNotFoundError(
-                    'Event pairs not found in db file '
+                raise PairsTableNotFoundError(
+                    'Event pairs table not found in db file '
                     f'{get_db_path(config)}'
                 ) from err
             raise

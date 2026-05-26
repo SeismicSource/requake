@@ -17,7 +17,8 @@ from argparse import Namespace
 from unittest.mock import patch
 from obspy import UTCDateTime
 from requake.config import config
-from requake.families.pairs import RequakeEventPair, read_pairs_file
+from requake.families.pairs import RequakeEventPair
+from requake.database.pairs import read_pairs as read_pairs_from_db
 from requake.catalog import RequakeEvent
 from requake.database.catalog import write_catalog
 from requake.database.pairs import write_pairs
@@ -119,7 +120,7 @@ class TestPairsSchema(unittest.TestCase):
         with self._patch_runtime_config():
             self._seed_catalog_for_pairs(pairs_data)
             write_pairs(pairs_data, config, append=False)
-            pairs = list(read_pairs_file())
+            pairs = list(read_pairs_from_db(config))
 
         self.assertEqual(len(pairs), 2)
         self.assertEqual(pairs[0].event1.evid, pairs_data[0].event1.evid)
@@ -144,7 +145,7 @@ class TestPairsSchema(unittest.TestCase):
         with self._patch_runtime_config():
             self._seed_catalog_for_pairs(pairs_data)
             write_pairs(pairs_data, config, append=False)
-            pairs = list(read_pairs_file())
+            pairs = list(read_pairs_from_db(config))
 
         self.assertEqual(len(pairs), 2, 'Should have 2 pairs')
 
@@ -200,7 +201,7 @@ class TestPairsSchema(unittest.TestCase):
         with self._patch_runtime_config():
             self._seed_catalog_for_pairs(pairs_data)
             write_pairs(pairs_data, config, append=False)
-            pairs = list(read_pairs_file())
+            pairs = list(read_pairs_from_db(config))
 
         self.assertEqual(len(pairs), 1)
         self.assertEqual(pairs[0].event1.evid, 'ev_a')
