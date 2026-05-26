@@ -227,6 +227,111 @@ def _should_save_pair(pair_out):
     return abs(pair_out.cc_max) >= threshold
 
 
+def _init_pair_processing_state(npairs, initial_processed, total_pairs):
+    """Build mutable state for pair processing."""
+    if total_pairs is None:
+        total_pairs = npairs
+    start_time = time.monotonic()
+    return {
+        'start_time': start_time,
+        'next_log_time': start_time + 60.0,
+        'waveform_fetch_time': 0.0,
+        'crosscorr_time': 0.0,
+        'discarded_pairs': 0,
+        'saved_pairs': 0,
+        'initial_processed': initial_processed,
+        'total_pairs': total_pairs,
+    }
+
+
+def _init_progress_bar(state):
+    """Initialize progress bar and return (show_pbar, pbar)."""
+    show_pbar = sys.stderr.isatty()
+    if not show_pbar:
+        return show_pbar, None
+    pbar = tqdm(
+        total=state['total_pairs'],
+        unit='pairs',
+        unit_scale=True,
+        desc=f'Processing {state["total_pairs"]:n} event pairs',
+        initial=state['initial_processed'],
+    )
+    return show_pbar, pbar
+
+
+def _update_noninteractive_progress(
+    state,
+    waveform_pair,
+    show_pbar,
+    processed,
+):
+    """Periodically log progress in non-interactive mode."""
+    if show_pbar:
+        return
+    processed_total = state['initial_processed'] + processed
+    state['next_log_time'] = _log_noninteractive_progress(
+        processed_total,
+        state['total_pairs'],
+        state['start_time'],
+        state['next_log_time'],
+        state['waveform_fetch_time'],
+        state['crosscorr_time'],
+        waveform_pair,
+    )
+
+
+def _process_and_store_pair(pair, waveform_pair, batch_of_pairs, state):
+    """Process one pair and update batch/state counters."""
+    pair_out, fetch_dt, crosscorr_dt = _process_pair(pair, waveform_pair)
+    state['waveform_fetch_time'] += fetch_dt
+    state['crosscorr_time'] += crosscorr_dt
+    if _should_save_pair(pair_out):
+        batch_of_pairs.append(pair_out)
+        state['saved_pairs'] += 1
+    else:
+        state['discarded_pairs'] += 1
+    if len(batch_of_pairs) >= 100:
+        write_pairs_to_db(batch_of_pairs, config, append=True)
+        batch_of_pairs.clear()
+
+
+def _finalize_pair_processing(
+    batch_of_pairs,
+    pbar,
+    npairs,
+    state,
+    waveform_pair,
+):
+    """Flush pending rows and emit final processing logs."""
+    if batch_of_pairs:
+        write_pairs_to_db(batch_of_pairs, config, append=True)
+    if pbar is not None:
+        pbar.close()
+    elif npairs > 0:
+        summary = _progress_summary(
+            state['total_pairs'],
+            state['total_pairs'],
+            state['start_time'],
+        )
+        logger.info(
+            f'Processing pairs: {summary}'
+        )
+    if npairs == 0:
+        return
+    _log_timing_split(
+        state['start_time'],
+        state['waveform_fetch_time'],
+        state['crosscorr_time'],
+    )
+    _log_cache_stats(waveform_pair)
+    logger.info(
+        'Pairs saved to db after |cc| filter: '
+        f'{state["saved_pairs"]:n}/{npairs:n}; '
+        f'discarded={state["discarded_pairs"]:n}; '
+        f'min_abs_cc_to_save={config.catalog_min_abs_cc_to_save:g}'
+    )
+
+
 def _process_valid_pair_indices(
     catalog,
     valid_pair_idx,
@@ -238,54 +343,25 @@ def _process_valid_pair_indices(
     logger.info('Computing waveform cross-correlation...')
     waveform_pair = WaveformPair()
     batch_of_pairs = []
-    start_time = time.monotonic()
-    next_log_time = start_time + 60.0
-    waveform_fetch_time = 0.0
-    crosscorr_time = 0.0
-    discarded_pairs = 0
-    saved_pairs = 0
-    if total_pairs is None:
-        total_pairs = npairs
-    show_pbar = sys.stderr.isatty()
-    if show_pbar:
-        pbar = tqdm(
-            total=total_pairs,
-            unit='pairs',
-            unit_scale=True,
-            desc=f'Processing {total_pairs:n} event pairs',
-            initial=initial_processed,
-        )
-    else:
-        pbar = None
+    state = _init_pair_processing_state(npairs, initial_processed, total_pairs)
+    show_pbar, pbar = _init_progress_bar(state)
     for processed, (idx1, idx2) in enumerate(valid_pair_idx, start=1):
-        processed_total = initial_processed + processed
-        if not show_pbar:
-            next_log_time = _log_noninteractive_progress(
-                processed_total,
-                total_pairs,
-                start_time,
-                next_log_time,
-                waveform_fetch_time,
-                crosscorr_time,
-                waveform_pair
-            )
+        _update_noninteractive_progress(
+            state,
+            waveform_pair,
+            show_pbar,
+            processed,
+        )
         pair = (catalog[idx1], catalog[idx2])
         if pbar is not None:
             pbar.update()
         try:
-            pair_out, fetch_dt, crosscorr_dt = _process_pair(
-                pair, waveform_pair
+            _process_and_store_pair(
+                pair,
+                waveform_pair,
+                batch_of_pairs,
+                state,
             )
-            waveform_fetch_time += fetch_dt
-            crosscorr_time += crosscorr_dt
-            if _should_save_pair(pair_out):
-                batch_of_pairs.append(pair_out)
-                saved_pairs += 1
-            else:
-                discarded_pairs += 1
-            if len(batch_of_pairs) >= 100:
-                write_pairs_to_db(batch_of_pairs, config, append=True)
-                batch_of_pairs = []
         except (NoMetadataError, MetadataMismatchError) as msg:
             logger.error(msg)
             rq_exit(1)
@@ -293,25 +369,13 @@ def _process_valid_pair_indices(
             # Do not print empty messages
             if str(msg):
                 logger.warning(msg)
-    if batch_of_pairs:
-        write_pairs_to_db(batch_of_pairs, config, append=True)
-    if pbar is not None:
-        pbar.close()
-    elif npairs > 0:
-        logger.info(
-            'Processing pairs: '
-            f'{_progress_summary(total_pairs, total_pairs, start_time)}'
-        )
-    if npairs > 0:
-        _log_timing_split(start_time, waveform_fetch_time, crosscorr_time)
-        _log_cache_stats(waveform_pair)
-        logger.info(
-            'Pairs saved to db after |cc| filter: '
-            f'{saved_pairs:n}/{npairs:n}; '
-            f'discarded={discarded_pairs:n}; '
-            f'min_abs_cc_to_save='
-            f'{config.catalog_min_abs_cc_to_save:g}'
-        )
+    _finalize_pair_processing(
+        batch_of_pairs,
+        pbar,
+        npairs,
+        state,
+        waveform_pair,
+    )
 
 
 def _fix_trace_id(stats):
