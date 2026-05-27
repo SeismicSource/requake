@@ -250,12 +250,6 @@ def _process_pair(pair, waveform_pair):
     return pair_out, waveform_fetch_dt, crosscorr_dt
 
 
-def _should_save_pair(pair_out):
-    """Return True when pair should be saved according to config."""
-    threshold = config.catalog_min_abs_cc_to_save
-    return abs(pair_out.cc_max) >= threshold
-
-
 def _init_pair_processing_state(npairs, initial_processed, total_pairs):
     """Build mutable state for pair processing."""
     if total_pairs is None:
@@ -270,8 +264,6 @@ def _init_pair_processing_state(npairs, initial_processed, total_pairs):
         'window_pair_count': 0,
         'window_fetch_time': 0.0,
         'window_crosscorr_time': 0.0,
-        'discarded_pairs': 0,
-        'saved_pairs': 0,
         'initial_processed': initial_processed,
         'total_pairs': total_pairs,
     }
@@ -326,11 +318,7 @@ def _process_and_store_pair(pair, waveform_pair, batch_of_pairs, state):
     state['window_pair_count'] += 1
     state['window_fetch_time'] += fetch_dt
     state['window_crosscorr_time'] += crosscorr_dt
-    if _should_save_pair(pair_out):
-        batch_of_pairs.append(pair_out)
-        state['saved_pairs'] += 1
-    else:
-        state['discarded_pairs'] += 1
+    batch_of_pairs.append(pair_out)
     if len(batch_of_pairs) >= 100:
         write_pairs_to_db(batch_of_pairs, config, append=True)
         batch_of_pairs.clear()
@@ -367,12 +355,6 @@ def _finalize_pair_processing(
         state['crosscorr_time'],
     )
     _log_cache_stats(waveform_pair)
-    logger.info(
-        'Pairs saved to db after |cc| filter: '
-        f'{state["saved_pairs"]:n}/{npairs:n}; '
-        f'discarded={state["discarded_pairs"]:n}; '
-        f'min_abs_cc_to_save={config.catalog_min_abs_cc_to_save:g}'
-    )
 
 
 def _process_valid_pair_indices(
