@@ -9,6 +9,8 @@ SQLite-backed event pair persistence.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
+import logging
+import math
 import sqlite3
 from obspy import UTCDateTime
 from .db import (
@@ -17,6 +19,15 @@ from .db import (
     get_db_connection,
     get_db_path,
 )
+from .trace_metadata import (
+    PairsMetadataError,  # noqa: F401 (re-exported for callers)
+    TRACE_METADATA_TABLE,
+    TRACE_METADATA_SCHEMA_STATEMENTS,
+    _is_missing_trace_metadata_table_error,
+    _store_trace_metadata,
+)
+
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 EVENT_PAIRS_TABLE = 'event_pairs'
 MISSING_EVENT_PAIRS_TABLE = f'no such table: {EVENT_PAIRS_TABLE}'
@@ -26,6 +37,12 @@ class PairsTableNotFoundError(LookupError):
     """Raised when the event pairs table is missing from the database."""
 
 
+class PairsSchemaError(RuntimeError):
+    """Raised when stored pairs use an incompatible database schema."""
+
+
+# Combined schema for both event_pairs and trace_metadata.
+# Used by _ensure_pairs_table and the local migration helper.
 PAIRS_SCHEMA_STATEMENTS = [
     f'''
     CREATE TABLE IF NOT EXISTS {EVENT_PAIRS_TABLE} (
@@ -33,21 +50,8 @@ PAIRS_SCHEMA_STATEMENTS = [
       evid1           TEXT NOT NULL,
       evid2           TEXT NOT NULL,
       trace_id        TEXT NOT NULL,
-      orig_time1      TEXT NOT NULL,
-      lon1            REAL,
-      lat1            REAL,
-      depth_km1       REAL,
-      mag_type1       TEXT,
-      mag1            REAL,
-      orig_time2      TEXT NOT NULL,
-      lon2            REAL,
-      lat2            REAL,
-      depth_km2       REAL,
-      mag_type2       TEXT,
-      mag2            REAL,
       lag_samples     INTEGER,
-      lag_sec         REAL,
-      cc_max          REAL NOT NULL,
+      cc_x100         INTEGER NOT NULL,
             FOREIGN KEY (evid1)
                 REFERENCES catalog(evid)
                 ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -57,6 +61,7 @@ PAIRS_SCHEMA_STATEMENTS = [
       UNIQUE (evid1, evid2, trace_id)
     )
     ''',
+    *TRACE_METADATA_SCHEMA_STATEMENTS,
     (
         'CREATE INDEX IF NOT EXISTS idx_pairs_evid1 '
         f'ON {EVENT_PAIRS_TABLE}(evid1)'
@@ -69,7 +74,7 @@ PAIRS_SCHEMA_STATEMENTS = [
 
 
 def _ensure_pairs_table(cursor):
-    """Create the event pair table and indexes when needed."""
+    """Create the event pair and trace metadata tables when needed."""
     for statement in PAIRS_SCHEMA_STATEMENTS:
         cursor.execute(statement)
 
@@ -79,27 +84,48 @@ def _is_missing_pairs_table_error(err):
     return MISSING_EVENT_PAIRS_TABLE in str(err)
 
 
+def _is_incompatible_pairs_schema_error(err):
+    """Return True when sqlite error means pairs schema is outdated."""
+    message = str(err)
+    return (
+        'no such column: p.cc_x100' in message
+        or 'no such column: cc_x100' in message
+        or _is_missing_trace_metadata_table_error(err)
+    )
+
+
+def _encode_cc_max(cc_max):
+    """Encode cc_max with 0.01 precision for compact storage."""
+    return int(round(cc_max * 100))
+
+
+def _decode_cc_max(cc_x100):
+    """Decode compact cc_max storage to float."""
+    return cc_x100 / 100.0
+
+
+def _cc_filter_clause(cc_min, cc_max):
+    """Build SQL filter clause and params for encoded cc values."""
+    conditions = []
+    params = []
+    if cc_min is not None:
+        conditions.append('p.cc_x100 >= ?')
+        params.append(int(math.ceil(cc_min * 100)))
+    if cc_max is not None:
+        conditions.append('p.cc_x100 <= ?')
+        params.append(int(math.floor(cc_max * 100)))
+    where = f'WHERE {" AND ".join(conditions)}' if conditions else ''
+    return where, params
+
+
 def _pair_values(pair):
-    """Convert a RequakeEventPair into a row tuple."""
+    """Convert a RequakeEventPair into a compact row tuple."""
     return (
         pair.event1.evid,
         pair.event2.evid,
         pair.trace_id,
-        str(pair.event1.orig_time),
-        pair.event1.lon,
-        pair.event1.lat,
-        pair.event1.depth,
-        pair.event1.mag_type,
-        pair.event1.mag,
-        str(pair.event2.orig_time),
-        pair.event2.lon,
-        pair.event2.lat,
-        pair.event2.depth,
-        pair.event2.mag_type,
-        pair.event2.mag,
         int(pair.lag_samples),
-        pair.lag_sec,
-        pair.cc_max,
+        _encode_cc_max(pair.cc_max),
     )
 
 
@@ -128,18 +154,21 @@ def _pair_from_row(row):
         mag=row['mag2'],
         trace_id=row['trace_id'],
     )
+    # lag_sec is reconstructed at read time from lag_samples and the
+    # sampling rate resolved at the first event time.
     return RequakeEventPair(
         event1,
         event2,
         row['trace_id'],
         row['lag_samples'],
-        row['lag_sec'],
-        row['cc_max'],
+        row['lag_samples'] / row['sampling_rate_hz'],
+        _decode_cc_max(row['cc_x100']),
     )
 
 
 def write_pairs(pairs, config, append=True):
     """Write event pairs into SQLite."""
+    pairs = list(pairs)
     conn = get_db_connection(config, initdb=True)
     try:
         cursor = conn.cursor()
@@ -149,24 +178,31 @@ def write_pairs(pairs, config, append=True):
                 lambda: cursor.execute(f'DELETE FROM {EVENT_PAIRS_TABLE}'),
                 'clear event pairs table',
             )
+            execute_with_retry(
+                lambda: cursor.execute(f'DELETE FROM {TRACE_METADATA_TABLE}'),
+                'clear trace metadata table',
+            )
         if pairs:
+            _store_trace_metadata(cursor, pairs, config)
             execute_with_retry(
                 lambda: cursor.executemany(
                     f'''
                     INSERT OR REPLACE INTO {EVENT_PAIRS_TABLE} (
-                      evid1, evid2, trace_id, orig_time1, lon1, lat1,
-                      depth_km1, mag_type1, mag1, orig_time2, lon2, lat2,
-                      depth_km2, mag_type2, mag2, lag_samples, lag_sec, cc_max
-                                        ) VALUES (
-                                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                                            ?, ?, ?, ?, ?, ?
-                                        )
+                      evid1, evid2, trace_id, lag_samples, cc_x100
+                    ) VALUES (?, ?, ?, ?, ?)
                     ''',
                     (_pair_values(pair) for pair in pairs),
                 ),
                 'write event pairs batch',
             )
         conn.commit()
+    except sqlite3.OperationalError as err:
+        if _is_incompatible_pairs_schema_error(err):
+            raise PairsSchemaError(
+                'Stored event pairs schema is incompatible with this '
+                f'Requake version in db file {get_db_path(config)}'
+            ) from err
+        raise
     finally:
         conn.close()
 
@@ -224,27 +260,64 @@ def read_pairs(config, cc_min=None, cc_max=None):
 
     :raise PairsTableNotFoundError: if the stored pairs table is missing
     """
-    conditions = []
-    params = []
-    if cc_min is not None:
-        conditions.append('cc_max >= ?')
-        params.append(cc_min)
-    if cc_max is not None:
-        conditions.append('cc_max <= ?')
-        params.append(cc_max)
-    where = f'WHERE {" AND ".join(conditions)}' if conditions else ''
+    where, params = _cc_filter_clause(cc_min, cc_max)
     conn = get_db_connection(config, initdb=False)
     try:
         cursor = conn.cursor()
         try:
             rows = cursor.execute(
                 f'''
-                SELECT * FROM {EVENT_PAIRS_TABLE}
+                SELECT
+                  p.evid1,
+                  p.evid2,
+                  p.trace_id,
+                  p.lag_samples,
+                  p.cc_x100,
+                  c1.orig_time AS orig_time1,
+                  c1.lon AS lon1,
+                  c1.lat AS lat1,
+                  c1.depth_km AS depth_km1,
+                  c1.mag_type AS mag_type1,
+                  c1.mag AS mag1,
+                  c2.orig_time AS orig_time2,
+                  c2.lon AS lon2,
+                  c2.lat AS lat2,
+                  c2.depth_km AS depth_km2,
+                  c2.mag_type AS mag_type2,
+                  c2.mag AS mag2,
+                  tm.sampling_rate_hz
+                FROM {EVENT_PAIRS_TABLE} AS p
+                JOIN catalog AS c1 ON c1.evid = p.evid1
+                JOIN catalog AS c2 ON c2.evid = p.evid2
+                LEFT JOIN {TRACE_METADATA_TABLE} AS tm
+                  ON tm.trace_id = p.trace_id
+                 AND tm.valid_from_utc <= c1.orig_time
+                 AND (
+                   tm.valid_to_utc IS NULL OR c1.orig_time < tm.valid_to_utc
+                 )
                 {where}
-                ORDER BY orig_time1, orig_time2, evid1, evid2, trace_id
+                ORDER BY c1.orig_time, c2.orig_time,
+                         p.evid1, p.evid2, p.trace_id
                 ''',
                 params,
             ).fetchall()
+            if any(row['sampling_rate_hz'] is None for row in rows):
+                raise PairsMetadataError(
+                    'Trace metadata is missing for one or more stored pairs '
+                    f'in db file {get_db_path(config)}'
+                )
+        except sqlite3.OperationalError as err:
+            if _is_missing_pairs_table_error(err):
+                raise PairsTableNotFoundError(
+                    'Event pairs table not found in db file '
+                    f'{get_db_path(config)}'
+                ) from err
+            if _is_incompatible_pairs_schema_error(err):
+                raise PairsSchemaError(
+                    'Stored event pairs schema is incompatible with this '
+                    f'Requake version in db file {get_db_path(config)}'
+                ) from err
+            raise
         except sqlite3.DatabaseError as err:
             if 'database disk image is malformed' in str(err).lower():
                 raise DatabaseCorruptError(
@@ -253,13 +326,6 @@ def read_pairs(config, cc_min=None, cc_max=None):
                     'You can try recovering it with:\n'
                     "sqlite3 requake.sqlite '.recover' | "
                     'sqlite3 requake_new.sqlite'
-                ) from err
-            raise
-        except sqlite3.OperationalError as err:
-            if _is_missing_pairs_table_error(err):
-                raise PairsTableNotFoundError(
-                    'Event pairs table not found in db file '
-                    f'{get_db_path(config)}'
                 ) from err
             raise
     finally:

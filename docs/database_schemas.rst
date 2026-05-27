@@ -5,10 +5,11 @@ Requake stores scan outputs in a SQLite database named ``requake.sqlite``
 inside
 the selected output directory.
 
-The database currently contains four domain tables:
+The database currently contains five domain tables:
 
 - ``catalog``
 - ``event_pairs``
+- ``trace_metadata``
 - ``families``
 - ``template_detections``
 
@@ -69,21 +70,8 @@ The ``event_pairs`` table stores cross-correlation results from
      evid1           TEXT NOT NULL,
      evid2           TEXT NOT NULL,
      trace_id        TEXT NOT NULL,
-     orig_time1      TEXT NOT NULL,
-     lon1            REAL,
-     lat1            REAL,
-     depth_km1       REAL,
-     mag_type1       TEXT,
-     mag1            REAL,
-     orig_time2      TEXT NOT NULL,
-     lon2            REAL,
-     lat2            REAL,
-     depth_km2       REAL,
-     mag_type2       TEXT,
-     mag2            REAL,
      lag_samples     INTEGER,
-     lag_sec         REAL,
-     cc_max          REAL NOT NULL,
+     cc_x100         INTEGER NOT NULL,
      FOREIGN KEY (evid1)
        REFERENCES catalog(evid)
        ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -97,6 +85,36 @@ Indexes:
 
 - ``idx_pairs_evid1`` on ``event_pairs(evid1)``
 - ``idx_pairs_evid2`` on ``event_pairs(evid2)``
+
+``cc_x100`` stores ``cc_max`` with 0.01 precision using
+``round(cc_max * 100)``.
+
+The lag value in seconds is computed at run time using
+``lag_samples / sampling_rate_hz`` from ``trace_metadata``.
+
+Trace Metadata Table
+^^^^^^^^^^^^^^^^^^^^
+
+The ``trace_metadata`` table stores sampling-rate and coordinates with
+time-valid intervals for each ``trace_id``.
+
+.. code-block:: sql
+
+   CREATE TABLE trace_metadata (
+     trace_id          TEXT NOT NULL,
+     valid_from_utc    TEXT NOT NULL,
+     valid_to_utc      TEXT,
+     sampling_rate_hz  REAL NOT NULL,
+     trace_lon         REAL,
+     trace_lat         REAL,
+     updated_at        TEXT,
+     PRIMARY KEY (trace_id, valid_from_utc)
+   )
+
+Index:
+
+- ``idx_trace_metadata_lookup`` on
+  ``trace_metadata(trace_id, valid_from_utc, valid_to_utc)``
 
 Families Table
 ^^^^^^^^^^^^^^

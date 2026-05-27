@@ -14,7 +14,11 @@ from itertools import combinations
 from scipy.cluster.hierarchy import average, fcluster
 from ..config import config, rq_exit
 from ..database.db import DatabaseCorruptError, get_db_path
-from ..database.pairs import PairsTableNotFoundError
+from ..database.pairs import (
+    PairsMetadataError,
+    PairsSchemaError,
+    PairsTableNotFoundError,
+)
 from ..database.families import write_families as write_families_to_db
 from .pairs import read_events_from_pairs
 from .families import Family
@@ -153,6 +157,9 @@ def build_families():
             'Unable to find event pairs in database: '
             f'{get_db_path(config)}'
         )
+        rq_exit(1)
+    except (PairsMetadataError, PairsSchemaError) as msg:
+        logger.error(msg)
         rq_exit(1)
     except DatabaseCorruptError as msg:
         logger.error(msg)

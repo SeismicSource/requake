@@ -25,6 +25,7 @@ from ..database.pairs import (
     read_pair_keys,
     write_pairs as write_pairs_to_db,
 )
+from ..database.trace_metadata import store_trace_metadata_from_inventory
 from ..waveforms import (
     WaveformPair, cc_waveform_pair,
     NoWaveformError, NoMetadataError, MetadataMismatchError
@@ -247,6 +248,9 @@ def _process_pair(pair, waveform_pair):
         lag_sec,
         cc_max,
     )
+    # Preserve the authoritative rate from the waveform trace so the
+    # write path does not need to infer it from lag values.
+    pair_out.sampling_rate_hz = float(tr1.stats.sampling_rate)
     return pair_out, waveform_fetch_dt, crosscorr_dt
 
 
@@ -502,6 +506,15 @@ def _process_pairs(catalog, continue_scan=False):
     """Process event pairs."""
     if not continue_scan:
         write_pairs_to_db([], config, append=False)
+    # Write trace metadata immediately after tables are created so that
+    # the DB is populated even when no pairs are found (e.g. all
+    # waveform fetches fail).  Uses the inventory already in config.
+    trace_ids = (
+        [config.args.traceid]
+        if getattr(config.args, 'traceid', None) is not None
+        else list(config.catalog_trace_id)
+    )
+    store_trace_metadata_from_inventory(trace_ids, config)
     nevents = len(catalog)
     initial_npairs = nevents * (nevents - 1) // 2
     logger.info('Building valid event pairs...')

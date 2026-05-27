@@ -4,6 +4,7 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- Slimmed-down DB size by optimizing `event_pairs` storage
 - Dramatic speedup of event pairs building by using a KD-tree
   spatial index and approximate geodetic distance calculations.
 - Dramatic speedup of waveform fetching by improving the caching mechanism.

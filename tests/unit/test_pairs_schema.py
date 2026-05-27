@@ -13,6 +13,7 @@ Unit tests for event pairs CSV schema and types.
 import unittest
 import tempfile
 import os
+import sqlite3
 from argparse import Namespace
 from unittest.mock import patch
 from obspy import UTCDateTime
@@ -21,6 +22,7 @@ from requake.families.pairs import RequakeEventPair
 from requake.database.pairs import read_pairs as read_pairs_from_db
 from requake.catalog import RequakeEvent
 from requake.database.catalog import write_catalog
+from requake.database.db import get_db_path
 from requake.database.pairs import write_pairs
 
 
@@ -206,6 +208,55 @@ class TestPairsSchema(unittest.TestCase):
         self.assertEqual(len(pairs), 1)
         self.assertEqual(pairs[0].event1.evid, 'ev_a')
         self.assertEqual(pairs[0].event2.evid, 'ev_b')
+        self.assertEqual(pairs[0].cc_max, 0.86)
+
+    def test_pairs_use_compact_schema_and_trace_metadata(self):
+        """Stored pairs should use compact columns plus trace metadata."""
+        pairs_data = self._get_synthetic_pairs_data(1)
+
+        with self._patch_runtime_config():
+            self._seed_catalog_for_pairs(pairs_data)
+            write_pairs(pairs_data, config, append=False)
+            db_path = get_db_path(config)
+
+        conn = sqlite3.connect(db_path)
+        try:
+            pair_columns = {
+                row[1]
+                for row in conn.execute(
+                    'PRAGMA table_info(event_pairs)'
+                ).fetchall()
+            }
+            metadata_rows = conn.execute(
+                'SELECT trace_id, sampling_rate_hz FROM trace_metadata'
+            ).fetchall()
+        finally:
+            conn.close()
+
+        self.assertIn('lag_samples', pair_columns)
+        self.assertIn('cc_x100', pair_columns)
+        self.assertNotIn('lag_sec', pair_columns)
+        self.assertNotIn('orig_time1', pair_columns)
+        self.assertEqual(len(metadata_rows), 1)
+        self.assertEqual(metadata_rows[0][0], 'XX.TEST.00.BHZ')
+        self.assertAlmostEqual(metadata_rows[0][1], 40.0)
+
+    def test_pairs_filters_use_encoded_cc_values(self):
+        """cc_min/cc_max filters should match reconstructed cc values."""
+        pairs_data = self._get_synthetic_pairs_data(3)
+        pairs_data[0].cc_max = 0.841
+        pairs_data[1].cc_max = 0.851
+        pairs_data[2].cc_max = 0.861
+
+        with self._patch_runtime_config():
+            self._seed_catalog_for_pairs(pairs_data)
+            write_pairs(pairs_data, config, append=False)
+            pairs = list(
+                read_pairs_from_db(config, cc_min=0.851, cc_max=0.861)
+            )
+
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual(pairs[0].event1.evid, pairs_data[2].event1.evid)
         self.assertEqual(pairs[0].cc_max, 0.86)
 
 

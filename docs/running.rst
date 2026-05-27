@@ -100,3 +100,20 @@ you are ready to build repeating earthquake families:
 
    requake build_families
 
+
+Migrating Legacy Pair Databases
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you already have an older ``requake.sqlite`` with the legacy
+``event_pairs`` layout, use the local migration helper before running new
+commands on that database:
+
+.. code-block::
+
+   python .vscode/migrate_pairs_schema.py \
+       --config .vscode/migrate_pairs_schema.ini
+
+By default, lag consistency mismatches are reported as warnings and migration
+continues with ``lag_samples`` as the authoritative value. Use
+``--strict-lag-check`` to fail on any mismatch.
+

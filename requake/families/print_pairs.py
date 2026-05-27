@@ -12,7 +12,12 @@ Print pairs to screen.
 import logging
 from ..config import config, rq_exit, generic_printer
 from ..database.db import DatabaseCorruptError
-from ..database.pairs import PairsTableNotFoundError, read_pairs
+from ..database.pairs import (
+    PairsMetadataError,
+    PairsSchemaError,
+    PairsTableNotFoundError,
+    read_pairs,
+)
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
@@ -67,9 +72,12 @@ def print_pairs():
             ]
             generic_printer(rows, headers_fmt, print_headers)
             print_headers = False
-    except (FileNotFoundError, PairsTableNotFoundError) as msg:
-        logger.error(msg)
-        rq_exit(1)
-    except DatabaseCorruptError as msg:
+    except (
+        DatabaseCorruptError,
+        FileNotFoundError,
+        PairsMetadataError,
+        PairsSchemaError,
+        PairsTableNotFoundError,
+    ) as msg:
         logger.error(msg)
         rq_exit(1)
