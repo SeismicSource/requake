@@ -30,6 +30,7 @@ from requake.database.db import (
     get_db_path,
     set_db_version,
 )
+from requake.database.pairs import DatabaseCorruptError, read_pairs
 
 
 class TestDatabaseDbHelpers(unittest.TestCase):
@@ -128,17 +129,30 @@ class TestDatabaseDbHelpers(unittest.TestCase):
             catalog = read_catalog(config)
             self.assertEqual(catalog[0].evid, event.evid)
 
-            conn = get_db_connection(config)
-            try:
-                cursor = conn.cursor()
-                cursor.execute(
-                    'SELECT count(*) FROM sqlite_master '
-                    "WHERE type='table' AND name='catalog'"
+    def test_read_pairs_raises_corruption_error(self):
+        """Malformed pairs databases should raise a dedicated error."""
+
+        class _FakeCursor:
+            def execute(self, *args, **kwargs):
+                raise sqlite3.DatabaseError(
+                    'database disk image is malformed'
                 )
-                row = cursor.fetchone()
-                self.assertEqual(row[0], 1)
-            finally:
-                conn.close()
+
+        class _FakeConnection:
+            def cursor(self):
+                return _FakeCursor()
+
+            def close(self):
+                return None
+
+        with self._patch_runtime_config():
+            with patch(
+                'requake.database.pairs.get_db_connection',
+                return_value=_FakeConnection(),
+            ):
+                with self.assertRaises(DatabaseCorruptError) as ctx:
+                    read_pairs(config)
+        self.assertIn("sqlite3 requake.sqlite '.recover'", str(ctx.exception))
 
 
 if __name__ == '__main__':

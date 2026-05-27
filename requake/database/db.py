@@ -29,6 +29,10 @@ class DatabaseBusyError(RuntimeError):
     """Raised when retries for transient SQLite lock errors are exhausted."""
 
 
+class DatabaseCorruptError(RuntimeError):
+    """Raised when the SQLite database file is corrupt or malformed."""
+
+
 def get_db_path(config, db_path=None):
     """Return the SQLite path."""
     if db_path is not None:

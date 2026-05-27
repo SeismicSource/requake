@@ -11,7 +11,12 @@ SQLite-backed event pair persistence.
 """
 import sqlite3
 from obspy import UTCDateTime
-from .db import execute_with_retry, get_db_connection, get_db_path
+from .db import (
+    DatabaseCorruptError,
+    execute_with_retry,
+    get_db_connection,
+    get_db_path,
+)
 
 EVENT_PAIRS_TABLE = 'event_pairs'
 MISSING_EVENT_PAIRS_TABLE = f'no such table: {EVENT_PAIRS_TABLE}'
@@ -240,6 +245,16 @@ def read_pairs(config, cc_min=None, cc_max=None):
                 ''',
                 params,
             ).fetchall()
+        except sqlite3.DatabaseError as err:
+            if 'database disk image is malformed' in str(err).lower():
+                raise DatabaseCorruptError(
+                    'The event pairs database is corrupted or malformed: '
+                    f'{get_db_path(config)}\n'
+                    'You can try recovering it with:\n'
+                    "sqlite3 requake.sqlite '.recover' | "
+                    'sqlite3 requake_new.sqlite'
+                ) from err
+            raise
         except sqlite3.OperationalError as err:
             if _is_missing_pairs_table_error(err):
                 raise PairsTableNotFoundError(
