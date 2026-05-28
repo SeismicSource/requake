@@ -1,13 +1,14 @@
 Database Schemas
 ----------------
 
-Requake stores scan outputs in a SQLite database named ``requake.sqlite``
-inside
+Requake stores scan outputs in a SQLite database named ``requake.sqlite`` in
 the selected output directory.
 
-The database currently contains five domain tables:
+The database currently contains seven domain tables:
 
 - ``catalog``
+- ``event_keys``
+- ``trace_keys``
 - ``event_pairs``
 - ``trace_metadata``
 - ``families``
@@ -36,7 +37,7 @@ backoff and jitter.
 Catalog Table
 ^^^^^^^^^^^^^
 
-The ``catalog`` table stores the events read by ``requake read_catalog``.
+The ``catalog`` table stores events read by ``requake read_catalog``.
 
 .. code-block:: sql
 
@@ -57,46 +58,72 @@ The ``catalog`` table stores the events read by ``requake read_catalog``.
      trace_id        TEXT
    )
 
+Event Keys Table
+^^^^^^^^^^^^^^^^
+
+The ``event_keys`` table maps event IDs to integer keys.
+
+.. code-block:: sql
+
+   CREATE TABLE event_keys (
+     event_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+     evid            TEXT NOT NULL UNIQUE
+   )
+
+Trace Keys Table
+^^^^^^^^^^^^^^^^
+
+The ``trace_keys`` table maps trace IDs to integer keys.
+
+.. code-block:: sql
+
+   CREATE TABLE trace_keys (
+     trace_key_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+     trace_id        TEXT NOT NULL UNIQUE
+   )
+
 Event Pairs Table
 ^^^^^^^^^^^^^^^^^
 
 The ``event_pairs`` table stores cross-correlation results from
-``requake scan_catalog``.
+``requake scan_catalog`` and is optimized for storage efficiency:
+
+- repeated text identifiers are replaced by integer lookup keys;
+- cross-correlation is encoded as ``cc_x100``;
+- lag is stored as ``lag_samples``.
+
+Lag in seconds is reconstructed at read time from ``lag_samples`` and
+``trace_metadata.sampling_rate_hz``.
 
 .. code-block:: sql
 
    CREATE TABLE event_pairs (
      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-     evid1           TEXT NOT NULL,
-     evid2           TEXT NOT NULL,
-     trace_id        TEXT NOT NULL,
+     event1_id       INTEGER NOT NULL,
+     event2_id       INTEGER NOT NULL,
+     trace_key_id    INTEGER NOT NULL,
      lag_samples     INTEGER,
      cc_x100         INTEGER NOT NULL,
-     FOREIGN KEY (evid1)
-       REFERENCES catalog(evid)
+     FOREIGN KEY (event1_id)
+       REFERENCES event_keys(event_id)
        ON UPDATE CASCADE ON DELETE RESTRICT,
-     FOREIGN KEY (evid2)
-       REFERENCES catalog(evid)
+     FOREIGN KEY (event2_id)
+       REFERENCES event_keys(event_id)
        ON UPDATE CASCADE ON DELETE RESTRICT,
-     UNIQUE (evid1, evid2, trace_id)
+     FOREIGN KEY (trace_key_id)
+       REFERENCES trace_keys(trace_key_id)
+       ON UPDATE CASCADE ON DELETE RESTRICT,
+     UNIQUE (event1_id, event2_id, trace_key_id)
    )
-
-Indexes:
-
-- ``idx_pairs_evid1`` on ``event_pairs(evid1)``
-- ``idx_pairs_evid2`` on ``event_pairs(evid2)``
 
 ``cc_x100`` stores ``cc_max`` with 0.01 precision using
 ``round(cc_max * 100)``.
 
-The lag value in seconds is computed at run time using
-``lag_samples / sampling_rate_hz`` from ``trace_metadata``.
-
 Trace Metadata Table
 ^^^^^^^^^^^^^^^^^^^^
 
-The ``trace_metadata`` table stores sampling-rate and coordinates with
-time-valid intervals for each ``trace_id``.
+The ``trace_metadata`` table stores sampling rate and coordinates using
+time-valid intervals per ``trace_id``.
 
 .. code-block:: sql
 
@@ -119,7 +146,7 @@ Index:
 Families Table
 ^^^^^^^^^^^^^^
 
-The ``families`` table stores event-family assignments from
+The ``families`` table stores event-family assignments produced by
 ``requake build_families``.
 
 .. code-block:: sql
@@ -148,7 +175,7 @@ Index:
 Template Detections Table
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The ``template_detections`` table stores detections from
+The ``template_detections`` table stores detections produced by
 ``requake scan_templates``.
 
 .. code-block:: sql

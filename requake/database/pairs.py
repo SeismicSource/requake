@@ -30,6 +30,8 @@ from .trace_metadata import (
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 EVENT_PAIRS_TABLE = 'event_pairs'
+EVENT_KEYS_TABLE = 'event_keys'
+TRACE_KEYS_TABLE = 'trace_keys'
 MISSING_EVENT_PAIRS_TABLE = f'no such table: {EVENT_PAIRS_TABLE}'
 
 
@@ -41,40 +43,47 @@ class PairsSchemaError(RuntimeError):
     """Raised when stored pairs use an incompatible database schema."""
 
 
-# Combined schema for both event_pairs and trace_metadata.
+# Combined schema for event_pairs, lookup tables, and trace_metadata.
 # Used by _ensure_pairs_table and the local migration helper.
 PAIRS_SCHEMA_STATEMENTS = [
     f'''
+    CREATE TABLE IF NOT EXISTS {EVENT_KEYS_TABLE} (
+      event_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      evid            TEXT NOT NULL UNIQUE
+    )
+    ''',
+    f'''
+    CREATE TABLE IF NOT EXISTS {TRACE_KEYS_TABLE} (
+      trace_key_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+      trace_id        TEXT NOT NULL UNIQUE
+    )
+    ''',
+    f'''
     CREATE TABLE IF NOT EXISTS {EVENT_PAIRS_TABLE} (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      evid1           TEXT NOT NULL,
-      evid2           TEXT NOT NULL,
-      trace_id        TEXT NOT NULL,
+      event1_id       INTEGER NOT NULL,
+      event2_id       INTEGER NOT NULL,
+      trace_key_id    INTEGER NOT NULL,
       lag_samples     INTEGER,
       cc_x100         INTEGER NOT NULL,
-            FOREIGN KEY (evid1)
-                REFERENCES catalog(evid)
-                ON UPDATE CASCADE ON DELETE RESTRICT,
-            FOREIGN KEY (evid2)
-                REFERENCES catalog(evid)
-                ON UPDATE CASCADE ON DELETE RESTRICT,
-      UNIQUE (evid1, evid2, trace_id)
+      FOREIGN KEY (event1_id)
+        REFERENCES {EVENT_KEYS_TABLE}(event_id)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+      FOREIGN KEY (event2_id)
+        REFERENCES {EVENT_KEYS_TABLE}(event_id)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+      FOREIGN KEY (trace_key_id)
+        REFERENCES {TRACE_KEYS_TABLE}(trace_key_id)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+      UNIQUE (event1_id, event2_id, trace_key_id)
     )
     ''',
     *TRACE_METADATA_SCHEMA_STATEMENTS,
-    (
-        'CREATE INDEX IF NOT EXISTS idx_pairs_evid1 '
-        f'ON {EVENT_PAIRS_TABLE}(evid1)'
-    ),
-    (
-        'CREATE INDEX IF NOT EXISTS idx_pairs_evid2 '
-        f'ON {EVENT_PAIRS_TABLE}(evid2)'
-    ),
 ]
 
 
 def _ensure_pairs_table(cursor):
-    """Create the event pair and trace metadata tables when needed."""
+    """Create pair and metadata tables when needed."""
     for statement in PAIRS_SCHEMA_STATEMENTS:
         cursor.execute(statement)
 
@@ -90,6 +99,14 @@ def _is_incompatible_pairs_schema_error(err):
     return (
         'no such column: p.cc_x100' in message
         or 'no such column: cc_x100' in message
+        or 'no such column: p.event1_id' in message
+        or 'no such column: p.event2_id' in message
+        or 'no such column: p.trace_key_id' in message
+        or 'has no column named event1_id' in message
+        or 'has no column named event2_id' in message
+        or 'has no column named trace_key_id' in message
+        or f'no such table: {EVENT_KEYS_TABLE}' in message
+        or f'no such table: {TRACE_KEYS_TABLE}' in message
         or _is_missing_trace_metadata_table_error(err)
     )
 
@@ -118,12 +135,70 @@ def _cc_filter_clause(cc_min, cc_max):
     return where, params
 
 
-def _pair_values(pair):
+def _lookup_id(
+    cursor,
+    table,
+    id_column,
+    value_column,
+    value,
+    cache,
+):
+    """Return integer key for a lookup-table value, creating row if needed."""
+    cached = cache.get(value)
+    if cached is not None:
+        return cached
+    execute_with_retry(
+        lambda: cursor.execute(
+            f'INSERT OR IGNORE INTO {table} ({value_column}) VALUES (?)',
+            (value,),
+        ),
+        f'ensure lookup row in {table}',
+    )
+    row = cursor.execute(
+        f'SELECT {id_column} AS lookup_id '
+        f'FROM {table} '
+        f'WHERE {value_column} = ?',
+        (value,),
+    ).fetchone()
+    if row is None:
+        raise RuntimeError(
+            f'Failed to resolve lookup id in {table} for value {value}'
+        )
+    lookup_id = int(row['lookup_id'])
+    cache[value] = lookup_id
+    return lookup_id
+
+
+def _pair_values(pair, cursor, event_cache, trace_cache):
     """Convert a RequakeEventPair into a compact row tuple."""
-    return (
+    event1_id = _lookup_id(
+        cursor,
+        EVENT_KEYS_TABLE,
+        'event_id',
+        'evid',
         pair.event1.evid,
+        event_cache,
+    )
+    event2_id = _lookup_id(
+        cursor,
+        EVENT_KEYS_TABLE,
+        'event_id',
+        'evid',
         pair.event2.evid,
+        event_cache,
+    )
+    trace_key_id = _lookup_id(
+        cursor,
+        TRACE_KEYS_TABLE,
+        'trace_key_id',
+        'trace_id',
         pair.trace_id,
+        trace_cache,
+    )
+    return (
+        event1_id,
+        event2_id,
+        trace_key_id,
         int(pair.lag_samples),
         _encode_cc_max(pair.cc_max),
     )
@@ -179,19 +254,42 @@ def write_pairs(pairs, config, append=True):
                 'clear event pairs table',
             )
             execute_with_retry(
+                lambda: cursor.execute(f'DELETE FROM {EVENT_KEYS_TABLE}'),
+                'clear event keys table',
+            )
+            execute_with_retry(
+                lambda: cursor.execute(f'DELETE FROM {TRACE_KEYS_TABLE}'),
+                'clear trace keys table',
+            )
+            execute_with_retry(
                 lambda: cursor.execute(f'DELETE FROM {TRACE_METADATA_TABLE}'),
                 'clear trace metadata table',
             )
         if pairs:
             _store_trace_metadata(cursor, pairs, config)
+            event_cache = {}
+            trace_cache = {}
+            pair_rows = [
+                _pair_values(
+                    pair,
+                    cursor,
+                    event_cache,
+                    trace_cache,
+                )
+                for pair in pairs
+            ]
             execute_with_retry(
                 lambda: cursor.executemany(
                     f'''
                     INSERT OR REPLACE INTO {EVENT_PAIRS_TABLE} (
-                      evid1, evid2, trace_id, lag_samples, cc_x100
+                      event1_id,
+                      event2_id,
+                      trace_key_id,
+                      lag_samples,
+                      cc_x100
                     ) VALUES (?, ?, ?, ?, ?)
                     ''',
-                    (_pair_values(pair) for pair in pairs),
+                    pair_rows,
                 ),
                 'write event pairs batch',
             )
@@ -233,13 +331,22 @@ def read_pair_keys(config):
         try:
             rows = cursor.execute(
                 f'''
-                SELECT evid1, evid2
-                FROM {EVENT_PAIRS_TABLE}
+                SELECT e1.evid AS evid1, e2.evid AS evid2
+                FROM {EVENT_PAIRS_TABLE} AS p
+                JOIN {EVENT_KEYS_TABLE} AS e1
+                  ON e1.event_id = p.event1_id
+                JOIN {EVENT_KEYS_TABLE} AS e2
+                  ON e2.event_id = p.event2_id
                 '''
             ).fetchall()
         except sqlite3.OperationalError as err:
             if _is_missing_pairs_table_error(err):
                 return set()
+            if _is_incompatible_pairs_schema_error(err):
+                raise PairsSchemaError(
+                    'Stored event pairs schema is incompatible with this '
+                    f'Requake version in db file {get_db_path(config)}'
+                ) from err
             raise
     finally:
         conn.close()
@@ -268,9 +375,9 @@ def read_pairs(config, cc_min=None, cc_max=None):
             rows = cursor.execute(
                 f'''
                 SELECT
-                  p.evid1,
-                  p.evid2,
-                  p.trace_id,
+                  e1.evid AS evid1,
+                  e2.evid AS evid2,
+                  tk.trace_id AS trace_id,
                   p.lag_samples,
                   p.cc_x100,
                   c1.orig_time AS orig_time1,
@@ -287,17 +394,23 @@ def read_pairs(config, cc_min=None, cc_max=None):
                   c2.mag AS mag2,
                   tm.sampling_rate_hz
                 FROM {EVENT_PAIRS_TABLE} AS p
-                JOIN catalog AS c1 ON c1.evid = p.evid1
-                JOIN catalog AS c2 ON c2.evid = p.evid2
+                JOIN {EVENT_KEYS_TABLE} AS e1
+                  ON e1.event_id = p.event1_id
+                JOIN {EVENT_KEYS_TABLE} AS e2
+                  ON e2.event_id = p.event2_id
+                JOIN {TRACE_KEYS_TABLE} AS tk
+                  ON tk.trace_key_id = p.trace_key_id
+                JOIN catalog AS c1 ON c1.evid = e1.evid
+                JOIN catalog AS c2 ON c2.evid = e2.evid
                 LEFT JOIN {TRACE_METADATA_TABLE} AS tm
-                  ON tm.trace_id = p.trace_id
+                  ON tm.trace_id = tk.trace_id
                  AND tm.valid_from_utc <= c1.orig_time
                  AND (
                    tm.valid_to_utc IS NULL OR c1.orig_time < tm.valid_to_utc
                  )
                 {where}
                 ORDER BY c1.orig_time, c2.orig_time,
-                         p.evid1, p.evid2, p.trace_id
+                         e1.evid, e2.evid, tk.trace_id
                 ''',
                 params,
             ).fetchall()
