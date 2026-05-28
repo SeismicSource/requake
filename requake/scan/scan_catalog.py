@@ -22,7 +22,8 @@ from ..catalog import fix_non_locatable_events, read_stored_catalog
 from ..database.pairs import (
     PairRecord,
     count_pairs,
-    read_pair_keys,
+    read_event_key_rows,
+    read_pair_key_ids,
     write_pair_records,
 )
 from ..database.trace_metadata import store_trace_metadata_from_inventory
@@ -320,6 +321,54 @@ def _process_and_store_pair(pair, waveform_pair, batch_of_pairs, state):
     _flush_pair_batch_if_needed(batch_of_pairs)
 
 
+def _process_candidate_pair(pair, waveform_pair, batch_of_pairs, state):
+    """Process one candidate pair and handle waveform-level errors."""
+    try:
+        _process_and_store_pair(
+            pair,
+            waveform_pair,
+            batch_of_pairs,
+            state,
+        )
+    except (NoMetadataError, MetadataMismatchError) as msg:
+        logger.error(msg)
+        rq_exit(1)
+    except NoWaveformError as msg:
+        # Do not print empty messages
+        if str(msg):
+            logger.warning(msg)
+        batch_of_pairs.append(
+            PairRecord(pair[0], pair[1], pair[0].trace_id, None, None)
+        )
+        _flush_pair_batch_if_needed(batch_of_pairs)
+
+
+def _mask_existing_pair_indices(valid_pair_idx, existing_pair_ids, nevents):
+    """Drop candidate pairs already present in storage."""
+    if not existing_pair_ids or len(valid_pair_idx) == 0:
+        return valid_pair_idx, 0
+    t_mask_start = time.monotonic()
+    logger.info('Masking already processed pairs before processing...')
+    nevents_u64 = np.uint64(nevents)
+    existing_ids = np.fromiter(
+        existing_pair_ids,
+        dtype=np.uint64,
+        count=len(existing_pair_ids),
+    )
+    candidate_ids = (
+        valid_pair_idx[:, 0].astype(np.uint64) * nevents_u64
+        + valid_pair_idx[:, 1].astype(np.uint64)
+    )
+    keep = ~np.isin(candidate_ids, existing_ids)
+    skipped = int((~keep).sum())
+    filtered = valid_pair_idx[keep]
+    mask_dt = time.monotonic() - t_mask_start
+    logger.info(
+        f'Existing-pair masking completed in {mask_dt:.1f}s'
+    )
+    return filtered, skipped
+
+
 def _flush_pair_batch_if_needed(batch_of_pairs):
     """Flush pair batch when it reaches the configured chunk size."""
     if len(batch_of_pairs) >= 100:
@@ -371,6 +420,7 @@ def _process_valid_pair_indices(
     logger.info('Computing waveform cross-correlation...')
     waveform_pair = WaveformPair()
     batch_of_pairs = []
+    analyzed_pairs = 0
     state = _init_pair_processing_state(npairs, initial_processed, total_pairs)
     show_pbar, pbar = _init_progress_bar(state)
     for processed, (idx1, idx2) in enumerate(valid_pair_idx, start=1):
@@ -381,33 +431,23 @@ def _process_valid_pair_indices(
             processed,
         )
         pair = (catalog[idx1], catalog[idx2])
+        analyzed_pairs += 1
         if pbar is not None:
             pbar.update()
-        try:
-            _process_and_store_pair(
-                pair,
-                waveform_pair,
-                batch_of_pairs,
-                state,
-            )
-        except (NoMetadataError, MetadataMismatchError) as msg:
-            logger.error(msg)
-            rq_exit(1)
-        except NoWaveformError as msg:
-            # Do not print empty messages
-            if str(msg):
-                logger.warning(msg)
-            batch_of_pairs.append(
-                PairRecord(pair[0], pair[1], pair[0].trace_id, None, None)
-            )
-            _flush_pair_batch_if_needed(batch_of_pairs)
+        _process_candidate_pair(
+            pair,
+            waveform_pair,
+            batch_of_pairs,
+            state,
+        )
     _finalize_pair_processing(
         batch_of_pairs,
         pbar,
-        npairs,
+        analyzed_pairs,
         state,
         waveform_pair,
     )
+    return analyzed_pairs
 
 
 def _fix_trace_id(stats):
@@ -427,35 +467,49 @@ def _fix_trace_id(stats):
     stats.channel = stats.channel.replace('.', '_')
 
 
-def _filter_existing_pair_indices(catalog, valid_pair_idx):
-    """Drop pairs already present in the database."""
-    existing_pairs = read_pair_keys(config)
-    if not existing_pairs or len(valid_pair_idx) == 0:
-        return valid_pair_idx, 0
+def _load_existing_pair_ids(catalog):
+    """Return packed pair IDs already present in the database."""
+    t_read_keys_start = time.monotonic()
+    logger.info(
+        'Loading existing pair key IDs from db file... '
+    )
+    event_key_rows = read_event_key_rows(config)
+    existing_pair_key_ids = read_pair_key_ids(config)
+    read_keys_dt = time.monotonic() - t_read_keys_start
+    logger.info(
+        f'{len(existing_pair_key_ids):n} unique pairs loaded '
+        f'in {read_keys_dt:.1f}s '
+    )
+    if not existing_pair_key_ids:
+        return set()
+    t_build_id_start = time.monotonic()
+    logger.info(
+        'Building existing pair IDs for quick lookup... '
+    )
     evid_to_idx = {
         ev.evid: idx for idx, ev in enumerate(catalog)
     }
-    nevents = np.uint64(len(catalog))
-    existing_ids = []
-    for evid1, evid2 in existing_pairs:
-        idx1 = evid_to_idx.get(evid1)
-        idx2 = evid_to_idx.get(evid2)
+    event_id_to_idx = {}
+    for event_id, evid in event_key_rows:
+        idx = evid_to_idx.get(evid)
+        if idx is not None:
+            event_id_to_idx[event_id] = idx
+    get_idx = event_id_to_idx.get
+    nevents = len(catalog)
+    existing_ids = set()
+    add_id = existing_ids.add
+    for event1_id, event2_id in existing_pair_key_ids:
+        idx1 = get_idx(event1_id)
+        idx2 = get_idx(event2_id)
         if idx1 is None or idx2 is None:
             continue
-        first = min(idx1, idx2)
-        second = max(idx1, idx2)
-        pair_id = np.uint64(first) * nevents + np.uint64(second)
-        existing_ids.append(pair_id)
-    if not existing_ids:
-        return valid_pair_idx, 0
-    existing_ids = np.asarray(existing_ids, dtype=np.uint64)
-    candidate_ids = (
-        valid_pair_idx[:, 0].astype(np.uint64) * nevents
-        + valid_pair_idx[:, 1].astype(np.uint64)
+        first, second = (idx1, idx2) if idx1 < idx2 else (idx2, idx1)
+        add_id(first * nevents + second)
+    build_id_dt = time.monotonic() - t_build_id_start
+    logger.info(
+        f'Existing pair IDs built in {build_id_dt:.1f}s'
     )
-    keep = ~np.isin(candidate_ids, existing_ids)
-    skipped = int((~keep).sum())
-    return valid_pair_idx[keep], skipped
+    return existing_ids
 
 
 def _ask_existing_pairs_action(npairs_in_db):
@@ -521,41 +575,56 @@ def _process_pairs(catalog, continue_scan=False):
     nevents = len(catalog)
     initial_npairs = nevents * (nevents - 1) // 2
     logger.info('Building valid event pairs...')
+    t_grouping_start = time.monotonic()
     valid_pair_idx = _build_valid_pair_indices(catalog)
+    grouping_dt = time.monotonic() - t_grouping_start
+    logger.info(
+        f'Valid-pair spatial grouping completed in {grouping_dt:.1f}s'
+    )
     skipped_npairs = 0
+    candidate_npairs = len(valid_pair_idx)
     if continue_scan:
-        valid_pair_idx, skipped_npairs = _filter_existing_pair_indices(
-            catalog, valid_pair_idx
+        logger.info(
+            'Continue-scan mode: loading existing pairs for '
+            'pre-processing mask'
         )
-    already_processed = skipped_npairs
+        t_resume_filter_start = time.monotonic()
+        existing_pair_ids = _load_existing_pair_ids(catalog)
+        valid_pair_idx, skipped_npairs = _mask_existing_pair_indices(
+            valid_pair_idx,
+            existing_pair_ids,
+            nevents,
+        )
+        resume_filter_dt = time.monotonic() - t_resume_filter_start
+        logger.info(
+            'Loading existing pair IDs and applying mask completed in '
+            f'{resume_filter_dt:.1f}s'
+        )
     npairs = len(valid_pair_idx)
-    total_valid_pairs = already_processed + npairs
+    total_valid_pairs = skipped_npairs + npairs
     ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
     logger.info(f'Initial pairs: {initial_npairs:n}')
+    logger.info(f'Candidate pairs: {candidate_npairs:n}')
     logger.info(f'Final pairs: {npairs:n}')
     logger.info(f'Pair ratio: {ratio:.6f} ({ratio:.2%})')
-    if continue_scan:
-        logger.info(
-            'Resume mode: existing event-pair keys were loaded from '
-            'the database'
-        )
-        logger.info(
-            f'Skipping {skipped_npairs:n} event pairs already present '
-            'in the database'
-        )
     _log_pair_grouping_stats(valid_pair_idx)
     logger.info(
         f'Processing {npairs:n} event pairs '
-        f'({already_processed:n}/{total_valid_pairs:n} already processed)'
+        f'({skipped_npairs:n}/{total_valid_pairs:n} already processed)'
     )
-    _process_valid_pair_indices(
+    analyzed_npairs = _process_valid_pair_indices(
         catalog,
         valid_pair_idx,
         npairs,
-        initial_processed=already_processed,
+        initial_processed=skipped_npairs,
         total_pairs=total_valid_pairs,
     )
-    return npairs
+    if continue_scan:
+        logger.info(
+            f'Skipped {skipped_npairs:n} event pairs already present '
+            'in the database'
+        )
+    return analyzed_npairs
 
 
 def scan_catalog():

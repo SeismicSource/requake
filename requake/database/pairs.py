@@ -333,20 +333,42 @@ def count_pairs(config):
     return int(row['npairs'])
 
 
-def read_pair_keys(config):
-    """Read stored event-pair keys as (evid1, evid2) tuples."""
+def read_event_key_rows(config):
+    """Read event lookup rows as ``(event_id, evid)`` tuples."""
     conn = get_db_connection(config, initdb=False)
     try:
         cursor = conn.cursor()
         try:
             rows = cursor.execute(
                 f'''
-                SELECT e1.evid AS evid1, e2.evid AS evid2
-                FROM {EVENT_PAIRS_TABLE} AS p
-                JOIN {EVENT_KEYS_TABLE} AS e1
-                  ON e1.event_id = p.event1_id
-                JOIN {EVENT_KEYS_TABLE} AS e2
-                  ON e2.event_id = p.event2_id
+                SELECT event_id, evid
+                FROM {EVENT_KEYS_TABLE}
+                '''
+            ).fetchall()
+        except sqlite3.OperationalError as err:
+            if _is_missing_pairs_table_error(err):
+                return []
+            if _is_incompatible_pairs_schema_error(err):
+                raise PairsSchemaError(
+                    'Stored event pairs schema is incompatible with this '
+                    f'Requake version in db file {get_db_path(config)}'
+                ) from err
+            raise
+    finally:
+        conn.close()
+    return [(int(row['event_id']), row['evid']) for row in rows]
+
+
+def read_pair_key_ids(config):
+    """Read stored event-pair foreign keys as integer ID tuples."""
+    conn = get_db_connection(config, initdb=False)
+    try:
+        cursor = conn.cursor()
+        try:
+            rows = cursor.execute(
+                f'''
+                SELECT DISTINCT event1_id, event2_id
+                FROM {EVENT_PAIRS_TABLE}
                 '''
             ).fetchall()
         except sqlite3.OperationalError as err:
@@ -360,7 +382,10 @@ def read_pair_keys(config):
             raise
     finally:
         conn.close()
-    return {(row['evid1'], row['evid2']) for row in rows}
+    return {
+        (int(row['event1_id']), int(row['event2_id']))
+        for row in rows
+    }
 
 
 def read_pairs(config, cc_min=None, cc_max=None):

@@ -18,7 +18,7 @@ import numpy as np
 
 from requake.config.parse_arguments import parse_arguments
 from requake.scan.scan_catalog import (
-    _filter_existing_pair_indices,
+    _load_existing_pair_ids,
     _process_valid_pair_indices,
 )
 
@@ -65,22 +65,27 @@ class TestScanCatalogResume(unittest.TestCase):
                 parse_arguments('requake')
         self.assertEqual(exc.exception.code, 2)
 
-    def test_filter_existing_pair_indices_uses_canonical_keys(self):
-        """Resume filtering should skip already computed event pairs."""
+    def test_load_existing_pair_ids_uses_canonical_keys(self):
+        """Existing-pair IDs should be canonicalized by catalog index."""
         catalog = [_DummyEvent('A'), _DummyEvent('B'), _DummyEvent('C')]
-        valid_pair_idx = np.array([[0, 1], [0, 2], [1, 2]], dtype=np.int32)
-        existing = {('B', 'A'), ('C', 'B')}
+        event_keys = [(10, 'A'), (11, 'B'), (12, 'C')]
+        existing = {(11, 10), (12, 11)}
         with patch.object(
             SCAN_CATALOG_MODULE,
-            'read_pair_keys',
+            'read_event_key_rows',
+            return_value=event_keys,
+        ), patch.object(
+            SCAN_CATALOG_MODULE,
+            'read_pair_key_ids',
             return_value=existing,
         ):
-            filtered, skipped = _filter_existing_pair_indices(
-                catalog, valid_pair_idx
-            )
-        expected = np.array([[0, 2]], dtype=np.int32)
-        self.assertEqual(skipped, 2)
-        np.testing.assert_array_equal(filtered, expected)
+            existing_ids = _load_existing_pair_ids(catalog)
+        nevents = len(catalog)
+        expected = {
+            0 * nevents + 1,
+            1 * nevents + 2,
+        }
+        self.assertEqual(existing_ids, expected)
 
     def test_noninteractive_progress_uses_total_pair_count(self):
         """Resume progress log should use total pairs, not remaining."""
