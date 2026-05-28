@@ -102,7 +102,7 @@ class TestScanCatalogResume(unittest.TestCase):
             return_value=MagicMock(),
         ), patch.object(
             SCAN_CATALOG_MODULE,
-            'write_pairs_to_db',
+            'write_pair_records',
         ):
             _process_valid_pair_indices(
                 catalog=[],
@@ -128,7 +128,7 @@ class TestScanCatalogResume(unittest.TestCase):
             return_value=MagicMock(),
         ), patch.object(
             SCAN_CATALOG_MODULE,
-            'write_pairs_to_db',
+            'write_pair_records',
         ):
             tqdm_mock.return_value = MagicMock()
             _process_valid_pair_indices(

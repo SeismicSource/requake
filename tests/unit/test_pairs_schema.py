@@ -18,12 +18,11 @@ from argparse import Namespace
 from unittest.mock import patch
 from obspy import UTCDateTime
 from requake.config import config
-from requake.families.pairs import RequakeEventPair
-from requake.database.pairs import read_pairs as read_pairs_from_db
+from requake.database.pairs import PairRecord, read_pairs as read_pairs_from_db
 from requake.catalog import RequakeEvent
 from requake.database.catalog import write_catalog
 from requake.database.db import get_db_path
-from requake.database.pairs import write_pairs
+from requake.database.pairs import write_pair_records as write_pairs
 
 
 class TestPairsSchema(unittest.TestCase):
@@ -66,13 +65,13 @@ class TestPairsSchema(unittest.TestCase):
                 trace_id='XX.TEST.00.BHZ',
             )
             pairs.append(
-                RequakeEventPair(
+                PairRecord(
                     event1,
                     event2,
                     'XX.TEST.00.BHZ',
                     100,
-                    2.5,
                     0.85,
+                    sampling_rate_hz=40.0,
                 )
             )
         return pairs
@@ -129,7 +128,10 @@ class TestPairsSchema(unittest.TestCase):
         self.assertEqual(pairs[0].event2.evid, pairs_data[0].event2.evid)
         self.assertEqual(pairs[0].trace_id, pairs_data[0].trace_id)
         self.assertEqual(pairs[0].lag_samples, pairs_data[0].lag_samples)
-        self.assertEqual(pairs[0].lag_sec, pairs_data[0].lag_sec)
+        expected_lag_sec = (
+            pairs_data[0].lag_samples / pairs_data[0].sampling_rate_hz
+        )
+        self.assertAlmostEqual(pairs[0].lag_sec, expected_lag_sec)
         self.assertEqual(pairs[0].cc_max, pairs_data[0].cc_max)
 
     def test_pairs_row_types(self):
@@ -182,21 +184,21 @@ class TestPairsSchema(unittest.TestCase):
             trace_id='XX.TEST.00.BHZ',
         )
         pairs_data = [
-            RequakeEventPair(
+            PairRecord(
                 event1,
                 event2,
                 'XX.TEST.00.BHZ',
                 100,
-                2.5,
                 0.85,
+                sampling_rate_hz=40.0,
             ),
-            RequakeEventPair(
+            PairRecord(
                 event1,
                 event2,
                 'XX.TEST.00.BHZ',
                 100,
-                2.5,
                 0.86,
+                sampling_rate_hz=40.0,
             ),
         ]
 
@@ -243,10 +245,12 @@ class TestPairsSchema(unittest.TestCase):
 
     def test_pairs_filters_use_encoded_cc_values(self):
         """cc_min/cc_max filters should match reconstructed cc values."""
-        pairs_data = self._get_synthetic_pairs_data(3)
-        pairs_data[0].cc_max = 0.841
-        pairs_data[1].cc_max = 0.851
-        pairs_data[2].cc_max = 0.861
+        base = self._get_synthetic_pairs_data(3)
+        pairs_data = [
+            base[0]._replace(cc_max=0.841),
+            base[1]._replace(cc_max=0.851),
+            base[2]._replace(cc_max=0.861),
+        ]
 
         with self._patch_runtime_config():
             self._seed_catalog_for_pairs(pairs_data)

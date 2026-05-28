@@ -19,11 +19,11 @@ from scipy.spatial import cKDTree
 from ..config import config, rq_exit
 from ..database.db import get_db_path
 from ..catalog import fix_non_locatable_events, read_stored_catalog
-from ..families.pairs import RequakeEventPair
 from ..database.pairs import (
-    count_pairs as count_pairs_in_db,
+    PairRecord,
+    count_pairs,
     read_pair_keys,
-    write_pairs as write_pairs_to_db,
+    write_pair_records,
 )
 from ..database.trace_metadata import store_trace_metadata_from_inventory
 from ..waveforms import (
@@ -234,24 +234,18 @@ def _process_pair(pair, waveform_pair):
     waveform_fetch_dt = time.monotonic() - t_fetch_start
     tr1, tr2 = pair_st.traces
     t_cc_start = time.monotonic()
-    lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
+    lag, _, cc_max = cc_waveform_pair(tr1, tr2)
     crosscorr_dt = time.monotonic() - t_cc_start
-    stats1 = tr1.stats
-    stats2 = tr2.stats
-    _fix_trace_id(stats1)
-    _fix_trace_id(stats2)
-    pair_out = RequakeEventPair(
+    _fix_trace_id(tr1.stats)
+    _fix_trace_id(tr2.stats)
+    return PairRecord(
         pair[0],
         pair[1],
         tr1.id,
         lag,
-        lag_sec,
         cc_max,
-    )
-    # Preserve the authoritative rate from the waveform trace so the
-    # write path does not need to infer it from lag values.
-    pair_out.sampling_rate_hz = float(tr1.stats.sampling_rate)
-    return pair_out, waveform_fetch_dt, crosscorr_dt
+        float(tr1.stats.sampling_rate),
+    ), waveform_fetch_dt, crosscorr_dt
 
 
 def _init_pair_processing_state(npairs, initial_processed, total_pairs):
@@ -323,8 +317,13 @@ def _process_and_store_pair(pair, waveform_pair, batch_of_pairs, state):
     state['window_fetch_time'] += fetch_dt
     state['window_crosscorr_time'] += crosscorr_dt
     batch_of_pairs.append(pair_out)
+    _flush_pair_batch_if_needed(batch_of_pairs)
+
+
+def _flush_pair_batch_if_needed(batch_of_pairs):
+    """Flush pair batch when it reaches the configured chunk size."""
     if len(batch_of_pairs) >= 100:
-        write_pairs_to_db(batch_of_pairs, config, append=True)
+        write_pair_records(batch_of_pairs, config, append=True)
         batch_of_pairs.clear()
 
 
@@ -337,7 +336,7 @@ def _finalize_pair_processing(
 ):
     """Flush pending rows and emit final processing logs."""
     if batch_of_pairs:
-        write_pairs_to_db(batch_of_pairs, config, append=True)
+        write_pair_records(batch_of_pairs, config, append=True)
     if pbar is not None:
         pbar.close()
     elif npairs > 0:
@@ -398,6 +397,10 @@ def _process_valid_pair_indices(
             # Do not print empty messages
             if str(msg):
                 logger.warning(msg)
+            batch_of_pairs.append(
+                PairRecord(pair[0], pair[1], pair[0].trace_id, None, None)
+            )
+            _flush_pair_batch_if_needed(batch_of_pairs)
     _finalize_pair_processing(
         batch_of_pairs,
         pbar,
@@ -505,7 +508,7 @@ def _ask_existing_pairs_action(npairs_in_db):
 def _process_pairs(catalog, continue_scan=False):
     """Process event pairs."""
     if not continue_scan:
-        write_pairs_to_db([], config, append=False)
+        write_pair_records([], config, append=False)
     # Write trace metadata immediately after tables are created so that
     # the DB is populated even when no pairs are found (e.g. all
     # waveform fetches fail).  Uses the inventory already in config.
@@ -577,7 +580,7 @@ def scan_catalog():
         f'{nevents:n} events read from db file {get_db_path(config)}'
     )
     continue_scan = False
-    existing_pairs = count_pairs_in_db(config)
+    existing_pairs = count_pairs(config)
     if existing_pairs > 0:
         action = _ask_existing_pairs_action(existing_pairs)
         if action == 'abort':

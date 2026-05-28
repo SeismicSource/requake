@@ -4,7 +4,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
-- Slimmed-down DB size by optimizing `event_pairs` storage
+- Slimmed-down DB size by optimizing `event_pairs` storage. This allows storing
+  also unvalid pairs, so that resuming catalog scan is faster.
 - Dramatic speedup of event pairs building by using a KD-tree
   spatial index and approximate geodetic distance calculations.
 - Dramatic speedup of waveform fetching by improving the caching mechanism.

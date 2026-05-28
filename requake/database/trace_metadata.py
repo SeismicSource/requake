@@ -89,8 +89,9 @@ def _infer_sampling_rate(pair):
     """Infer sampling rate from the pair when inventory metadata is absent."""
     if getattr(pair, 'sampling_rate_hz', None) is not None:
         return float(pair.sampling_rate_hz)
-    if pair.lag_sec and pair.lag_samples:
-        return abs(pair.lag_samples / pair.lag_sec)
+    lag_sec = getattr(pair, 'lag_sec', None)
+    if lag_sec and pair.lag_samples:
+        return abs(pair.lag_samples / lag_sec)
     raise PairsMetadataError(
         'Unable to infer sampling rate for '
         f'trace_id {pair.trace_id}. Inventory metadata is missing.'

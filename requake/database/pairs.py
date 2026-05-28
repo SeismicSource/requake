@@ -12,6 +12,7 @@ SQLite-backed event pair persistence.
 import logging
 import math
 import sqlite3
+from typing import NamedTuple
 from obspy import UTCDateTime
 from .db import (
     DatabaseCorruptError,
@@ -37,6 +38,45 @@ MISSING_EVENT_PAIRS_TABLE = f'no such table: {EVENT_PAIRS_TABLE}'
 
 class PairsTableNotFoundError(LookupError):
     """Raised when the event pairs table is missing from the database."""
+
+
+class PairRecord(NamedTuple):
+    """
+    Lightweight write-side record for one event pair.
+
+    ``lag_samples`` and ``cc_max`` are ``None`` for unanalyzable pairs.
+    ``sampling_rate_hz`` is ``None`` for failed pairs where the rate
+    cannot be determined from the waveform.
+    """
+
+    event1: object
+    event2: object
+    trace_id: str
+    lag_samples: object
+    cc_max: object
+    sampling_rate_hz: object = None
+
+    def db_values(self, cursor, event_cache, trace_cache):
+        """Return an event_pairs row tuple for SQLite insertion."""
+        event1_id = _lookup_id(
+            cursor, EVENT_KEYS_TABLE, 'event_id', 'evid',
+            self.event1.evid, event_cache,
+        )
+        event2_id = _lookup_id(
+            cursor, EVENT_KEYS_TABLE, 'event_id', 'evid',
+            self.event2.evid, event_cache,
+        )
+        trace_key_id = _lookup_id(
+            cursor, TRACE_KEYS_TABLE, 'trace_key_id', 'trace_id',
+            self.trace_id, trace_cache,
+        )
+        lag_samples = (
+            int(self.lag_samples) if self.lag_samples is not None else None
+        )
+        cc_x100 = (
+            _encode_cc_max(self.cc_max) if self.cc_max is not None else None
+        )
+        return (event1_id, event2_id, trace_key_id, lag_samples, cc_x100)
 
 
 class PairsSchemaError(RuntimeError):
@@ -65,7 +105,7 @@ PAIRS_SCHEMA_STATEMENTS = [
       event2_id       INTEGER NOT NULL,
       trace_key_id    INTEGER NOT NULL,
       lag_samples     INTEGER,
-      cc_x100         INTEGER NOT NULL,
+      cc_x100         INTEGER,
       FOREIGN KEY (event1_id)
         REFERENCES {EVENT_KEYS_TABLE}(event_id)
         ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -122,8 +162,11 @@ def _decode_cc_max(cc_x100):
 
 
 def _cc_filter_clause(cc_min, cc_max):
-    """Build SQL filter clause and params for encoded cc values."""
-    conditions = []
+    """Build SQL filter clause and params for readable pair rows."""
+    conditions = [
+        'p.cc_x100 IS NOT NULL',
+        'p.lag_samples IS NOT NULL',
+    ]
     params = []
     if cc_min is not None:
         conditions.append('p.cc_x100 >= ?')
@@ -131,7 +174,7 @@ def _cc_filter_clause(cc_min, cc_max):
     if cc_max is not None:
         conditions.append('p.cc_x100 <= ?')
         params.append(int(math.floor(cc_max * 100)))
-    where = f'WHERE {" AND ".join(conditions)}' if conditions else ''
+    where = f'WHERE {" AND ".join(conditions)}'
     return where, params
 
 
@@ -167,41 +210,6 @@ def _lookup_id(
     lookup_id = int(row['lookup_id'])
     cache[value] = lookup_id
     return lookup_id
-
-
-def _pair_values(pair, cursor, event_cache, trace_cache):
-    """Convert a RequakeEventPair into a compact row tuple."""
-    event1_id = _lookup_id(
-        cursor,
-        EVENT_KEYS_TABLE,
-        'event_id',
-        'evid',
-        pair.event1.evid,
-        event_cache,
-    )
-    event2_id = _lookup_id(
-        cursor,
-        EVENT_KEYS_TABLE,
-        'event_id',
-        'evid',
-        pair.event2.evid,
-        event_cache,
-    )
-    trace_key_id = _lookup_id(
-        cursor,
-        TRACE_KEYS_TABLE,
-        'trace_key_id',
-        'trace_id',
-        pair.trace_id,
-        trace_cache,
-    )
-    return (
-        event1_id,
-        event2_id,
-        trace_key_id,
-        int(pair.lag_samples),
-        _encode_cc_max(pair.cc_max),
-    )
 
 
 def _pair_from_row(row):
@@ -241,8 +249,15 @@ def _pair_from_row(row):
     )
 
 
-def write_pairs(pairs, config, append=True):
-    """Write event pairs into SQLite."""
+def write_pair_records(pairs, config, append=True):
+    """
+    Write a list of PairRecord objects into SQLite.
+
+    :param pairs: pair records to write; each item must be a PairRecord.
+        Unanalyzable pairs have ``lag_samples=None`` and ``cc_max=None``.
+    :param config: Requake configuration object.
+    :param append: if False, clear existing pairs before writing.
+    """
     pairs = list(pairs)
     conn = get_db_connection(config, initdb=True)
     try:
@@ -270,12 +285,7 @@ def write_pairs(pairs, config, append=True):
             event_cache = {}
             trace_cache = {}
             pair_rows = [
-                _pair_values(
-                    pair,
-                    cursor,
-                    event_cache,
-                    trace_cache,
-                )
+                pair.db_values(cursor, event_cache, trace_cache)
                 for pair in pairs
             ]
             execute_with_retry(
