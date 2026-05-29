@@ -100,31 +100,3 @@ you are ready to build repeating earthquake families:
 
    requake build_families
 
-
-Migrating Legacy Pair Databases
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If you already have an older ``requake.sqlite`` with the legacy
-``event_pairs`` layout (text columns ``evid1/evid2/trace_id``), first use the
-legacy-to-compact migration helper:
-
-.. code-block::
-
-   python .vscode/migrate_pairs_schema.py \
-       --config .vscode/migrate_pairs_schema.ini
-
-By default, lag consistency mismatches are reported as warnings and migration
-continues with ``lag_samples`` as the authoritative value. Use
-``--strict-lag-check`` to fail on any mismatch.
-
-To convert an existing compact database to the integer-key pair schema
-(``event1_id/event2_id/trace_key_id``), run:
-
-.. code-block::
-
-   python .vscode/migrate_pairs_integer_keys.py \
-      --db /path/to/requake.sqlite
-
-By default this migration creates a timestamped backup and compacts the
-database with ``VACUUM`` after conversion.
-
