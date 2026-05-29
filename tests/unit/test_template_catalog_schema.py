@@ -65,8 +65,8 @@ class TestTemplateCatalogSchema(unittest.TestCase):
         ]
 
         with self._patch_runtime_config():
-            write_template_detections(detections, config, append=False)
-            families = read_template_families(config)
+            write_template_detections(detections, append=False)
+            families = read_template_families()
 
         self.assertEqual(len(families), 2)
         self.assertEqual(families[0].number, 0)
@@ -83,8 +83,8 @@ class TestTemplateCatalogSchema(unittest.TestCase):
         ]
 
         with self._patch_runtime_config():
-            write_template_detections(detections, config, append=False)
-            conn = sqlite3.connect(get_db_path(config))
+            write_template_detections(detections, append=False)
+            conn = sqlite3.connect(get_db_path())
             try:
                 rows = conn.execute(
                     'SELECT evid, cc_max FROM template_detections '

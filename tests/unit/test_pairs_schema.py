@@ -112,7 +112,7 @@ class TestPairsSchema(unittest.TestCase):
         for pair in pairs_data:
             catalog_rows[pair.event1.evid] = pair.event1
             catalog_rows[pair.event2.evid] = pair.event2
-        write_catalog(list(catalog_rows.values()), config)
+        write_catalog(list(catalog_rows.values()))
 
     def test_pairs_roundtrip_preserves_fields(self):
         """Stored pairs should preserve the same values when read back."""
@@ -120,8 +120,8 @@ class TestPairsSchema(unittest.TestCase):
 
         with self._patch_runtime_config():
             self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, config, append=False)
-            pairs = list(read_pairs_from_db(config))
+            write_pairs(pairs_data, append=False)
+            pairs = list(read_pairs_from_db())
 
         self.assertEqual(len(pairs), 2)
         self.assertEqual(pairs[0].event1.evid, pairs_data[0].event1.evid)
@@ -148,8 +148,8 @@ class TestPairsSchema(unittest.TestCase):
 
         with self._patch_runtime_config():
             self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, config, append=False)
-            pairs = list(read_pairs_from_db(config))
+            write_pairs(pairs_data, append=False)
+            pairs = list(read_pairs_from_db())
 
         self.assertEqual(len(pairs), 2, 'Should have 2 pairs')
 
@@ -204,8 +204,8 @@ class TestPairsSchema(unittest.TestCase):
 
         with self._patch_runtime_config():
             self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, config, append=False)
-            pairs = list(read_pairs_from_db(config))
+            write_pairs(pairs_data, append=False)
+            pairs = list(read_pairs_from_db())
 
         self.assertEqual(len(pairs), 1)
         self.assertEqual(pairs[0].event1.evid, 'ev_a')
@@ -218,8 +218,8 @@ class TestPairsSchema(unittest.TestCase):
 
         with self._patch_runtime_config():
             self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, config, append=False)
-            db_path = get_db_path(config)
+            write_pairs(pairs_data, append=False)
+            db_path = get_db_path()
 
         conn = sqlite3.connect(db_path)
         try:
@@ -254,9 +254,9 @@ class TestPairsSchema(unittest.TestCase):
 
         with self._patch_runtime_config():
             self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, config, append=False)
+            write_pairs(pairs_data, append=False)
             pairs = list(
-                read_pairs_from_db(config, cc_min=0.851, cc_max=0.861)
+                read_pairs_from_db(cc_min=0.851, cc_max=0.861)
             )
 
         self.assertEqual(len(pairs), 1)

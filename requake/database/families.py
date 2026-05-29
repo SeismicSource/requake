@@ -64,9 +64,9 @@ def _family_row(family, event):
     )
 
 
-def write_families(families, config):
+def write_families(families):
     """Write catalog-scan families into SQLite."""
-    conn = get_db_connection(config, initdb=True)
+    conn = get_db_connection(initdb=True)
     try:
         cursor = conn.cursor()
         _ensure_families_table(cursor)
@@ -95,12 +95,12 @@ def write_families(families, config):
         conn.close()
 
 
-def read_families(config):
+def read_families():
     """Read catalog-scan families from SQLite."""
     from ..catalog import RequakeEvent
     from ..families.families import Family
 
-    conn = get_db_connection(config, initdb=False)
+    conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
         try:
@@ -113,7 +113,7 @@ def read_families(config):
         except sqlite3.OperationalError as err:
             if MISSING_FAMILIES_TABLE in str(err):
                 raise FileNotFoundError(
-                    f'Families not found in db file {get_db_path(config)}'
+                    f'Families not found in db file {get_db_path()}'
                 ) from err
             raise
     finally:
@@ -147,9 +147,9 @@ def read_families(config):
     return families
 
 
-def update_family_valid(config, family_number, is_valid):
+def update_family_valid(family_number, is_valid):
     """Update the validity flag for all events in one family."""
-    conn = get_db_connection(config, initdb=False)
+    conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
         try:
@@ -166,7 +166,7 @@ def update_family_valid(config, family_number, is_valid):
         except sqlite3.OperationalError as err:
             if MISSING_FAMILIES_TABLE in str(err):
                 raise FileNotFoundError(
-                    f'Families not found in db file {get_db_path(config)}'
+                    f'Families not found in db file {get_db_path()}'
                 ) from err
             raise
         conn.commit()

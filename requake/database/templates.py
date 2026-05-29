@@ -65,9 +65,9 @@ def _detection_row(detection):
     )
 
 
-def write_template_detections(detections, config, append=True):
+def write_template_detections(detections, append=True):
     """Write template detections into SQLite."""
-    conn = get_db_connection(config, initdb=True)
+    conn = get_db_connection(initdb=True)
     try:
         cursor = conn.cursor()
         _ensure_template_detections_table(cursor)
@@ -96,9 +96,9 @@ def write_template_detections(detections, config, append=True):
         conn.close()
 
 
-def clear_template_detections(config):
+def clear_template_detections():
     """Delete all template detections from SQLite."""
-    conn = get_db_connection(config, initdb=True)
+    conn = get_db_connection(initdb=True)
     try:
         cursor = conn.cursor()
         _ensure_template_detections_table(cursor)
@@ -111,9 +111,9 @@ def clear_template_detections(config):
         conn.close()
 
 
-def has_template_detections(config):
+def has_template_detections():
     """Return True when the template detection table contains rows."""
-    conn = get_db_connection(config, initdb=True)
+    conn = get_db_connection(initdb=True)
     try:
         cursor = conn.cursor()
         _ensure_template_detections_table(cursor)
@@ -125,12 +125,12 @@ def has_template_detections(config):
         conn.close()
 
 
-def read_template_families(config):
+def read_template_families():
     """Read template detections from SQLite and group them as families."""
     from ..catalog import RequakeEvent
     from ..families.families import Family
 
-    conn = get_db_connection(config, initdb=False)
+    conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
         try:
@@ -144,7 +144,7 @@ def read_template_families(config):
             if MISSING_TEMPLATE_DETECTIONS_TABLE in str(err):
                 raise FileNotFoundError(
                     'Template detections not found in db file '
-                    f'{get_db_path(config)}'
+                    f'{get_db_path()}'
                 ) from err
             raise
     finally:

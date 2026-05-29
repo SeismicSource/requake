@@ -96,7 +96,6 @@ class TestFamiliesSchema(unittest.TestCase):
         """Write catalog rows required by family foreign-key constraints."""
         write_catalog(
             [event for family in families_data for event in family],
-            config,
         )
 
     def test_families_roundtrip_preserves_fields(self):
@@ -104,7 +103,7 @@ class TestFamiliesSchema(unittest.TestCase):
         with self._patch_runtime_config():
             families_data = self._get_synthetic_families_data(2, 2)
             self._seed_catalog_for_families(families_data)
-            write_families(families_data, config)
+            write_families(families_data)
             families = _read_families_from_catalog_scan()
 
         self.assertEqual(len(families), 2)
@@ -127,7 +126,7 @@ class TestFamiliesSchema(unittest.TestCase):
         with self._patch_runtime_config():
             families_data = self._get_synthetic_families_data(2, 2)
             self._seed_catalog_for_families(families_data)
-            write_families(families_data, config)
+            write_families(families_data)
             families = _read_families_from_catalog_scan()
 
         self.assertEqual(len(families), 2, 'Should have 2 families')
@@ -151,8 +150,8 @@ class TestFamiliesSchema(unittest.TestCase):
     def test_families_empty_write_read(self):
         """Test that empty families round-trip produces empty list."""
         with self._patch_runtime_config():
-            write_catalog([], config)
-            write_families([], config)
+            write_catalog([])
+            write_families([])
             families = _read_families_from_catalog_scan()
 
         # Assert empty

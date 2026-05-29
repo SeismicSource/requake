@@ -11,7 +11,6 @@ Build families of repeating earthquakes from a catalog of pairs.
 """
 import logging
 from numbers import Real
-from ..config import config
 from ..catalog import RequakeEvent
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -87,7 +86,7 @@ def read_events_from_pairs(cc_min=None, cc_max=None):
     """
     from ..database.pairs import read_pairs
     events = {}
-    for pair in read_pairs(config, cc_min=cc_min, cc_max=cc_max):
+    for pair in read_pairs(cc_min=cc_min, cc_max=cc_max):
         evid1 = pair.event1.evid
         try:
             ev1 = events[evid1]

@@ -14,6 +14,7 @@ import contextlib
 import random
 import sqlite3
 import time
+from ..config.config import config
 
 DB_VERSION = 1
 DB_FILENAME = 'requake.sqlite'
@@ -33,7 +34,7 @@ class DatabaseCorruptError(RuntimeError):
     """Raised when the SQLite database file is corrupt or malformed."""
 
 
-def get_db_path(config, db_path=None):
+def get_db_path(db_path=None):
     """Return the SQLite path."""
     if db_path is not None:
         return db_path
@@ -65,9 +66,9 @@ def get_db_path(config, db_path=None):
     return os.path.join(outdir, DB_FILENAME)
 
 
-def check_db_exists(config, initdb=False, db_path=None):
+def check_db_exists(initdb=False, db_path=None):
     """Validate the configured database path for read or init mode."""
-    db_path = get_db_path(config, db_path=db_path)
+    db_path = get_db_path(db_path=db_path)
     if initdb:
         _ensure_parent_dir(db_path)
         return db_path
@@ -142,15 +143,15 @@ def execute_with_retry(operation, operation_name):
             attempt += 1
 
 
-def initialize_database_if_needed(config, db_path=None):
+def initialize_database_if_needed(db_path=None):
     """Initialize database schema version and pragmas if missing."""
-    conn = get_db_connection(config, initdb=True, db_path=db_path)
+    conn = get_db_connection(initdb=True, db_path=db_path)
     conn.close()
 
 
-def get_db_connection(config, initdb=False, db_path=None):
+def get_db_connection(initdb=False, db_path=None):
     """Open a SQLite connection for the configured database file."""
-    db_path = check_db_exists(config, initdb=initdb, db_path=db_path)
+    db_path = check_db_exists(initdb=initdb, db_path=db_path)
     conn = sqlite3.connect(db_path)
     _configure_connection(conn)
     conn.row_factory = sqlite3.Row

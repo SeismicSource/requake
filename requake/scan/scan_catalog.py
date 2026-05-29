@@ -356,7 +356,7 @@ def _mask_existing_pair_indices(valid_pair_idx, existing_pair_ids, nevents):
 def _flush_pair_batch_if_needed(batch_of_pairs):
     """Flush pair batch when it reaches the configured chunk size."""
     if len(batch_of_pairs) >= 100:
-        write_pair_records(batch_of_pairs, config, append=True)
+        write_pair_records(batch_of_pairs, append=True)
         batch_of_pairs.clear()
 
 
@@ -369,7 +369,7 @@ def _finalize_pair_processing(
 ):
     """Flush pending rows and emit final processing logs."""
     if batch_of_pairs:
-        write_pair_records(batch_of_pairs, config, append=True)
+        write_pair_records(batch_of_pairs, append=True)
     if pbar is not None:
         pbar.close()
     elif npairs > 0:
@@ -457,8 +457,8 @@ def _load_existing_pair_ids(catalog):
     logger.info(
         'Loading existing pair key IDs from db file... '
     )
-    event_key_rows = read_event_key_rows(config)
-    existing_pair_key_ids = read_pair_key_ids(config)
+    event_key_rows = read_event_key_rows()
+    existing_pair_key_ids = read_pair_key_ids()
     read_keys_dt = time.monotonic() - t_read_keys_start
     logger.info(
         f'{len(existing_pair_key_ids):n} unique pairs loaded '
@@ -506,7 +506,7 @@ def _ask_existing_pairs_action(npairs_in_db):
     if not sys.stdin.isatty():
         logger.error(
             f'Found {npairs_in_db:n} event pairs in db file '
-            f'{get_db_path(config)}.'
+            f'{get_db_path()}.'
         )
         logger.error(
             'Cannot prompt in non-interactive mode. '
@@ -515,7 +515,7 @@ def _ask_existing_pairs_action(npairs_in_db):
         rq_exit(1)
     logger.warning(
         f'Found {npairs_in_db:n} existing event pairs in db file '
-        f'{get_db_path(config)}.'
+        f'{get_db_path()}.'
     )
     logger.warning(
         'You can overwrite them and restart, or continue from where '
@@ -546,7 +546,7 @@ def _ask_existing_pairs_action(npairs_in_db):
 def _process_pairs(catalog, continue_scan=False):
     """Process event pairs."""
     if not continue_scan:
-        write_pair_records([], config, append=False)
+        write_pair_records([], append=False)
     # Write trace metadata immediately after tables are created so that
     # the DB is populated even when no pairs are found (e.g. all
     # waveform fetches fail).  Uses the inventory already in config.
@@ -555,7 +555,7 @@ def _process_pairs(catalog, continue_scan=False):
         if getattr(config.args, 'traceid', None) is not None
         else list(config.catalog_trace_id)
     )
-    store_trace_metadata_from_inventory(trace_ids, config)
+    store_trace_metadata_from_inventory(trace_ids)
     nevents = len(catalog)
     initial_npairs = nevents * (nevents - 1) // 2
     logger.info('Building valid event pairs...')
@@ -630,10 +630,10 @@ def scan_catalog():
             'You need at least 2 events to run the scan 😉')
         rq_exit(1)
     logger.info(
-        f'{nevents:n} events read from db file {get_db_path(config)}'
+        f'{nevents:n} events read from db file {get_db_path()}'
     )
     continue_scan = False
-    existing_pairs = count_pairs(config)
+    existing_pairs = count_pairs()
     if existing_pairs > 0:
         action = _ask_existing_pairs_action(existing_pairs)
         if action == 'abort':
@@ -642,4 +642,4 @@ def scan_catalog():
         continue_scan = action == 'continue'
     npairs = _process_pairs(catalog, continue_scan=continue_scan)
     logger.info(f'Processed {npairs:n} event pairs')
-    logger.info(f'Done! Output written to {get_db_path(config)}')
+    logger.info(f'Done! Output written to {get_db_path()}')

@@ -11,7 +11,6 @@ Classes and functions for downloading, reading and writing catalogs.
 """
 import numpy as np
 from obspy import UTCDateTime
-from ..config import config
 from ..formulas import float_or_none
 from ..waveforms import get_traceid_coords
 
@@ -230,7 +229,7 @@ def read_stored_catalog():
     """
     from ..database.catalog import read_catalog as read_catalog_from_db
 
-    cat = read_catalog_from_db(config)
+    cat = read_catalog_from_db()
     cat.sort()
     if not cat:
         raise ValueError('Empty catalog')
@@ -246,7 +245,7 @@ def fix_non_locatable_events(catalog):
     """
     if not any(ev.lat is None or ev.lon is None for ev in catalog):
         return
-    traceid_coords = get_traceid_coords(config)
+    traceid_coords = get_traceid_coords()
     mean_lat = np.mean([
         coords['latitude'] for coords in traceid_coords.values()])
     mean_lon = np.mean([

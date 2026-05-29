@@ -101,8 +101,8 @@ class TestCatalogRoundtrip(unittest.TestCase):
         events = self._create_synthetic_events(n_events)
 
         with self._patch_runtime_config():
-            write_catalog(events, config)
-            cat_in = read_catalog(config)
+            write_catalog(events)
+            cat_in = read_catalog()
 
         cat_out = RequakeCatalog()
         cat_out.extend(events)
@@ -147,8 +147,8 @@ class TestCatalogRoundtrip(unittest.TestCase):
         events = self._create_synthetic_events(1)
 
         with self._patch_runtime_config():
-            write_catalog(events, config)
-            cat_in = read_catalog(config)
+            write_catalog(events)
+            cat_in = read_catalog()
 
         # Check that all fields are present (not None)
         ev = cat_in[0]
@@ -169,8 +169,8 @@ class TestCatalogRoundtrip(unittest.TestCase):
     def test_catalog_empty_write_read(self):
         """Test that empty catalog round-trip produces empty catalog."""
         with self._patch_runtime_config():
-            write_catalog([], config)
-            cat_in = read_catalog(config)
+            write_catalog([])
+            cat_in = read_catalog()
 
         # Assert empty
         self.assertEqual(len(cat_in), 0, 'Empty catalog should remain empty')
@@ -181,10 +181,10 @@ class TestCatalogRoundtrip(unittest.TestCase):
         cat_out.extend(self._create_synthetic_events(3))
 
         with self._patch_runtime_config():
-            write_catalog(cat_out, config)
-            self.assertTrue(os.path.exists(get_db_path(config)))
+            write_catalog(cat_out)
+            self.assertTrue(os.path.exists(get_db_path()))
 
-            cat_in = read_catalog(config)
+            cat_in = read_catalog()
 
         self.assertEqual(len(cat_in), 3)
         ev_map_in = {ev.evid: ev for ev in cat_in}

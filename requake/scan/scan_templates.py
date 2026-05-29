@@ -156,7 +156,7 @@ def scan_templates():
     except (FileNotFoundError, FamilyNotFoundError) as msg:
         logger.error(msg)
         rq_exit(1)
-    if has_template_detections(config):
+    if has_template_detections():
         logger.warning(
             'Existing template detections from previous scans will be '
             'removed before starting a new scan'
@@ -164,7 +164,7 @@ def scan_templates():
         if not confirm_action('Continue and clear previous detections?'):
             logger.info('Scan aborted by user; previous detections kept')
             rq_exit(0)
-    clear_template_detections(config)
+    clear_template_detections()
     time = config.template_start_time
     time_chunk = config.time_chunk
     overlap = config.time_chunk_overlap
@@ -181,6 +181,6 @@ def scan_templates():
                 logger.warning(msg)
                 continue
         if detections:
-            write_template_detections(detections, config, append=True)
+            write_template_detections(detections, append=True)
         trace_cache.clear()
         time += time_chunk

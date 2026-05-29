@@ -159,7 +159,7 @@ def _read_families_from_catalog_scan():
     :rtype: list of Family
     """
     from ..database.families import read_families as read_families_from_db
-    return read_families_from_db(config)
+    return read_families_from_db()
 
 
 def _read_families_from_template_scan():
@@ -172,7 +172,7 @@ def _read_families_from_template_scan():
     from ..database.templates import (
         read_template_families as read_template_families_from_db,
     )
-    return read_template_families_from_db(config)
+    return read_template_families_from_db()
 
 
 def read_families():

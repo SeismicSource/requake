@@ -26,6 +26,6 @@ def flag_family():
         )
         return
     is_valid = is_valid in {'true', 't'}
-    update_family_valid(config, family_number, is_valid)
+    update_family_valid(family_number, is_valid)
     text = {True: 'valid', False: 'not valid'}
     logger.info(f'Family "{family_number}" flagged as {text[is_valid]}')

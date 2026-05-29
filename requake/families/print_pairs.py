@@ -47,7 +47,7 @@ def print_pairs():
     cc_max = config.args.cc_max
     try:
         print_headers = True
-        for pair in read_pairs(config, cc_min=cc_min, cc_max=cc_max):
+        for pair in read_pairs(cc_min=cc_min, cc_max=cc_max):
             rows = [
                 [
                     pair.event1.evid,

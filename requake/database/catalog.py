@@ -86,9 +86,9 @@ def _event_from_row(row):
     )
 
 
-def write_catalog(catalog, config, db_path=None):
+def write_catalog(catalog, db_path=None):
     """Write the stored catalog into SQLite."""
-    conn = get_db_connection(config, initdb=True, db_path=db_path)
+    conn = get_db_connection(initdb=True, db_path=db_path)
     try:
         cursor = conn.cursor()
         _ensure_catalog_table(cursor)
@@ -112,11 +112,11 @@ def write_catalog(catalog, config, db_path=None):
         conn.close()
 
 
-def read_catalog(config, db_path=None):
+def read_catalog(db_path=None):
     """Read the stored catalog from SQLite."""
     from ..catalog.catalog import RequakeCatalog
 
-    conn = get_db_connection(config, initdb=False, db_path=db_path)
+    conn = get_db_connection(initdb=False, db_path=db_path)
     try:
         rows = conn.execute(
             f'SELECT * FROM {CATALOG_TABLE} ORDER BY orig_time'
@@ -125,7 +125,7 @@ def read_catalog(config, db_path=None):
         if MISSING_CATALOG_TABLE in str(err):
             raise FileNotFoundError(
                 'Catalog not found in db file '
-                f'{get_db_path(config, db_path=db_path)}'
+                f'{get_db_path(db_path=db_path)}'
             ) from err
         raise
     finally:

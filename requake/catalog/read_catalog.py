@@ -118,7 +118,7 @@ def read_catalog():
             nevs_read = len(catalog)
             logger.info(
                 f'{nevs_read:n} events read from db file '
-                f'{get_db_path(config)}'
+                f'{get_db_path()}'
             )
     logger.info('Reading catalog...')
     input_cat_file = config.args.catalog_file
@@ -150,9 +150,9 @@ def read_catalog():
     # Sort catalog in increasing time order
     catalog.sort()
     # Write catalog to the output database
-    write_stored_catalog(catalog, config)
+    write_stored_catalog(catalog)
     nevs_written = len(catalog) - nevs_read
     logger.info(
         f'{nevs_written:n} events written to db file '
-        f'{get_db_path(config)}'
+        f'{get_db_path()}'
     )

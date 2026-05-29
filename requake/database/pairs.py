@@ -249,17 +249,16 @@ def _pair_from_row(row):
     )
 
 
-def write_pair_records(pairs, config, append=True):
+def write_pair_records(pairs, append=True):
     """
     Write a list of PairRecord objects into SQLite.
 
     :param pairs: pair records to write; each item must be a PairRecord.
         Unanalyzable pairs have ``lag_samples=None`` and ``cc_max=None``.
-    :param config: Requake configuration object.
     :param append: if False, clear existing pairs before writing.
     """
     pairs = list(pairs)
-    conn = get_db_connection(config, initdb=True)
+    conn = get_db_connection(initdb=True)
     try:
         cursor = conn.cursor()
         _ensure_pairs_table(cursor)
@@ -281,7 +280,7 @@ def write_pair_records(pairs, config, append=True):
                 'clear trace metadata table',
             )
         if pairs:
-            _store_trace_metadata(cursor, pairs, config)
+            _store_trace_metadata(cursor, pairs)
             event_cache = {}
             trace_cache = {}
             pair_rows = [
@@ -308,16 +307,16 @@ def write_pair_records(pairs, config, append=True):
         if _is_incompatible_pairs_schema_error(err):
             raise PairsSchemaError(
                 'Stored event pairs schema is incompatible with this '
-                f'Requake version in db file {get_db_path(config)}'
+                f'Requake version in db file {get_db_path()}'
             ) from err
         raise
     finally:
         conn.close()
 
 
-def count_pairs(config):
+def count_pairs():
     """Return the number of stored event pairs."""
-    conn = get_db_connection(config, initdb=False)
+    conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
         try:
@@ -333,9 +332,9 @@ def count_pairs(config):
     return int(row['npairs'])
 
 
-def read_event_key_rows(config):
+def read_event_key_rows():
     """Read event lookup rows as ``(event_id, evid)`` tuples."""
-    conn = get_db_connection(config, initdb=False)
+    conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
         try:
@@ -351,7 +350,7 @@ def read_event_key_rows(config):
             if _is_incompatible_pairs_schema_error(err):
                 raise PairsSchemaError(
                     'Stored event pairs schema is incompatible with this '
-                    f'Requake version in db file {get_db_path(config)}'
+                    f'Requake version in db file {get_db_path()}'
                 ) from err
             raise
     finally:
@@ -359,9 +358,9 @@ def read_event_key_rows(config):
     return [(int(row['event_id']), row['evid']) for row in rows]
 
 
-def read_pair_key_ids(config):
+def read_pair_key_ids():
     """Read stored event-pair foreign keys as integer ID tuples."""
-    conn = get_db_connection(config, initdb=False)
+    conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
         try:
@@ -377,7 +376,7 @@ def read_pair_key_ids(config):
             if _is_incompatible_pairs_schema_error(err):
                 raise PairsSchemaError(
                     'Stored event pairs schema is incompatible with this '
-                    f'Requake version in db file {get_db_path(config)}'
+                    f'Requake version in db file {get_db_path()}'
                 ) from err
             raise
     finally:
@@ -388,11 +387,10 @@ def read_pair_key_ids(config):
     }
 
 
-def read_pairs(config, cc_min=None, cc_max=None):
+def read_pairs(cc_min=None, cc_max=None):
     """
     Read event pairs from SQLite, optionally filtering by cc_max.
 
-    :param config: Requake configuration object.
     :param cc_min: If given, only return pairs with cc_max >= cc_min.
     :type cc_min: float or None
     :param cc_max: If given, only return pairs with cc_max <= cc_max.
@@ -403,7 +401,7 @@ def read_pairs(config, cc_min=None, cc_max=None):
     :raise PairsTableNotFoundError: if the stored pairs table is missing
     """
     where, params = _cc_filter_clause(cc_min, cc_max)
-    conn = get_db_connection(config, initdb=False)
+    conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
         try:
@@ -452,25 +450,25 @@ def read_pairs(config, cc_min=None, cc_max=None):
             if any(row['sampling_rate_hz'] is None for row in rows):
                 raise PairsMetadataError(
                     'Trace metadata is missing for one or more stored pairs '
-                    f'in db file {get_db_path(config)}'
+                    f'in db file {get_db_path()}'
                 )
         except sqlite3.OperationalError as err:
             if _is_missing_pairs_table_error(err):
                 raise PairsTableNotFoundError(
                     'Event pairs table not found in db file '
-                    f'{get_db_path(config)}'
+                    f'{get_db_path()}'
                 ) from err
             if _is_incompatible_pairs_schema_error(err):
                 raise PairsSchemaError(
                     'Stored event pairs schema is incompatible with this '
-                    f'Requake version in db file {get_db_path(config)}'
+                    f'Requake version in db file {get_db_path()}'
                 ) from err
             raise
         except sqlite3.DatabaseError as err:
             if 'database disk image is malformed' in str(err).lower():
                 raise DatabaseCorruptError(
                     'The event pairs database is corrupted or malformed: '
-                    f'{get_db_path(config)}\n'
+                    f'{get_db_path()}\n'
                     'You can try recovering it with:\n'
                     "sqlite3 requake.sqlite '.recover' | "
                     'sqlite3 requake_new.sqlite'

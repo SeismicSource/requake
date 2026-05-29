@@ -273,7 +273,7 @@ def configure(args):
     should_write_catalog = (
         args.action == 'read_catalog'
         and not args.append
-        and not write_ok(get_db_path(config), args.force)
+        and not write_ok(get_db_path(), args.force)
     )
     if should_write_catalog:
         print('Exiting now.')

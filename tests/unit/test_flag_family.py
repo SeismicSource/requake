@@ -59,8 +59,8 @@ class TestFlagFamily(unittest.TestCase):
                 family.append(event)
                 catalog_rows.append(event)
             families.append(family)
-        write_catalog(catalog_rows, config)
-        write_families(families, config)
+        write_catalog(catalog_rows)
+        write_families(families)
 
     def _patch_runtime_config(self):
         """Return a patch that points the global config to a temp database."""
@@ -80,7 +80,7 @@ class TestFlagFamily(unittest.TestCase):
 
     def _family_valid_flags(self):
         """Read family valid flags from the database as a dict."""
-        families = read_families(config)
+        families = read_families()
         return {str(family.number): family.valid for family in families}
 
     def test_flag_family_toggles_valid(self):
@@ -116,7 +116,7 @@ class TestFlagFamily(unittest.TestCase):
             with patch.object(flag_family_module, 'logger'):
                 flag_family()
 
-            families = read_families(config)
+            families = read_families()
 
         family0 = next(family for family in families if family.number == 0)
         family1 = next(family for family in families if family.number == 1)

@@ -20,7 +20,7 @@ from unittest.mock import patch
 from obspy import UTCDateTime
 
 from requake.catalog import RequakeEvent
-from requake.config import config
+from requake.config.config import config
 from requake.database.catalog import read_catalog, write_catalog
 from requake.database.db import (
     check_db_exists,
@@ -56,28 +56,28 @@ class TestDatabaseDbHelpers(unittest.TestCase):
     def test_get_db_path_uses_outdir(self):
         """Database path should be resolved under configured outdir."""
         with self._patch_runtime_config():
-            db_path = get_db_path(config)
+            db_path = get_db_path()
         self.assertTrue(db_path.startswith(self.test_dir.name))
         self.assertTrue(db_path.endswith('requake.sqlite'))
 
     def test_check_db_exists_init_and_runtime(self):
         """Init mode creates parent dir, runtime mode requires db file."""
         with self._patch_runtime_config():
-            db_path = check_db_exists(config, initdb=True)
-            self.assertEqual(db_path, get_db_path(config))
+            db_path = check_db_exists(initdb=True)
+            self.assertEqual(db_path, get_db_path())
             self.assertTrue(os.path.isdir(os.path.dirname(db_path)))
 
             with self.assertRaises(FileNotFoundError):
-                check_db_exists(config, initdb=False)
+                check_db_exists(initdb=False)
 
             conn = sqlite3.connect(db_path)
             conn.close()
-            self.assertEqual(check_db_exists(config, initdb=False), db_path)
+            self.assertEqual(check_db_exists(initdb=False), db_path)
 
     def test_db_version_check(self):
         """Version checker should accept current version and reject others."""
         with self._patch_runtime_config():
-            db_path = check_db_exists(config, initdb=True)
+            db_path = check_db_exists(initdb=True)
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             set_db_version(cursor)
@@ -93,7 +93,7 @@ class TestDatabaseDbHelpers(unittest.TestCase):
     def test_get_db_connection_enables_foreign_keys(self):
         """Connections should enforce foreign keys via pragma."""
         with self._patch_runtime_config():
-            conn = get_db_connection(config, initdb=True)
+            conn = get_db_connection(initdb=True)
             try:
                 cursor = conn.cursor()
                 cursor.execute('PRAGMA foreign_keys')
@@ -125,8 +125,8 @@ class TestDatabaseDbHelpers(unittest.TestCase):
         )
 
         with self._patch_runtime_config():
-            write_catalog([event], config)
-            catalog = read_catalog(config)
+            write_catalog([event])
+            catalog = read_catalog()
             self.assertEqual(catalog[0].evid, event.evid)
 
     def test_read_pairs_raises_corruption_error(self):
@@ -151,7 +151,7 @@ class TestDatabaseDbHelpers(unittest.TestCase):
                 return_value=_FakeConnection(),
             ):
                 with self.assertRaises(DatabaseCorruptError) as ctx:
-                    read_pairs(config)
+                    read_pairs()
         self.assertIn("sqlite3 requake.sqlite '.recover'", str(ctx.exception))
 
 

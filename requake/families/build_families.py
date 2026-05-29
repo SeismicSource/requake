@@ -131,7 +131,7 @@ def _write_families(families):
     for number, family in enumerate(families):
         family.number = number
         family.valid = valid
-    write_families_to_db(families, config)
+    write_families_to_db(families)
 
 
 def build_families():
@@ -144,7 +144,7 @@ def build_families():
     try:
         logger.info(
             'Reading events from event pairs in '
-            f'db file {get_db_path(config)}...'
+            f'db file {get_db_path()}...'
         )
         cc_min = (
             config.cc_min
@@ -155,7 +155,7 @@ def build_families():
     except (FileNotFoundError, PairsTableNotFoundError):
         logger.error(
             'Unable to find event pairs in database: '
-            f'{get_db_path(config)}'
+            f'{get_db_path()}'
         )
         rq_exit(1)
     except (PairsMetadataError, PairsSchemaError) as msg:
@@ -171,4 +171,4 @@ def build_families():
         logger.info('Building families using UPGMA...')
         families = _build_families_from_upgma(events, config.cc_min)
     _write_families(families)
-    logger.info(f'Done! Output written to: {get_db_path(config)}')
+    logger.info(f'Done! Output written to: {get_db_path()}')

@@ -11,6 +11,7 @@ SQLite-backed trace metadata persistence.
 """
 import logging
 from obspy import UTCDateTime
+from ..config.config import config
 from .db import (
     execute_with_retry,
     get_db_connection,
@@ -98,7 +99,7 @@ def _infer_sampling_rate(pair):
     )
 
 
-def _trace_metadata_from_inventory(config, trace_id):
+def _trace_metadata_from_inventory(trace_id):
     """Extract time-valid trace metadata rows from a loaded inventory."""
     inventory = getattr(config, 'inventory', None)
     if inventory is None:
@@ -159,14 +160,14 @@ def _trace_metadata_fallback_rows(pairs):
     return rows
 
 
-def _trace_metadata_rows(pairs, config):
+def _trace_metadata_rows(pairs):
     """Build metadata rows needed by the current pair batch."""
     rows = []
     pairs_by_trace_id = {}
     for pair in pairs:
         pairs_by_trace_id.setdefault(pair.trace_id, []).append(pair)
     for trace_id, trace_pairs in pairs_by_trace_id.items():
-        inventory_rows = _trace_metadata_from_inventory(config, trace_id)
+        inventory_rows = _trace_metadata_from_inventory(trace_id)
         if inventory_rows:
             rows.extend(inventory_rows)
         else:
@@ -269,13 +270,13 @@ def _insert_trace_metadata_row(cursor, row):
     )
 
 
-def _store_trace_metadata(cursor, pairs, config):
+def _store_trace_metadata(cursor, pairs):
     """Insert trace metadata rows for a batch of pairs."""
-    for row in _trace_metadata_rows(pairs, config):
+    for row in _trace_metadata_rows(pairs):
         _insert_trace_metadata_row(cursor, row)
 
 
-def store_trace_metadata_from_inventory(trace_ids, config):
+def store_trace_metadata_from_inventory(trace_ids):
     """
     Persist trace metadata rows for the given trace IDs.
 
@@ -284,13 +285,12 @@ def store_trace_metadata_from_inventory(trace_ids, config):
     (e.g. all waveform fetches fail).
 
     :param trace_ids: iterable of trace IDs to store metadata for
-    :param config: Requake configuration object
     """
-    conn = get_db_connection(config, initdb=False)
+    conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
         for trace_id in trace_ids:
-            rows = _trace_metadata_from_inventory(config, trace_id)
+            rows = _trace_metadata_from_inventory(trace_id)
             if not rows:
                 # inventory absent or trace_id not found; skip silently
                 continue
