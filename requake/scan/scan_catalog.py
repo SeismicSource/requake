@@ -136,22 +136,6 @@ def _log_pair_grouping_stats(valid_pair_idx):
         )
 
 
-def _log_timing_split(start_time, waveform_fetch_time, crosscorr_time):
-    """Log cumulative timing split for waveform fetch and correlation."""
-    elapsed = max(time.monotonic() - start_time, 1e-9)
-    timed = waveform_fetch_time + crosscorr_time
-    other_time = max(elapsed - timed, 0.0)
-    logger.info(
-        'Timing split: '
-        f'fetch={waveform_fetch_time:.1f}s '
-        f'({waveform_fetch_time / elapsed:.1%}), '
-        f'cc={crosscorr_time:.1f}s '
-        f'({crosscorr_time / elapsed:.1%}), '
-        f'other={other_time:.1f}s '
-        f'({other_time / elapsed:.1%})'
-    )
-
-
 def _log_pair_timing_split(
     pair_count,
     elapsed,

@@ -92,6 +92,10 @@ The ``event_pairs`` table stores cross-correlation results from
 - cross-correlation is encoded as ``cc_x100``;
 - lag is stored as ``lag_samples``.
 
+Pairs that cannot be analyzed (for example due to missing waveforms) are
+still stored for resume logic, with ``lag_samples`` and ``cc_x100`` set to
+``NULL``.
+
 Lag in seconds is reconstructed at read time from ``lag_samples`` and
 ``trace_metadata.sampling_rate_hz``.
 
@@ -103,7 +107,7 @@ Lag in seconds is reconstructed at read time from ``lag_samples`` and
      event2_id       INTEGER NOT NULL,
      trace_key_id    INTEGER NOT NULL,
      lag_samples     INTEGER,
-     cc_x100         INTEGER NOT NULL,
+     cc_x100         INTEGER,
      FOREIGN KEY (event1_id)
        REFERENCES event_keys(event_id)
        ON UPDATE CASCADE ON DELETE RESTRICT,

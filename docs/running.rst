@@ -27,7 +27,7 @@ Different commands are available:
    build_families      build families of repeating earthquakes from a catalog
                        of pairs
    print_families      print families to screen
-   plot_families       plot traces for one ore more event families
+   plot_families       plot traces for one or more event families
    plot_timespans      plot family timespans
    plot_cumulative     cumulative plot for one or more families
    map_families        plot families on a map
