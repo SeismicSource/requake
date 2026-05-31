@@ -17,6 +17,7 @@ import sqlite3
 from argparse import Namespace
 from unittest.mock import patch
 from obspy import UTCDateTime
+from obspy.core.inventory import Channel, Inventory, Network, Station
 from requake.config import config
 from requake.database.pairs import PairRecord, read_pairs as read_pairs_from_db
 from requake.catalog import RequakeEvent
@@ -229,8 +230,15 @@ class TestPairsSchema(unittest.TestCase):
                     'PRAGMA table_info(event_pairs)'
                 ).fetchall()
             }
+            metadata_columns = {
+                row[1]
+                for row in conn.execute(
+                    'PRAGMA table_info(trace_metadata)'
+                ).fetchall()
+            }
             metadata_rows = conn.execute(
-                'SELECT trace_id, sampling_rate_hz FROM trace_metadata'
+                'SELECT trace_id, sampling_rate_hz, elevation, local_depth '
+                'FROM trace_metadata'
             ).fetchall()
         finally:
             conn.close()
@@ -239,9 +247,55 @@ class TestPairsSchema(unittest.TestCase):
         self.assertIn('cc_x100', pair_columns)
         self.assertNotIn('lag_sec', pair_columns)
         self.assertNotIn('orig_time1', pair_columns)
+        self.assertIn('elevation', metadata_columns)
+        self.assertIn('local_depth', metadata_columns)
         self.assertEqual(len(metadata_rows), 1)
         self.assertEqual(metadata_rows[0][0], 'XX.TEST.00.BHZ')
         self.assertAlmostEqual(metadata_rows[0][1], 40.0)
+        self.assertIsNone(metadata_rows[0][2])
+        self.assertIsNone(metadata_rows[0][3])
+
+    def test_trace_metadata_stores_inventory_elevation_and_depth(self):
+        """Inventory-backed metadata should persist elevation and depth."""
+        pairs_data = self._get_synthetic_pairs_data(1)
+        channel = Channel(
+            code='BHZ',
+            location_code='00',
+            latitude=45.0,
+            longitude=10.0,
+            elevation=321.5,
+            depth=12.25,
+            sample_rate=40.0,
+        )
+        channel.start_date = UTCDateTime('2019-01-01T00:00:00')
+        station = Station(
+            code='TEST',
+            latitude=45.0,
+            longitude=10.0,
+            elevation=321.5,
+            channels=[channel],
+        )
+        inventory = Inventory(
+            networks=[Network(code='XX', stations=[station])]
+        )
+
+        with self._patch_runtime_config(), patch.dict(
+            config, {'inventory': inventory}, clear=False
+        ):
+            self._seed_catalog_for_pairs(pairs_data)
+            write_pairs(pairs_data, append=False)
+            db_path = get_db_path()
+
+        conn = sqlite3.connect(db_path)
+        try:
+            metadata_row = conn.execute(
+                'SELECT elevation, local_depth FROM trace_metadata'
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertEqual(metadata_row[0], 321.5)
+        self.assertEqual(metadata_row[1], 12.25)
 
     def test_pairs_filters_use_encoded_cc_values(self):
         """cc_min/cc_max filters should match reconstructed cc values."""

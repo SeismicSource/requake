@@ -126,8 +126,8 @@ Lag in seconds is reconstructed at read time from ``lag_samples`` and
 Trace Metadata Table
 ^^^^^^^^^^^^^^^^^^^^
 
-The ``trace_metadata`` table stores sampling rate and coordinates using
-time-valid intervals per ``trace_id``.
+The ``trace_metadata`` table stores sampling rate, coordinates, and
+elevation/depth using time-valid intervals per ``trace_id``.
 
 .. code-block:: sql
 
@@ -138,6 +138,8 @@ time-valid intervals per ``trace_id``.
      sampling_rate_hz  REAL NOT NULL,
      trace_lon         REAL,
      trace_lat         REAL,
+     elevation         REAL,
+     local_depth       REAL,
      updated_at        TEXT,
      PRIMARY KEY (trace_id, valid_from_utc)
    )

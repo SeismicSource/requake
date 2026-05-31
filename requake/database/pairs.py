@@ -425,7 +425,9 @@ def read_pairs(cc_min=None, cc_max=None):
                   c2.depth_km AS depth_km2,
                   c2.mag_type AS mag_type2,
                   c2.mag AS mag2,
-                  tm.sampling_rate_hz
+                  tm.sampling_rate_hz,
+                  tm.elevation,
+                  tm.local_depth
                 FROM {EVENT_PAIRS_TABLE} AS p
                 JOIN {EVENT_KEYS_TABLE} AS e1
                   ON e1.event_id = p.event1_id

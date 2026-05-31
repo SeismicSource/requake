@@ -29,6 +29,7 @@ TRACE_METADATA_VALID_FROM = '1900-01-01T00:00:00'
 SAMPLING_RATE_REL_TOL = 1e-6
 SAMPLING_RATE_ABS_TOL = 1e-9
 TRACE_COORDS_ABS_TOL = 1e-6
+TRACE_DEPTH_ABS_TOL = 1e-6
 
 
 class PairsMetadataError(RuntimeError):
@@ -44,6 +45,8 @@ TRACE_METADATA_SCHEMA_STATEMENTS = [
       sampling_rate_hz  REAL NOT NULL,
       trace_lon         REAL,
       trace_lat         REAL,
+      elevation         REAL,
+      local_depth       REAL,
       updated_at        TEXT,
       PRIMARY KEY (trace_id, valid_from_utc)
     )
@@ -83,7 +86,21 @@ def _trace_metadata_value_differs(existing, candidate):
     lat_changed = _float_differs(
         existing['trace_lat'], candidate['trace_lat'], TRACE_COORDS_ABS_TOL
     )
-    return sampling_rate_changed or lon_changed or lat_changed
+    elevation_changed = _float_differs(
+        existing['elevation'], candidate['elevation'], TRACE_DEPTH_ABS_TOL
+    )
+    local_depth_changed = _float_differs(
+        existing['local_depth'],
+        candidate['local_depth'],
+        TRACE_DEPTH_ABS_TOL,
+    )
+    return (
+        sampling_rate_changed
+        or lon_changed
+        or lat_changed
+        or elevation_changed
+        or local_depth_changed
+    )
 
 
 def _infer_sampling_rate(pair):
@@ -132,6 +149,8 @@ def _trace_metadata_from_inventory(trace_id):
                         'sampling_rate_hz': float(sampling_rate),
                         'trace_lon': getattr(channel, 'longitude', None),
                         'trace_lat': getattr(channel, 'latitude', None),
+                        'elevation': getattr(channel, 'elevation', None),
+                        'local_depth': getattr(channel, 'depth', None),
                         'updated_at': str(UTCDateTime()),
                     }
                 )
@@ -154,6 +173,8 @@ def _trace_metadata_fallback_rows(pairs):
                 'sampling_rate_hz': _infer_sampling_rate(pair),
                 'trace_lon': None,
                 'trace_lat': None,
+                'elevation': None,
+                'local_depth': None,
                 'updated_at': str(UTCDateTime()),
             }
         )
@@ -197,7 +218,13 @@ def _intervals_overlap(existing, candidate):
 def _warn_trace_metadata_change(existing, candidate):
     """Warn when refreshed metadata differs from stored values."""
     changed_fields = []
-    for key in ('sampling_rate_hz', 'trace_lon', 'trace_lat'):
+    for key in (
+        'sampling_rate_hz',
+        'trace_lon',
+        'trace_lat',
+        'elevation',
+        'local_depth',
+    ):
         if key == 'sampling_rate_hz':
             differs = _float_differs(
                 existing[key],
@@ -205,9 +232,13 @@ def _warn_trace_metadata_change(existing, candidate):
                 SAMPLING_RATE_ABS_TOL,
                 SAMPLING_RATE_REL_TOL,
             )
-        else:
+        elif key in ('trace_lon', 'trace_lat'):
             differs = _float_differs(
                 existing[key], candidate[key], TRACE_COORDS_ABS_TOL
+            )
+        else:
+            differs = _float_differs(
+                existing[key], candidate[key], TRACE_DEPTH_ABS_TOL
             )
         if differs:
             changed_fields.append(
@@ -253,8 +284,9 @@ def _insert_trace_metadata_row(cursor, row):
             f'''
             INSERT INTO {TRACE_METADATA_TABLE} (
               trace_id, valid_from_utc, valid_to_utc,
-              sampling_rate_hz, trace_lon, trace_lat, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+              sampling_rate_hz, trace_lon, trace_lat,
+              elevation, local_depth, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''',
             (
                 row['trace_id'],
@@ -263,6 +295,8 @@ def _insert_trace_metadata_row(cursor, row):
                 row['sampling_rate_hz'],
                 row['trace_lon'],
                 row['trace_lat'],
+                row['elevation'],
+                row['local_depth'],
                 row['updated_at'],
             ),
         ),
