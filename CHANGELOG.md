@@ -2,7 +2,7 @@
 
 Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
-## [unreleased]
+## [0.8.1] - 2026-05-31
 
 - Slimmed-down DB size by optimizing `event_pairs` storage. This allows storing
   also invalid pairs, so that resuming catalog scan is faster.
@@ -178,7 +178,7 @@ Mostly a bugfix release with a slightly improved trace plotting.
 
 - Initial release, not yet feature complete
 
-[unreleased]: https://github.com/SeismicSource/requake/compare/v0.8...HEAD
+[0.8.1]: https://github.com/SeismicSource/requake/compare/v0.8...v0.8.1
 [0.8]: https://github.com/SeismicSource/requake/compare/v0.7.3...v0.8
 [0.7.3]: https://github.com/SeismicSource/requake/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/SeismicSource/requake/compare/v0.7.1...v0.7.2
