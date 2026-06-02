@@ -268,6 +268,28 @@ class TestScanCatalogResume(unittest.TestCase):
             resolved = resolve_scan_catalog_nprocs(5, {})
         self.assertEqual(resolved, 5)
 
+    def test_resolve_nprocs_uses_slurm_cpus_on_node(self):
+        """Automatic nprocs should use SLURM_CPUS_ON_NODE."""
+        dummy_config = SimpleNamespace(
+            args=SimpleNamespace(nprocs=None),
+            catalog_scan_nprocs=0,
+        )
+        slurm_context = {'SLURM_CPUS_ON_NODE': '12'}
+        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
+            resolved = resolve_scan_catalog_nprocs(100, slurm_context)
+        self.assertEqual(resolved, 12)
+
+    def test_resolve_nprocs_parses_job_cpus_per_node(self):
+        """Automatic nprocs should parse SLURM_JOB_CPUS_PER_NODE."""
+        dummy_config = SimpleNamespace(
+            args=SimpleNamespace(nprocs=None),
+            catalog_scan_nprocs=0,
+        )
+        slurm_context = {'SLURM_JOB_CPUS_PER_NODE': '8(x2),4'}
+        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
+            resolved = resolve_scan_catalog_nprocs(100, slurm_context)
+        self.assertEqual(resolved, 8)
+
     def test_get_slurm_context_returns_only_set_values(self):
         """Slurm context should include only environment variables set."""
         env = {

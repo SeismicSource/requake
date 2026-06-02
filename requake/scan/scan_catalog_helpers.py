@@ -26,6 +26,8 @@ SLURM_CONTEXT_KEYS = (
     'SLURM_JOB_NAME',
     'SLURM_CLUSTER_NAME',
     'SLURM_CPUS_PER_TASK',
+    'SLURM_CPUS_ON_NODE',
+    'SLURM_JOB_CPUS_PER_NODE',
     'SLURM_NTASKS',
     'SLURM_PROCID',
     'SLURM_NODELIST',
@@ -81,6 +83,18 @@ def _available_cpu_count():
     return os.cpu_count() or 1
 
 
+def _parse_slurm_cpu_count(value):
+    """Parse a Slurm CPU count value into an integer."""
+    if value is None:
+        return None
+    with suppress(ValueError):
+        return int(value)
+    head = value.split('(', 1)[0].split(',', 1)[0].strip()
+    with suppress(ValueError):
+        return int(head)
+    return None
+
+
 def resolve_scan_catalog_nprocs(npairs, slurm_context):
     """Resolve effective worker count for scan_catalog."""
     cli_nprocs = getattr(config.args, 'nprocs', None)
@@ -90,17 +104,25 @@ def resolve_scan_catalog_nprocs(npairs, slurm_context):
         logger.error('catalog_scan_nprocs must be >= 0')
         rq_exit(1)
     if requested == 0:
-        slurm_cpus = slurm_context.get('SLURM_CPUS_PER_TASK')
-        if slurm_cpus is not None:
-            try:
-                base_nprocs = int(slurm_cpus)
-            except ValueError:
-                logger.warning(
-                    'Invalid SLURM_CPUS_PER_TASK value '
-                    f'{slurm_cpus!r}; using host CPU count instead'
-                )
-                base_nprocs = _available_cpu_count()
-        else:
+        slurm_cpu_sources = (
+            'SLURM_CPUS_PER_TASK',
+            'SLURM_CPUS_ON_NODE',
+            'SLURM_JOB_CPUS_PER_NODE',
+        )
+        base_nprocs = None
+        for key in slurm_cpu_sources:
+            slurm_cpus = slurm_context.get(key)
+            parsed_cpus = _parse_slurm_cpu_count(slurm_cpus)
+            if parsed_cpus is None:
+                if slurm_cpus is not None:
+                    logger.warning(
+                        f'Invalid {key} value {slurm_cpus!r}; '
+                        'trying fallback CPU count'
+                    )
+                continue
+            base_nprocs = parsed_cpus
+            break
+        if base_nprocs is None:
             base_nprocs = _available_cpu_count()
             if base_nprocs > 1:
                 base_nprocs -= 1
