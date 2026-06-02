@@ -213,6 +213,11 @@ def _resolve_scan_catalog_nprocs(npairs, slurm_context):
 
 def _effective_worker_cache_size(nprocs):
     """Return per-worker waveform cache size."""
+    parallel_cache_size = int(
+        getattr(config, 'catalog_waveform_cache_size_parallel', 0)
+    )
+    if parallel_cache_size > 0:
+        return max(parallel_cache_size, MIN_WORKER_CACHE_SIZE)
     global_cache_size = max(
         int(getattr(config, 'catalog_waveform_cache_size', 5000)),
         MIN_WORKER_CACHE_SIZE,

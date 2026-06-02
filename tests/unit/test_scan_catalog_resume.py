@@ -21,6 +21,7 @@ import numpy as np
 from requake.config.parse_arguments import parse_arguments
 from requake.scan.scan_catalog import (
     _ParallelCacheStatsCollector,
+    _effective_worker_cache_size,
     _get_slurm_context,
     _load_existing_pair_ids,
     _log_pair_processing_report,
@@ -246,6 +247,26 @@ class TestScanCatalogResume(unittest.TestCase):
         self.assertEqual(_max_pending_futures(1), 32)
         self.assertEqual(_max_pending_futures(8), 32)
         self.assertEqual(_max_pending_futures(20), 40)
+
+    def test_effective_worker_cache_size_splits_global_cache(self):
+        """Without override, parallel cache should split global budget."""
+        dummy_config = SimpleNamespace(
+            catalog_waveform_cache_size=5000,
+            catalog_waveform_cache_size_parallel=0,
+        )
+        with patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config):
+            size = _effective_worker_cache_size(7)
+        self.assertEqual(size, 714)
+
+    def test_effective_worker_cache_size_parallel_override(self):
+        """Parallel override should set per-worker cache size directly."""
+        dummy_config = SimpleNamespace(
+            catalog_waveform_cache_size=5000,
+            catalog_waveform_cache_size_parallel=1200,
+        )
+        with patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config):
+            size = _effective_worker_cache_size(7)
+        self.assertEqual(size, 1200)
 
     def test_process_valid_pair_indices_uses_parallel_branch(self):
         """nprocs>1 should route processing through parallel helper."""
