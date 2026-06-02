@@ -36,6 +36,7 @@ from ..database.pairs import (
 from ..database.trace_metadata import store_trace_metadata_from_inventory
 from ..waveforms import (
     WaveformPair, cc_waveform_pair,
+    load_inventory,
     NoWaveformError, NoMetadataError, MetadataMismatchError
 )
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -882,6 +883,14 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
     """Process event pairs."""
     if not continue_scan:
         write_pair_records([], append=False)
+    # Ensure inventory is loaded in the parent process before parent-side
+    # writes, so trace_metadata rows keep full interval metadata in
+    # parallel mode as in serial mode.
+    try:
+        load_inventory()
+    except (NoMetadataError, MetadataMismatchError) as msg:
+        logger.error(msg)
+        rq_exit(1)
     # Write trace metadata immediately after tables are created so that
     # the DB is populated even when no pairs are found (e.g. all
     # waveform fetches fail).  Uses the inventory already in config.

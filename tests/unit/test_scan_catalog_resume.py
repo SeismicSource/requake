@@ -22,6 +22,7 @@ from requake.scan.scan_catalog import (
     _get_slurm_context,
     _load_existing_pair_ids,
     _max_pending_futures,
+    _process_pairs,
     _process_valid_pair_indices,
     _resolve_scan_catalog_nprocs,
     _slurm_progress_suffix,
@@ -35,6 +36,14 @@ class _DummyEvent:
 
     def __init__(self, evid):
         self.evid = evid
+
+
+class _DummyConfig:
+    """Config stub used by scan_catalog helper tests."""
+
+    def __init__(self):
+        self.args = SimpleNamespace(traceid=None)
+        self.catalog_trace_id = ['WI.TDBA.00.HHZ']
 
 
 class TestScanCatalogResume(unittest.TestCase):
@@ -255,6 +264,57 @@ class TestScanCatalogResume(unittest.TestCase):
             )
         self.assertEqual(result, 11)
         self.assertTrue(parallel_mock.called)
+
+    def test_process_pairs_loads_inventory_before_trace_metadata(self):
+        """Parent should load inventory before parent-side metadata writes."""
+        call_order = []
+        dummy_config = _DummyConfig()
+        valid_pair_idx = np.empty((0, 2), dtype=np.int32)
+        catalog = [_DummyEvent('A'), _DummyEvent('B')]
+
+        def _mark_load_inventory():
+            call_order.append('load_inventory')
+
+        def _mark_store_trace_metadata(_trace_ids):
+            call_order.append('store_trace_metadata')
+
+        with (
+            patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config),
+            patch.object(
+                SCAN_CATALOG_MODULE,
+                'write_pair_records',
+            ),
+            patch.object(
+                SCAN_CATALOG_MODULE,
+                'load_inventory',
+                side_effect=_mark_load_inventory,
+            ),
+            patch.object(
+                SCAN_CATALOG_MODULE,
+                'store_trace_metadata_from_inventory',
+                side_effect=_mark_store_trace_metadata,
+            ),
+            patch.object(
+                SCAN_CATALOG_MODULE,
+                '_build_valid_pair_indices',
+                return_value=valid_pair_idx,
+            ),
+            patch.object(
+                SCAN_CATALOG_MODULE,
+                '_resolve_scan_catalog_nprocs',
+                return_value=1,
+            ),
+            patch.object(
+                SCAN_CATALOG_MODULE,
+                '_process_valid_pair_indices',
+                return_value=0,
+            ),
+        ):
+            _process_pairs(catalog, continue_scan=False, slurm_context={})
+
+        self.assertGreaterEqual(len(call_order), 2)
+        self.assertEqual(call_order[0], 'load_inventory')
+        self.assertEqual(call_order[1], 'store_trace_metadata')
 
 
 if __name__ == '__main__':
