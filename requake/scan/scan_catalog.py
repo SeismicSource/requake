@@ -65,6 +65,20 @@ _WORKER_WAVEFORM_PAIR = None
 _WORKER_CATALOG = None
 
 
+class _WorkerLogCaptureHandler(logging.Handler):
+    """Collect worker log messages for parent-side emission."""
+
+    def __init__(self):
+        super().__init__(level=logging.WARNING)
+        self.messages = []
+
+    def emit(self, record):
+        """Capture warning/error messages as single-line strings."""
+        message = record.getMessage().replace('\n', ' ').strip()
+        if message:
+            self.messages.append(message)
+
+
 def _get_slurm_context():
     """Return current Slurm environment variables that are set."""
     context = {}
@@ -168,11 +182,21 @@ def _connect_worker_clients():
     config.dataselect_client = FDSNClient(config.fdsn_dataselect_url)
 
 
+def _silence_worker_console_logging():
+    """Disable worker console logging to keep tqdm output stable."""
+    root_logger = logging.getLogger()
+    for handler in list(root_logger.handlers):
+        root_logger.removeHandler(handler)
+    root_logger.addHandler(logging.NullHandler())
+    root_logger.setLevel(logging.INFO)
+
+
 def _worker_initializer(cfg_dict, catalog, worker_cache_size):
     """Initialize process-local worker state."""
     global _WORKER_WAVEFORM_PAIR
     global _WORKER_CATALOG
 
+    _silence_worker_console_logging()
     restored_cfg = from_picklable_config_dict(cfg_dict)
     config.clear()
     config.update(restored_cfg)
@@ -184,6 +208,9 @@ def _worker_initializer(cfg_dict, catalog, worker_cache_size):
 
 def _worker_process_pair(idx_pair):
     """Process one pair index in a worker and return a compact payload."""
+    root_logger = logging.getLogger()
+    capture_handler = _WorkerLogCaptureHandler()
+    root_logger.addHandler(capture_handler)
     idx1, idx2 = idx_pair
     pair = (_WORKER_CATALOG[idx1], _WORKER_CATALOG[idx2])
     try:
@@ -191,6 +218,7 @@ def _worker_process_pair(idx_pair):
             pair,
             _WORKER_WAVEFORM_PAIR,
         )
+        root_logger.removeHandler(capture_handler)
         return {
             'status': 'ok',
             'idx1': idx1,
@@ -201,8 +229,10 @@ def _worker_process_pair(idx_pair):
             'sampling_rate_hz': pair_out.sampling_rate_hz,
             'fetch_dt': fetch_dt,
             'crosscorr_dt': crosscorr_dt,
+            'worker_messages': tuple(capture_handler.messages),
         }
     except NoWaveformError as err:
+        root_logger.removeHandler(capture_handler)
         return {
             'status': 'no_waveform',
             'idx1': idx1,
@@ -211,6 +241,7 @@ def _worker_process_pair(idx_pair):
             'message': str(err),
             'fetch_dt': 0.0,
             'crosscorr_dt': 0.0,
+            'worker_messages': tuple(capture_handler.messages),
         }
 
 
@@ -235,8 +266,14 @@ def _result_to_pair_record(catalog, result):
             result['sampling_rate_hz'],
         )
         return pair_record, fetch_dt, crosscorr_dt
+    seen_messages = set()
+    for message in result.get('worker_messages', ()):
+        if message in seen_messages:
+            continue
+        seen_messages.add(message)
+        logger.warning(message)
     msg = result.get('message', '')
-    if msg:
+    if msg and msg not in seen_messages:
         logger.warning(msg)
     pair_record = PairRecord(
         catalog[idx1],

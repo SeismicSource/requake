@@ -11,6 +11,7 @@ Unit tests for scan_catalog restart/continue controls.
 """
 
 import sys
+import logging
 import unittest
 import importlib
 from types import SimpleNamespace
@@ -24,7 +25,9 @@ from requake.scan.scan_catalog import (
     _max_pending_futures,
     _process_pairs,
     _process_valid_pair_indices,
+    _result_to_pair_record,
     _resolve_scan_catalog_nprocs,
+    _silence_worker_console_logging,
     _slurm_progress_suffix,
 )
 
@@ -315,6 +318,54 @@ class TestScanCatalogResume(unittest.TestCase):
         self.assertGreaterEqual(len(call_order), 2)
         self.assertEqual(call_order[0], 'load_inventory')
         self.assertEqual(call_order[1], 'store_trace_metadata')
+
+    def test_silence_worker_console_logging(self):
+        """Worker logging setup should remove visible root handlers."""
+        root_logger = logging.getLogger()
+        original_handlers = list(root_logger.handlers)
+        original_level = root_logger.level
+        extra_handler = logging.StreamHandler(stream=sys.stderr)
+        root_logger.addHandler(extra_handler)
+        try:
+            _silence_worker_console_logging()
+            self.assertEqual(root_logger.level, logging.INFO)
+            self.assertEqual(len(root_logger.handlers), 1)
+            self.assertIsInstance(root_logger.handlers[0], logging.NullHandler)
+        finally:
+            root_logger.handlers.clear()
+            root_logger.handlers.extend(original_handlers)
+            root_logger.setLevel(original_level)
+
+    def test_result_to_pair_record_logs_worker_messages_in_parent(self):
+        """Forwarded worker messages should be logged by parent once."""
+        result = {
+            'status': 'no_waveform',
+            'idx1': 0,
+            'idx2': 1,
+            'trace_id': 'WI.TDBA.00.HHZ',
+            'message': 'worker failure detail',
+            'fetch_dt': 0.0,
+            'crosscorr_dt': 0.0,
+            'worker_messages': (
+                'worker warning one',
+                'worker warning one',
+                'worker failure detail',
+            ),
+        }
+        catalog = [_DummyEvent('A'), _DummyEvent('B')]
+        with patch.object(SCAN_CATALOG_MODULE.logger, 'warning') as warning:
+            pair_record, fetch_dt, cc_dt = _result_to_pair_record(
+                catalog,
+                result,
+            )
+        self.assertEqual(pair_record.trace_id, 'WI.TDBA.00.HHZ')
+        self.assertEqual(fetch_dt, 0.0)
+        self.assertEqual(cc_dt, 0.0)
+        messages = [call.args[0] for call in warning.call_args_list]
+        self.assertEqual(
+            messages,
+            ['worker warning one', 'worker failure detail'],
+        )
 
 
 if __name__ == '__main__':
