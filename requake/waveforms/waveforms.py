@@ -38,6 +38,20 @@ class NoWaveformError(Exception):
     """Exception raised for missing waveform data."""
 
 
+def _error_message(err):
+    """Return a robust one-line message for any exception."""
+    try:
+        message = str(err)
+    except Exception as str_err:  # pylint: disable=broad-except
+        err_type = type(err).__name__
+        str_err_type = type(str_err).__name__
+        return (
+            f'Unable to format {err_type} message '
+            f'({str_err_type} raised while converting to string).'
+        )
+    return message.replace('\n', ' ')
+
+
 def _increment_waveform_cache_stat(stat_name):
     """Increment a waveform cache statistic."""
     WAVEFORM_CACHE_STATS[stat_name] += 1
@@ -157,7 +171,7 @@ def get_waveform_from_client(traceid, starttime, endtime):
             starttime=starttime, endtime=endtime
         )
     except FDSNNoDataException as err:
-        msg = str(err).replace('\n', ' ')
+        msg = _error_message(err)
         raise NoWaveformError(
             f'No waveform data for trace id: {traceid} '
             f'between {starttime} and {endtime}\n'
@@ -166,7 +180,7 @@ def get_waveform_from_client(traceid, starttime, endtime):
     # ObsPy FDSN client raises an AttributeError when a timeout occurs
     # (this is a bug in ObsPy)
     except AttributeError as err:
-        msg = str(err).replace('\n', ' ')
+        msg = _error_message(err)
         raise NoWaveformError(
             f'Timeout occurred while trying '
             f'to get waveform data for trace id: {traceid} '
@@ -174,7 +188,7 @@ def get_waveform_from_client(traceid, starttime, endtime):
             f'Error message: {msg}'
         ) from err
     except FDSNException as err:
-        msg = str(err).replace('\n', ' ')
+        msg = _error_message(err)
         raise NoWaveformError(
             f'Unable to get waveform data for trace id: {traceid} '
             f'between {starttime} and {endtime}\n'
@@ -250,7 +264,7 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
     try:
         tr = get_waveform_from_client(traceid, t0, t1)
     except NoWaveformError as err:
-        msg = str(err).replace('\n', ' ')
+        msg = _error_message(err)
         raise NoWaveformError(
             f'Unable to get waveform data for event {evid} '
             f'and trace_id {traceid}. '
@@ -336,7 +350,7 @@ def get_event_waveform(ev):
     try:
         traceid_coords = get_traceid_coords(orig_time)
     except MetadataMismatchError as err:
-        msg = str(err).replace('\n', ' ')
+        msg = _error_message(err)
         raise NoWaveformError(
             f'Unable to get waveform data for event {evid} '
             f'and trace_id {traceid}. '
@@ -346,7 +360,7 @@ def get_event_waveform(ev):
     try:
         coords = traceid_coords[traceid]
     except KeyError as err:
-        msg = str(err).replace('\n', ' ')
+        msg = _error_message(err)
         raise NoWaveformError(
             f'No metadata for trace_id {traceid} '
             'in the metadata file. Skipping event.\n'
@@ -359,7 +373,7 @@ def get_event_waveform(ev):
             _get_arrivals_and_distance(
                 trace_lat, trace_lon, ev_lat, ev_lon, ev_depth, orig_time)
     except ValueError as err:
-        msg = str(err).replace('\n', ' ')
+        msg = _error_message(err)
         raise NoWaveformError(
             f'Unable to compute arrival times for event {evid} '
             f'and trace_id {traceid}. '

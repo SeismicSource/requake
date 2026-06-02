@@ -13,6 +13,7 @@ import logging
 import os
 import signal
 import time
+import traceback
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 
 from ..config import (
@@ -242,7 +243,6 @@ def worker_process_pair(idx_pair):
             'worker_cache_stats': _WORKER_WAVEFORM_PAIR.get_cache_stats(),
         }
     except NoWaveformError as err:
-        root_logger.removeHandler(capture_handler)
         return {
             'status': 'no_waveform',
             'idx1': idx1,
@@ -255,6 +255,22 @@ def worker_process_pair(idx_pair):
             'worker_messages': tuple(capture_handler.messages),
             'worker_cache_stats': _WORKER_WAVEFORM_PAIR.get_cache_stats(),
         }
+    except Exception as err:  # pylint: disable=broad-except
+        return {
+            'status': 'error',
+            'idx1': idx1,
+            'idx2': idx2,
+            'worker_pid': os.getpid(),
+            'trace_id': pair[0].trace_id,
+            'message': f'{type(err).__name__}: {err}',
+            'traceback': traceback.format_exc(),
+            'fetch_dt': 0.0,
+            'crosscorr_dt': 0.0,
+            'worker_messages': tuple(capture_handler.messages),
+            'worker_cache_stats': _WORKER_WAVEFORM_PAIR.get_cache_stats(),
+        }
+    finally:
+        root_logger.removeHandler(capture_handler)
 
 
 def max_pending_futures(nprocs):
@@ -286,7 +302,15 @@ def result_to_pair_record(catalog, result):
         logger.warning(message)
     msg = result.get('message', '')
     if msg and msg not in seen_messages:
-        logger.warning(msg)
+        if result.get('status') == 'error':
+            logger.warning(f'Worker error while processing pair: {msg}')
+            worker_tb = result.get(
+                'traceback', ''
+            ).strip().replace('\n', ' | ')
+            if worker_tb:
+                logger.debug(f'Worker traceback: {worker_tb}')
+        else:
+            logger.warning(msg)
     pair_record = PairRecord(
         catalog[idx1],
         catalog[idx2],
