@@ -19,22 +19,28 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 
 from requake.config.parse_arguments import parse_arguments
-from requake.scan.scan_catalog import (
-    _ParallelCacheStatsCollector,
-    _effective_worker_cache_size,
-    _get_slurm_context,
-    _load_existing_pair_ids,
-    _log_pair_processing_report,
-    _max_pending_futures,
-    _process_pairs,
-    _process_valid_pair_indices,
-    _result_to_pair_record,
-    _resolve_scan_catalog_nprocs,
-    _silence_worker_console_logging,
-    _slurm_progress_suffix,
+from requake.scan.scan_catalog import _process_pairs
+from requake.scan.scan_catalog_pairs import load_existing_pair_ids
+from requake.scan.scan_catalog_helpers import (
+    get_slurm_context,
+    init_progress_bar,
+    log_pair_processing_report,
+    resolve_scan_catalog_nprocs,
+    slurm_progress_suffix,
+)
+from requake.scan.scan_catalog_workers import (
+    ParallelCacheStatsCollector,
+    effective_worker_cache_size,
+    max_pending_futures,
+    process_valid_pair_indices,
+    result_to_pair_record,
+    silence_worker_console_logging,
 )
 
 SCAN_CATALOG_MODULE = importlib.import_module('requake.scan.scan_catalog')
+PAIRS_MODULE = importlib.import_module('requake.scan.scan_catalog_pairs')
+RUNTIME_MODULE = importlib.import_module('requake.scan.scan_catalog_helpers')
+WORKERS_MODULE = importlib.import_module('requake.scan.scan_catalog_workers')
 
 
 class _DummyEvent:
@@ -42,6 +48,62 @@ class _DummyEvent:
 
     def __init__(self, evid):
         self.evid = evid
+
+
+class _FakeFuture:
+    """Simple future stub returning a precomputed result."""
+
+    def __init__(self, result, executor):
+        self._result = result
+        self._executor = executor
+
+    def result(self):
+        return self._result
+
+
+class _RecordingExecutor:
+    """Executor stub recording max in-flight submissions."""
+
+    max_pending_seen = 0
+
+    def __init__(self, *args, **kwargs):
+        del args, kwargs
+        self.pending = set()
+        _RecordingExecutor.max_pending_seen = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        del exc_type, exc, tb
+        return False
+
+    def submit(self, fn, idx_pair):
+        del fn
+        idx1, idx2 = idx_pair
+        future = _FakeFuture(
+            {
+                'status': 'ok',
+                'idx1': int(idx1),
+                'idx2': int(idx2),
+                'worker_pid': 100 + int(idx1),
+                'trace_id': 'WI.TDBA.00.HHZ',
+                'lag_samples': 0,
+                'cc_max': 1.0,
+                'sampling_rate_hz': 100.0,
+                'fetch_dt': 0.0,
+                'crosscorr_dt': 0.0,
+                'worker_messages': (),
+                'worker_cache_stats': {},
+            },
+            self,
+        )
+        self.pending.add(future)
+        _RecordingExecutor.max_pending_seen = max(
+            _RecordingExecutor.max_pending_seen,
+            len(self.pending),
+        )
+        return future
 
 
 class _DummyConfig:
@@ -107,15 +169,15 @@ class TestScanCatalogResume(unittest.TestCase):
         event_keys = [(10, 'A'), (11, 'B'), (12, 'C')]
         existing = {(11, 10), (12, 11)}
         with patch.object(
-            SCAN_CATALOG_MODULE,
+            PAIRS_MODULE,
             'read_event_key_rows',
             return_value=event_keys,
         ), patch.object(
-            SCAN_CATALOG_MODULE,
+            PAIRS_MODULE,
             'read_pair_key_ids',
             return_value=existing,
         ):
-            existing_ids = _load_existing_pair_ids(catalog)
+            existing_ids = load_existing_pair_ids(catalog)
         nevents = len(catalog)
         expected = {
             0 * nevents + 1,
@@ -126,58 +188,50 @@ class TestScanCatalogResume(unittest.TestCase):
     def test_noninteractive_progress_uses_total_pair_count(self):
         """Resume progress log should use total pairs, not remaining."""
         with patch.object(
-            SCAN_CATALOG_MODULE.sys.stderr,
-            'isatty',
-            return_value=False,
+            WORKERS_MODULE,
+            'init_progress_bar',
+            return_value=(False, None),
         ), patch.object(
-            SCAN_CATALOG_MODULE,
-            '_log_noninteractive_progress',
-            return_value=1.0,
-        ) as log_progress, patch.object(
-            SCAN_CATALOG_MODULE,
+            WORKERS_MODULE,
+            'update_noninteractive_progress',
+        ) as update_progress, patch.object(
+            WORKERS_MODULE,
             '_process_pair',
             side_effect=AssertionError('No pairs should be processed'),
         ), patch.object(
-            SCAN_CATALOG_MODULE,
+            WORKERS_MODULE,
             'WaveformPair',
             return_value=MagicMock(),
         ), patch.object(
-            SCAN_CATALOG_MODULE,
+            WORKERS_MODULE,
             'write_pair_records',
         ):
-            _process_valid_pair_indices(
+            process_valid_pair_indices(
                 catalog=[],
                 valid_pair_idx=np.empty((0, 2), dtype=np.int32),
                 npairs=0,
                 initial_processed=7,
                 total_pairs=10,
             )
-        self.assertFalse(log_progress.called)
+        self.assertFalse(update_progress.called)
 
     def test_tqdm_uses_total_and_initial_on_resume(self):
         """Resume progress bar should initialize with total and offset."""
         with patch.object(
-            SCAN_CATALOG_MODULE.sys.stderr,
+            RUNTIME_MODULE.sys.stderr,
             'isatty',
             return_value=True,
         ), patch.object(
-            SCAN_CATALOG_MODULE,
+            RUNTIME_MODULE,
             'tqdm',
-        ) as tqdm_mock, patch.object(
-            SCAN_CATALOG_MODULE,
-            'WaveformPair',
-            return_value=MagicMock(),
-        ), patch.object(
-            SCAN_CATALOG_MODULE,
-            'write_pair_records',
-        ):
+        ) as tqdm_mock:
             tqdm_mock.return_value = MagicMock()
-            _process_valid_pair_indices(
-                catalog=[],
-                valid_pair_idx=np.empty((0, 2), dtype=np.int32),
-                npairs=0,
-                initial_processed=12,
-                total_pairs=40,
+            init_progress_bar(
+                {
+                    'nprocs': 1,
+                    'total_pairs': 40,
+                    'initial_processed': 12,
+                }
             )
         kwargs = tqdm_mock.call_args.kwargs
         self.assertEqual(kwargs['total'], 40)
@@ -189,8 +243,8 @@ class TestScanCatalogResume(unittest.TestCase):
             args=SimpleNamespace(nprocs=3),
             catalog_scan_nprocs=9,
         )
-        with patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config):
-            resolved = _resolve_scan_catalog_nprocs(100, {})
+        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
+            resolved = resolve_scan_catalog_nprocs(100, {})
         self.assertEqual(resolved, 3)
 
     def test_resolve_nprocs_auto_slurm(self):
@@ -200,8 +254,8 @@ class TestScanCatalogResume(unittest.TestCase):
             catalog_scan_nprocs=0,
         )
         slurm_context = {'SLURM_CPUS_PER_TASK': '8'}
-        with patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config):
-            resolved = _resolve_scan_catalog_nprocs(100, slurm_context)
+        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
+            resolved = resolve_scan_catalog_nprocs(100, slurm_context)
         self.assertEqual(resolved, 8)
 
     def test_resolve_nprocs_clamps_to_pair_count(self):
@@ -210,8 +264,8 @@ class TestScanCatalogResume(unittest.TestCase):
             args=SimpleNamespace(nprocs=32),
             catalog_scan_nprocs=0,
         )
-        with patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config):
-            resolved = _resolve_scan_catalog_nprocs(5, {})
+        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
+            resolved = resolve_scan_catalog_nprocs(5, {})
         self.assertEqual(resolved, 5)
 
     def test_get_slurm_context_returns_only_set_values(self):
@@ -221,8 +275,8 @@ class TestScanCatalogResume(unittest.TestCase):
             'SLURM_CPUS_PER_TASK': '12',
             'SLURM_NODELIST': 'node001',
         }
-        with patch.dict(SCAN_CATALOG_MODULE.os.environ, env, clear=True):
-            context = _get_slurm_context()
+        with patch.dict(RUNTIME_MODULE.os.environ, env, clear=True):
+            context = get_slurm_context()
         self.assertEqual(context['SLURM_JOB_ID'], '1234')
         self.assertEqual(context['SLURM_CPUS_PER_TASK'], '12')
         self.assertEqual(context['SLURM_NODELIST'], 'node001')
@@ -236,7 +290,7 @@ class TestScanCatalogResume(unittest.TestCase):
             'SLURM_NODELIST': 'nodeA',
             'SLURM_CPUS_PER_TASK': '16',
         }
-        suffix = _slurm_progress_suffix(context)
+        suffix = slurm_progress_suffix(context)
         self.assertIn('SLURM_JOB_ID=77', suffix)
         self.assertIn('SLURM_PROCID=2', suffix)
         self.assertIn('SLURM_NODELIST=nodeA', suffix)
@@ -244,9 +298,9 @@ class TestScanCatalogResume(unittest.TestCase):
 
     def test_max_pending_futures_is_bounded(self):
         """Pending futures should have a deterministic lower bound."""
-        self.assertEqual(_max_pending_futures(1), 32)
-        self.assertEqual(_max_pending_futures(8), 32)
-        self.assertEqual(_max_pending_futures(20), 40)
+        self.assertEqual(max_pending_futures(1), 32)
+        self.assertEqual(max_pending_futures(8), 32)
+        self.assertEqual(max_pending_futures(20), 40)
 
     def test_effective_worker_cache_size_splits_global_cache(self):
         """Without override, parallel cache should split global budget."""
@@ -254,8 +308,8 @@ class TestScanCatalogResume(unittest.TestCase):
             catalog_waveform_cache_size=5000,
             catalog_waveform_cache_size_parallel=0,
         )
-        with patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config):
-            size = _effective_worker_cache_size(7)
+        with patch.object(WORKERS_MODULE, 'config', dummy_config):
+            size = effective_worker_cache_size(7)
         self.assertEqual(size, 714)
 
     def test_effective_worker_cache_size_parallel_override(self):
@@ -264,22 +318,22 @@ class TestScanCatalogResume(unittest.TestCase):
             catalog_waveform_cache_size=5000,
             catalog_waveform_cache_size_parallel=1200,
         )
-        with patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config):
-            size = _effective_worker_cache_size(7)
+        with patch.object(WORKERS_MODULE, 'config', dummy_config):
+            size = effective_worker_cache_size(7)
         self.assertEqual(size, 1200)
 
     def test_process_valid_pair_indices_uses_parallel_branch(self):
         """nprocs>1 should route processing through parallel helper."""
         with patch.object(
-            SCAN_CATALOG_MODULE.sys.stderr,
-            'isatty',
-            return_value=False,
+            WORKERS_MODULE,
+            'init_progress_bar',
+            return_value=(False, None),
         ), patch.object(
-            SCAN_CATALOG_MODULE,
-            '_process_valid_pair_indices_parallel',
+            WORKERS_MODULE,
+            'process_valid_pair_indices_parallel',
             return_value=11,
         ) as parallel_mock:
-            result = _process_valid_pair_indices(
+            result = process_valid_pair_indices(
                 catalog=[],
                 valid_pair_idx=np.array([[0, 0]], dtype=np.int32),
                 npairs=1,
@@ -322,17 +376,17 @@ class TestScanCatalogResume(unittest.TestCase):
             ),
             patch.object(
                 SCAN_CATALOG_MODULE,
-                '_build_valid_pair_indices',
+                'build_valid_pair_indices',
                 return_value=valid_pair_idx,
             ),
             patch.object(
                 SCAN_CATALOG_MODULE,
-                '_resolve_scan_catalog_nprocs',
+                'resolve_scan_catalog_nprocs',
                 return_value=1,
             ),
             patch.object(
                 SCAN_CATALOG_MODULE,
-                '_process_valid_pair_indices',
+                'process_valid_pair_indices',
                 return_value=0,
             ),
         ):
@@ -342,6 +396,198 @@ class TestScanCatalogResume(unittest.TestCase):
         self.assertEqual(call_order[0], 'load_inventory')
         self.assertEqual(call_order[1], 'store_trace_metadata')
 
+    def test_worker_process_pair_returns_compact_payload(self):
+        """Worker payload should contain only compact scalar-like fields."""
+        dummy_pair_record = SimpleNamespace(
+            trace_id='WI.TDBA.00.HHZ',
+            lag_samples=12,
+            cc_max=0.95,
+            sampling_rate_hz=100.0,
+        )
+        waveform_pair = MagicMock()
+        waveform_pair.get_cache_stats.return_value = {
+            'trace_cache_hits': 1,
+            'trace_cache_misses': 1,
+            'trace_cache_hit_rate': 0.5,
+            'sorted_trace_ids_cache_hits': 0,
+            'sorted_trace_ids_cache_misses': 0,
+            'sorted_trace_ids_cache_hit_rate': 0.0,
+            'skipped_trace_hits': 0,
+            'trace_cache_evictions': 0,
+            'trace_cache_size': 1,
+            'max_trace_cache_size': 10,
+            'disk_cache_hits': 0,
+            'disk_cache_misses': 0,
+            'disk_cache_writes': 0,
+            'disk_cache_read_errors': 0,
+            'disk_cache_write_errors': 0,
+        }
+        with patch.object(
+            WORKERS_MODULE,
+            '_WORKER_WAVEFORM_PAIR',
+            waveform_pair,
+        ), patch.object(
+            WORKERS_MODULE,
+            '_WORKER_CATALOG',
+            [_DummyEvent('A'), _DummyEvent('B')],
+        ), patch.object(
+            WORKERS_MODULE,
+            '_process_pair',
+            return_value=(dummy_pair_record, 0.1, 0.2),
+        ), patch.object(WORKERS_MODULE.os, 'getpid', return_value=321):
+            result = WORKERS_MODULE.worker_process_pair((0, 1))
+        self.assertEqual(result['idx1'], 0)
+        self.assertEqual(result['idx2'], 1)
+        self.assertEqual(result['worker_pid'], 321)
+        self.assertIsInstance(result['trace_id'], str)
+        self.assertIsInstance(result['lag_samples'], int)
+        self.assertIsInstance(result['cc_max'], float)
+        self.assertIsInstance(result['sampling_rate_hz'], float)
+        self.assertIsInstance(result['worker_messages'], tuple)
+        self.assertIsInstance(result['worker_cache_stats'], dict)
+
+    def test_parallel_path_bounds_pending_futures(self):
+        """Parallel scheduler should never exceed max_pending futures."""
+        valid_pair_idx = np.array([[idx, idx + 1] for idx in range(40)])
+        catalog = [_DummyEvent(f'ev_{idx}') for idx in range(41)]
+        state = {
+            'nprocs': 2,
+            'initial_processed': 0,
+            'total_pairs': len(valid_pair_idx),
+            'waveform_fetch_time': 0.0,
+            'crosscorr_time': 0.0,
+            'window_pair_count': 0,
+            'window_fetch_time': 0.0,
+            'window_crosscorr_time': 0.0,
+            'next_log_time': 0.0,
+            'window_start_time': 0.0,
+            'slurm_context': {},
+            'start_time': 0.0,
+        }
+
+        def _fake_wait(pending, return_when):
+            del return_when
+            future = next(iter(pending))
+            pending.remove(future)
+            future._executor.pending.remove(future)
+            return {future}, pending
+
+        with patch.object(
+            WORKERS_MODULE,
+            'ProcessPoolExecutor',
+            _RecordingExecutor,
+        ), patch.object(
+            WORKERS_MODULE,
+            'wait',
+            side_effect=_fake_wait,
+        ), patch.object(
+            WORKERS_MODULE,
+            'to_picklable_config_dict',
+            return_value={},
+        ), patch.object(
+            WORKERS_MODULE,
+            'effective_worker_cache_size',
+            return_value=100,
+        ), patch.object(
+            WORKERS_MODULE,
+            'update_noninteractive_progress',
+        ), patch.object(
+            WORKERS_MODULE,
+            '_finalize_pair_processing',
+        ), patch.object(
+            WORKERS_MODULE,
+            '_flush_pair_batch_if_needed',
+        ):
+            analyzed = (
+                WORKERS_MODULE.process_valid_pair_indices_parallel(
+                    catalog,
+                    valid_pair_idx,
+                    len(valid_pair_idx),
+                    state,
+                    show_pbar=False,
+                    pbar=None,
+                )
+            )
+        self.assertEqual(analyzed, len(valid_pair_idx))
+        self.assertLessEqual(
+            _RecordingExecutor.max_pending_seen,
+            WORKERS_MODULE.max_pending_futures(2),
+        )
+
+    def test_parallel_path_flushes_batches_at_threshold(self):
+        """Parallel path should flush parent batches at the fixed threshold."""
+        valid_pair_idx = np.array([[idx, idx + 1] for idx in range(105)])
+        catalog = [_DummyEvent(f'ev_{idx}') for idx in range(106)]
+        state = {
+            'nprocs': 2,
+            'initial_processed': 0,
+            'total_pairs': len(valid_pair_idx),
+            'waveform_fetch_time': 0.0,
+            'crosscorr_time': 0.0,
+            'window_pair_count': 0,
+            'window_fetch_time': 0.0,
+            'window_crosscorr_time': 0.0,
+            'next_log_time': 0.0,
+            'window_start_time': 0.0,
+            'slurm_context': {},
+            'start_time': 0.0,
+        }
+        flush_lengths = []
+
+        def _fake_wait(pending, return_when):
+            del return_when
+            future = next(iter(pending))
+            pending.remove(future)
+            future._executor.pending.remove(future)
+            return {future}, pending
+
+        def _record_write_pair_records(pairs, append=True):
+            del append
+            flush_lengths.append(len(pairs))
+
+        def _record_finalize(batch_of_pairs, pbar, npairs, state_arg, cache):
+            del pbar, npairs, state_arg, cache
+            flush_lengths.append(len(batch_of_pairs))
+
+        with patch.object(
+            WORKERS_MODULE,
+            'ProcessPoolExecutor',
+            _RecordingExecutor,
+        ), patch.object(
+            WORKERS_MODULE,
+            'wait',
+            side_effect=_fake_wait,
+        ), patch.object(
+            WORKERS_MODULE,
+            'to_picklable_config_dict',
+            return_value={},
+        ), patch.object(
+            WORKERS_MODULE,
+            'effective_worker_cache_size',
+            return_value=100,
+        ), patch.object(
+            WORKERS_MODULE,
+            'update_noninteractive_progress',
+        ), patch.object(
+            WORKERS_MODULE,
+            'write_pair_records',
+            side_effect=_record_write_pair_records,
+        ), patch.object(
+            WORKERS_MODULE,
+            '_finalize_pair_processing',
+            side_effect=_record_finalize,
+        ):
+            WORKERS_MODULE.process_valid_pair_indices_parallel(
+                catalog,
+                valid_pair_idx,
+                len(valid_pair_idx),
+                state,
+                show_pbar=False,
+                pbar=None,
+            )
+        self.assertEqual(flush_lengths[0], 100)
+        self.assertEqual(flush_lengths[-1], 5)
+
     def test_silence_worker_console_logging(self):
         """Worker logging setup should remove visible root handlers."""
         root_logger = logging.getLogger()
@@ -350,7 +596,7 @@ class TestScanCatalogResume(unittest.TestCase):
         extra_handler = logging.StreamHandler(stream=sys.stderr)
         root_logger.addHandler(extra_handler)
         try:
-            _silence_worker_console_logging()
+            silence_worker_console_logging()
             self.assertEqual(root_logger.level, logging.INFO)
             self.assertEqual(len(root_logger.handlers), 1)
             self.assertIsInstance(root_logger.handlers[0], logging.NullHandler)
@@ -376,8 +622,8 @@ class TestScanCatalogResume(unittest.TestCase):
             ),
         }
         catalog = [_DummyEvent('A'), _DummyEvent('B')]
-        with patch.object(SCAN_CATALOG_MODULE.logger, 'warning') as warning:
-            pair_record, fetch_dt, cc_dt = _result_to_pair_record(
+        with patch.object(WORKERS_MODULE.logger, 'warning') as warning:
+            pair_record, fetch_dt, cc_dt = result_to_pair_record(
                 catalog,
                 result,
             )
@@ -399,8 +645,8 @@ class TestScanCatalogResume(unittest.TestCase):
             'waveform_fetch_time': 12.0,
             'crosscorr_time': 8.0,
         }
-        with patch.object(SCAN_CATALOG_MODULE.logger, 'info') as info_log:
-            _log_pair_processing_report(
+        with patch.object(RUNTIME_MODULE.logger, 'info') as info_log:
+            log_pair_processing_report(
                 state,
                 analyzed_pairs=100,
                 elapsed=40.0,
@@ -418,7 +664,7 @@ class TestScanCatalogResume(unittest.TestCase):
 
     def test_parallel_cache_stats_collector_aggregates_workers(self):
         """Parallel cache collector should merge worker snapshots."""
-        collector = _ParallelCacheStatsCollector()
+        collector = ParallelCacheStatsCollector()
         collector.update_from_result(
             {
                 'worker_pid': 11,
