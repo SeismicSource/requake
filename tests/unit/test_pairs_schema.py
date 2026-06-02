@@ -317,6 +317,64 @@ class TestPairsSchema(unittest.TestCase):
         self.assertEqual(pairs[0].event1.evid, pairs_data[2].event1.evid)
         self.assertEqual(pairs[0].cc_max, 0.86)
 
+    def test_no_waveform_pairs_without_metadata_do_not_fail_write(self):
+        """No-waveform-only traces should not abort metadata persistence."""
+        event1 = RequakeEvent(
+            evid='ev_nometa_a',
+            orig_time=UTCDateTime('2020-01-01T00:00:00'),
+            lon=10.0,
+            lat=45.0,
+            depth=10.0,
+            mag_type='Mw',
+            mag=4.0,
+            trace_id='YY.MISS.00.BHZ',
+        )
+        event2 = RequakeEvent(
+            evid='ev_nometa_b',
+            orig_time=UTCDateTime('2020-01-01T01:00:00'),
+            lon=10.0,
+            lat=45.0,
+            depth=10.0,
+            mag_type='Mw',
+            mag=4.1,
+            trace_id='YY.MISS.00.BHZ',
+        )
+        pair = PairRecord(
+            event1,
+            event2,
+            'YY.MISS.00.BHZ',
+            None,
+            None,
+            sampling_rate_hz=None,
+        )
+
+        with self._patch_runtime_config(), patch.dict(
+            config,
+            {'inventory': None},
+            clear=False,
+        ):
+            self._seed_catalog_for_pairs([pair])
+            # Should not raise PairsMetadataError.
+            write_pairs([pair], append=False)
+            db_path = get_db_path()
+
+        conn = sqlite3.connect(db_path)
+        try:
+            metadata_rows = conn.execute(
+                'SELECT trace_id FROM trace_metadata '
+                "WHERE trace_id = 'YY.MISS.00.BHZ'"
+            ).fetchall()
+            pair_rows = conn.execute(
+                'SELECT lag_samples, cc_x100 FROM event_pairs'
+            ).fetchall()
+        finally:
+            conn.close()
+
+        self.assertEqual(len(pair_rows), 1)
+        self.assertIsNone(pair_rows[0][0])
+        self.assertIsNone(pair_rows[0][1])
+        self.assertEqual(len(metadata_rows), 0)
+
 
 if __name__ == '__main__':
     unittest.main()

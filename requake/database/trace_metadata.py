@@ -165,12 +165,20 @@ def _trace_metadata_fallback_rows(pairs):
         if pair.trace_id in seen_trace_ids:
             continue
         seen_trace_ids.add(pair.trace_id)
+        try:
+            sampling_rate_hz = _infer_sampling_rate(pair)
+        except PairsMetadataError as err:
+            logger.warning(
+                'Skipping trace_metadata fallback row for trace_id '
+                f'{pair.trace_id}: {err}'
+            )
+            continue
         rows.append(
             {
                 'trace_id': pair.trace_id,
                 'valid_from_utc': TRACE_METADATA_VALID_FROM,
                 'valid_to_utc': None,
-                'sampling_rate_hz': _infer_sampling_rate(pair),
+                'sampling_rate_hz': sampling_rate_hz,
                 'trace_lon': None,
                 'trace_lat': None,
                 'elevation': None,
