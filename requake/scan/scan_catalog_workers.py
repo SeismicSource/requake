@@ -11,6 +11,7 @@ Worker and pair-processing helpers for catalog-based repeater scans.
 """
 import logging
 import os
+import signal
 import time
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 
@@ -165,6 +166,7 @@ def _worker_initializer(cfg_dict, catalog, worker_cache_size):
     global _WORKER_CATALOG
 
     silence_worker_console_logging()
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     restored_cfg = from_picklable_config_dict(cfg_dict)
     config.clear()
     config.update(restored_cfg)
