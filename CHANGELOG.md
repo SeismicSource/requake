@@ -4,6 +4,10 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- Parallel processing of earthquake pairs in `scan_catalog`. On by default
+  with automatic detection of the number of worker processes. This can be
+  configured with the `catalog_scan_nprocs` config option.
+
 ## [0.8.1] - 2026-05-31
 
 - Slimmed-down DB size by optimizing `event_pairs` storage. This allows storing
