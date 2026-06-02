@@ -509,6 +509,29 @@ def _log_pair_timing_split(
     )
 
 
+def _log_pair_processing_report(state, analyzed_pairs, elapsed):
+    """Log a benchmark-friendly end-of-run processing report."""
+    mode = 'serial' if state['nprocs'] == 1 else 'parallel'
+    elapsed = max(elapsed, 1e-9)
+    rate = analyzed_pairs / elapsed
+    avg_fetch = state['waveform_fetch_time'] / analyzed_pairs
+    avg_cc = state['crosscorr_time'] / analyzed_pairs
+    avg_other = max(elapsed / analyzed_pairs - avg_fetch - avg_cc, 0.0)
+    logger.info(
+        'Pair processing report: '
+        f'mode={mode}, '
+        f'workers={state["nprocs"]:n}, '
+        f'analyzed_pairs={analyzed_pairs:n}, '
+        f'skipped_pairs={state["initial_processed"]:n}, '
+        f'total_pairs={state["total_pairs"]:n}, '
+        f'elapsed_s={elapsed:.3f}, '
+        f'pairs_per_s={rate:.1f}, '
+        f'avg_fetch_s={avg_fetch:.4f}, '
+        f'avg_cc_s={avg_cc:.4f}, '
+        f'avg_other_s={avg_other:.4f}'
+    )
+
+
 def _log_cache_stats(waveform_pair):
     """Log waveform cache hit-rate statistics."""
     stats = waveform_pair.get_cache_stats()
@@ -750,6 +773,7 @@ def _finalize_pair_processing(
         state['waveform_fetch_time'],
         state['crosscorr_time'],
     )
+    _log_pair_processing_report(state, npairs, total_elapsed)
     _log_cache_stats(waveform_pair)
 
 

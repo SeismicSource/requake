@@ -22,6 +22,7 @@ from requake.config.parse_arguments import parse_arguments
 from requake.scan.scan_catalog import (
     _get_slurm_context,
     _load_existing_pair_ids,
+    _log_pair_processing_report,
     _max_pending_futures,
     _process_pairs,
     _process_valid_pair_indices,
@@ -366,6 +367,32 @@ class TestScanCatalogResume(unittest.TestCase):
             messages,
             ['worker warning one', 'worker failure detail'],
         )
+
+    def test_pair_processing_report_contains_benchmark_fields(self):
+        """End report should include stable metrics for comparisons."""
+        state = {
+            'nprocs': 7,
+            'initial_processed': 10,
+            'total_pairs': 110,
+            'waveform_fetch_time': 12.0,
+            'crosscorr_time': 8.0,
+        }
+        with patch.object(SCAN_CATALOG_MODULE.logger, 'info') as info_log:
+            _log_pair_processing_report(
+                state,
+                analyzed_pairs=100,
+                elapsed=40.0,
+            )
+        self.assertEqual(info_log.call_count, 1)
+        message = info_log.call_args.args[0]
+        self.assertIn('Pair processing report:', message)
+        self.assertIn('mode=parallel', message)
+        self.assertIn('workers=7', message)
+        self.assertIn('analyzed_pairs=100', message)
+        self.assertIn('skipped_pairs=10', message)
+        self.assertIn('total_pairs=110', message)
+        self.assertIn('elapsed_s=40.000', message)
+        self.assertIn('pairs_per_s=2.5', message)
 
 
 if __name__ == '__main__':
