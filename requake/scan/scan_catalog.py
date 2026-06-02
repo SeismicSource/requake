@@ -10,6 +10,7 @@ Catalog-based repeater scan for Requake.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import sys
+import os
 import math
 import time
 import logging
@@ -33,6 +34,100 @@ from ..waveforms import (
 )
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 EARTH_RADIUS_KM = 6371.0088
+SLURM_CONTEXT_KEYS = (
+    'SLURM_JOB_ID',
+    'SLURM_JOB_NAME',
+    'SLURM_CLUSTER_NAME',
+    'SLURM_CPUS_PER_TASK',
+    'SLURM_NTASKS',
+    'SLURM_PROCID',
+    'SLURM_NODELIST',
+    'SLURM_MEM_PER_CPU',
+    'SLURM_MEM_PER_NODE',
+)
+SLURM_PROGRESS_KEYS = (
+    'SLURM_JOB_ID',
+    'SLURM_PROCID',
+    'SLURM_NODELIST',
+)
+
+
+def _get_slurm_context():
+    """Return current Slurm environment variables that are set."""
+    context = {}
+    for key in SLURM_CONTEXT_KEYS:
+        value = os.environ.get(key)
+        if value:
+            context[key] = value
+    return context
+
+
+def _log_slurm_runtime_context(slurm_context):
+    """Log Slurm runtime details when available."""
+    if not slurm_context:
+        return
+    details = ', '.join(
+        f'{key}={slurm_context[key]}'
+        for key in SLURM_CONTEXT_KEYS
+        if key in slurm_context
+    )
+    logger.info(f'Slurm runtime context: {details}')
+
+
+def _slurm_progress_suffix(slurm_context):
+    """Build compact Slurm suffix for periodic progress logs."""
+    if not slurm_context:
+        return ''
+    details = ', '.join(
+        f'{key}={slurm_context[key]}'
+        for key in SLURM_PROGRESS_KEYS
+        if key in slurm_context
+    )
+    return f', {details}' if details else ''
+
+
+def _available_cpu_count():
+    """Return available CPU count, preferring affinity when supported."""
+    if hasattr(os, 'sched_getaffinity'):
+        try:
+            return len(os.sched_getaffinity(0))
+        except OSError:
+            pass
+    return os.cpu_count() or 1
+
+
+def _resolve_scan_catalog_nprocs(npairs, slurm_context):
+    """Resolve effective worker count for scan_catalog."""
+    cli_nprocs = getattr(config.args, 'nprocs', None)
+    config_nprocs = getattr(config, 'catalog_scan_nprocs', 0)
+    requested = cli_nprocs if cli_nprocs is not None else config_nprocs
+    if requested < 0:
+        logger.error('catalog_scan_nprocs must be >= 0')
+        rq_exit(1)
+    if requested == 0:
+        slurm_cpus = slurm_context.get('SLURM_CPUS_PER_TASK')
+        if slurm_cpus is not None:
+            try:
+                base_nprocs = int(slurm_cpus)
+            except ValueError:
+                logger.warning(
+                    'Invalid SLURM_CPUS_PER_TASK value '
+                    f'{slurm_cpus!r}; using host CPU count instead'
+                )
+                base_nprocs = _available_cpu_count()
+        else:
+            base_nprocs = _available_cpu_count()
+            if base_nprocs > 1:
+                base_nprocs -= 1
+    else:
+        base_nprocs = requested
+    max_workers = max(1, npairs)
+    effective_nprocs = min(max(1, base_nprocs), max_workers)
+    logger.info(
+        'scan_catalog workers: '
+        f'requested={requested:n}, effective={effective_nprocs:n}'
+    )
+    return effective_nprocs
 
 
 def _build_spatial_index(catalog):
@@ -193,14 +288,18 @@ def _log_noninteractive_progress(
     window_pair_count,
     window_fetch_time,
     window_crosscorr_time,
-    waveform_pair
+    waveform_pair,
+    nprocs,
+    slurm_context,
 ):
     """Log non-interactive progress periodically and return next log time."""
     if time.monotonic() < next_log_time:
         return next_log_time
+    slurm_suffix = _slurm_progress_suffix(slurm_context)
     logger.info(
         'Processing pairs: '
-        f'{_progress_summary(processed, npairs, window_start_time)}'
+        f'{_progress_summary(processed, npairs, window_start_time)} '
+        f'[workers={nprocs:n}{slurm_suffix}]'
     )
     _log_pair_timing_split(
         window_pair_count,
@@ -249,6 +348,8 @@ def _init_pair_processing_state(npairs, initial_processed, total_pairs):
         'window_crosscorr_time': 0.0,
         'initial_processed': initial_processed,
         'total_pairs': total_pairs,
+        'nprocs': 1,
+        'slurm_context': {},
     }
 
 
@@ -264,6 +365,8 @@ def _init_progress_bar(state):
         desc=f'Processing {state["total_pairs"]:n} event pairs',
         initial=state['initial_processed'],
     )
+    mode = 'serial' if state['nprocs'] == 1 else 'parallel'
+    pbar.set_postfix_str(f'workers={state["nprocs"]:n} mode={mode}')
     return show_pbar, pbar
 
 
@@ -286,6 +389,8 @@ def _update_noninteractive_progress(
         state['window_fetch_time'],
         state['window_crosscorr_time'],
         waveform_pair,
+        state['nprocs'],
+        state['slurm_context'],
     )
     state['window_start_time'] = time.monotonic()
     state['window_pair_count'] = 0
@@ -399,6 +504,8 @@ def _process_valid_pair_indices(
     npairs,
     initial_processed=0,
     total_pairs=None,
+    nprocs=1,
+    slurm_context=None,
 ):
     """Process valid pairs from index pairs."""
     logger.info('Computing waveform cross-correlation...')
@@ -406,6 +513,8 @@ def _process_valid_pair_indices(
     batch_of_pairs = []
     analyzed_pairs = 0
     state = _init_pair_processing_state(npairs, initial_processed, total_pairs)
+    state['nprocs'] = nprocs
+    state['slurm_context'] = slurm_context or {}
     show_pbar, pbar = _init_progress_bar(state)
     for processed, (idx1, idx2) in enumerate(valid_pair_idx, start=1):
         _update_noninteractive_progress(
@@ -543,7 +652,7 @@ def _ask_existing_pairs_action(npairs_in_db):
         print('Invalid choice. Please type o, c, or a.')
 
 
-def _process_pairs(catalog, continue_scan=False):
+def _process_pairs(catalog, continue_scan=False, slurm_context=None):
     """Process event pairs."""
     if not continue_scan:
         write_pair_records([], append=False)
@@ -586,6 +695,7 @@ def _process_pairs(catalog, continue_scan=False):
         )
     npairs = len(valid_pair_idx)
     total_valid_pairs = skipped_npairs + npairs
+    nprocs = _resolve_scan_catalog_nprocs(npairs, slurm_context or {})
     ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
     logger.info(f'Initial pairs: {initial_npairs:n}')
     logger.info(f'Candidate pairs: {candidate_npairs:n}')
@@ -602,6 +712,8 @@ def _process_pairs(catalog, continue_scan=False):
         npairs,
         initial_processed=skipped_npairs,
         total_pairs=total_valid_pairs,
+        nprocs=nprocs,
+        slurm_context=slurm_context,
     )
     if continue_scan:
         logger.info(
@@ -613,6 +725,8 @@ def _process_pairs(catalog, continue_scan=False):
 
 def scan_catalog():
     """Perform cross-correlation on catalog events."""
+    slurm_context = _get_slurm_context()
+    _log_slurm_runtime_context(slurm_context)
     try:
         catalog = read_stored_catalog()
     except (ValueError, FileNotFoundError) as msg:
@@ -640,6 +754,10 @@ def scan_catalog():
             logger.info('Scan aborted by user')
             rq_exit(0)
         continue_scan = action == 'continue'
-    npairs = _process_pairs(catalog, continue_scan=continue_scan)
+    npairs = _process_pairs(
+        catalog,
+        continue_scan=continue_scan,
+        slurm_context=slurm_context,
+    )
     logger.info(f'Processed {npairs:n} event pairs')
     logger.info(f'Done! Output written to {get_db_path()}')

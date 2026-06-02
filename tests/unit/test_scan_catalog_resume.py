@@ -13,13 +13,17 @@ Unit tests for scan_catalog restart/continue controls.
 import sys
 import unittest
 import importlib
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 import numpy as np
 
 from requake.config.parse_arguments import parse_arguments
 from requake.scan.scan_catalog import (
+    _get_slurm_context,
     _load_existing_pair_ids,
     _process_valid_pair_indices,
+    _resolve_scan_catalog_nprocs,
+    _slurm_progress_suffix,
 )
 
 SCAN_CATALOG_MODULE = importlib.import_module('requake.scan.scan_catalog')
@@ -60,6 +64,22 @@ class TestScanCatalogResume(unittest.TestCase):
             '--force',
             '--force-continue',
         ]
+        with patch.object(sys, 'argv', argv):
+            with self.assertRaises(SystemExit) as exc:
+                parse_arguments('requake')
+        self.assertEqual(exc.exception.code, 2)
+
+    def test_scan_catalog_nprocs_flag(self):
+        """--nprocs should be accepted for scan_catalog."""
+        argv = ['requake', 'scan_catalog', '--nprocs', '4']
+        with patch.object(sys, 'argv', argv):
+            args = parse_arguments('requake')
+        self.assertEqual(args.action, 'scan_catalog')
+        self.assertEqual(args.nprocs, 4)
+
+    def test_scan_catalog_nprocs_invalid(self):
+        """--nprocs must be a non-negative integer."""
+        argv = ['requake', 'scan_catalog', '--nprocs', '-1']
         with patch.object(sys, 'argv', argv):
             with self.assertRaises(SystemExit) as exc:
                 parse_arguments('requake')
@@ -146,6 +166,65 @@ class TestScanCatalogResume(unittest.TestCase):
         kwargs = tqdm_mock.call_args.kwargs
         self.assertEqual(kwargs['total'], 40)
         self.assertEqual(kwargs['initial'], 12)
+
+    def test_resolve_nprocs_prefers_cli(self):
+        """CLI nprocs should override config value."""
+        dummy_config = SimpleNamespace(
+            args=SimpleNamespace(nprocs=3),
+            catalog_scan_nprocs=9,
+        )
+        with patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config):
+            resolved = _resolve_scan_catalog_nprocs(100, {})
+        self.assertEqual(resolved, 3)
+
+    def test_resolve_nprocs_auto_slurm(self):
+        """Auto nprocs should use Slurm cpus per task."""
+        dummy_config = SimpleNamespace(
+            args=SimpleNamespace(nprocs=None),
+            catalog_scan_nprocs=0,
+        )
+        slurm_context = {'SLURM_CPUS_PER_TASK': '8'}
+        with patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config):
+            resolved = _resolve_scan_catalog_nprocs(100, slurm_context)
+        self.assertEqual(resolved, 8)
+
+    def test_resolve_nprocs_clamps_to_pair_count(self):
+        """Resolved workers should be clamped to pair count."""
+        dummy_config = SimpleNamespace(
+            args=SimpleNamespace(nprocs=32),
+            catalog_scan_nprocs=0,
+        )
+        with patch.object(SCAN_CATALOG_MODULE, 'config', dummy_config):
+            resolved = _resolve_scan_catalog_nprocs(5, {})
+        self.assertEqual(resolved, 5)
+
+    def test_get_slurm_context_returns_only_set_values(self):
+        """Slurm context should include only environment variables set."""
+        env = {
+            'SLURM_JOB_ID': '1234',
+            'SLURM_CPUS_PER_TASK': '12',
+            'SLURM_NODELIST': 'node001',
+        }
+        with patch.dict(SCAN_CATALOG_MODULE.os.environ, env, clear=True):
+            context = _get_slurm_context()
+        self.assertEqual(context['SLURM_JOB_ID'], '1234')
+        self.assertEqual(context['SLURM_CPUS_PER_TASK'], '12')
+        self.assertEqual(context['SLURM_NODELIST'], 'node001')
+        self.assertNotIn('SLURM_JOB_NAME', context)
+
+    def test_slurm_progress_suffix(self):
+        """Progress suffix should include compact Slurm metadata."""
+        context = {
+            'SLURM_JOB_ID': '77',
+            'SLURM_PROCID': '2',
+            'SLURM_NODELIST': 'nodeA',
+            'SLURM_CPUS_PER_TASK': '16',
+        }
+        suffix = _slurm_progress_suffix(context)
+        self.assertIn('SLURM_JOB_ID=77', suffix)
+        self.assertIn('SLURM_PROCID=2', suffix)
+        self.assertIn('SLURM_NODELIST=nodeA', suffix)
+        self.assertNotIn('SLURM_CPUS_PER_TASK', suffix)
 
 
 if __name__ == '__main__':

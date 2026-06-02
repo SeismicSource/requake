@@ -49,6 +49,21 @@ class SubcommandHelpFormatter(argparse.RawDescriptionHelpFormatter):
         return parts
 
 
+def _nonnegative_int(value):
+    """Argparse type for integers >= 0."""
+    try:
+        int_value = int(value)
+    except ValueError as err:
+        raise argparse.ArgumentTypeError(
+            f'invalid non-negative integer value: {value}'
+        ) from err
+    if int_value < 0:
+        raise argparse.ArgumentTypeError(
+            f'invalid non-negative integer value: {value}'
+        )
+    return int_value
+
+
 def parse_arguments(progname='requake'):
     """
     Parse command line arguments.
@@ -176,6 +191,13 @@ def parse_arguments(progname='requake'):
         '--force-continue',
         action='store_true',
         help='continue an interrupted scan and keep existing event pairs'
+    )
+    scan_catalog.add_argument(
+        '--nprocs',
+        type=_nonnegative_int,
+        default=None,
+        help='number of worker processes for scan_catalog '
+             '(0: auto, 1: disable parallelism)'
     )
     # ---
     # --- print_pairs
