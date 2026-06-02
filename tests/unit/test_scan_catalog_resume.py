@@ -21,6 +21,7 @@ from requake.config.parse_arguments import parse_arguments
 from requake.scan.scan_catalog import (
     _get_slurm_context,
     _load_existing_pair_ids,
+    _max_pending_futures,
     _process_valid_pair_indices,
     _resolve_scan_catalog_nprocs,
     _slurm_progress_suffix,
@@ -225,6 +226,35 @@ class TestScanCatalogResume(unittest.TestCase):
         self.assertIn('SLURM_PROCID=2', suffix)
         self.assertIn('SLURM_NODELIST=nodeA', suffix)
         self.assertNotIn('SLURM_CPUS_PER_TASK', suffix)
+
+    def test_max_pending_futures_is_bounded(self):
+        """Pending futures should have a deterministic lower bound."""
+        self.assertEqual(_max_pending_futures(1), 32)
+        self.assertEqual(_max_pending_futures(8), 32)
+        self.assertEqual(_max_pending_futures(20), 40)
+
+    def test_process_valid_pair_indices_uses_parallel_branch(self):
+        """nprocs>1 should route processing through parallel helper."""
+        with patch.object(
+            SCAN_CATALOG_MODULE.sys.stderr,
+            'isatty',
+            return_value=False,
+        ), patch.object(
+            SCAN_CATALOG_MODULE,
+            '_process_valid_pair_indices_parallel',
+            return_value=11,
+        ) as parallel_mock:
+            result = _process_valid_pair_indices(
+                catalog=[],
+                valid_pair_idx=np.array([[0, 0]], dtype=np.int32),
+                npairs=1,
+                initial_processed=0,
+                total_pairs=1,
+                nprocs=2,
+                slurm_context={},
+            )
+        self.assertEqual(result, 11)
+        self.assertTrue(parallel_mock.called)
 
 
 if __name__ == '__main__':

@@ -14,10 +14,16 @@ import os
 import math
 import time
 import logging
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 import numpy as np
 from tqdm import tqdm
 from scipy.spatial import cKDTree
-from ..config import config, rq_exit
+from ..config import (
+    config,
+    rq_exit,
+    to_picklable_config_dict,
+    from_picklable_config_dict,
+)
 from ..database.db import get_db_path
 from ..catalog import fix_non_locatable_events, read_stored_catalog
 from ..database.pairs import (
@@ -50,6 +56,12 @@ SLURM_PROGRESS_KEYS = (
     'SLURM_PROCID',
     'SLURM_NODELIST',
 )
+MIN_PENDING_FUTURES = 32
+MAX_PENDING_MULTIPLIER = 2
+MIN_WORKER_CACHE_SIZE = 2
+
+_WORKER_WAVEFORM_PAIR = None
+_WORKER_CATALOG = None
 
 
 def _get_slurm_context():
@@ -128,6 +140,211 @@ def _resolve_scan_catalog_nprocs(npairs, slurm_context):
         f'requested={requested:n}, effective={effective_nprocs:n}'
     )
     return effective_nprocs
+
+
+def _effective_worker_cache_size(nprocs):
+    """Return per-worker waveform cache size."""
+    global_cache_size = max(
+        int(getattr(config, 'catalog_waveform_cache_size', 5000)),
+        MIN_WORKER_CACHE_SIZE,
+    )
+    return max(MIN_WORKER_CACHE_SIZE, global_cache_size // max(nprocs, 1))
+
+
+def _connect_worker_clients():
+    """Create process-local clients for worker processes."""
+    if config.station_metadata_path is None:
+        from obspy.clients.fdsn import Client as FDSNClient
+        config.station_client = FDSNClient(config.fdsn_station_url)
+    if config.sds_data_path is not None:
+        from obspy.clients.filesystem.sds import Client as SDSClient
+        config.dataselect_client = SDSClient(config.sds_data_path)
+        return
+    if config.event_data_path is not None:
+        config.dataselect_client = None
+        return
+    from obspy.clients.fdsn import Client as FDSNClient
+    config.dataselect_client = FDSNClient(config.fdsn_dataselect_url)
+
+
+def _worker_initializer(cfg_dict, catalog, worker_cache_size):
+    """Initialize process-local worker state."""
+    global _WORKER_WAVEFORM_PAIR
+    global _WORKER_CATALOG
+
+    restored_cfg = from_picklable_config_dict(cfg_dict)
+    config.clear()
+    config.update(restored_cfg)
+    _connect_worker_clients()
+    config.catalog_waveform_cache_size = worker_cache_size
+    _WORKER_WAVEFORM_PAIR = WaveformPair()
+    _WORKER_CATALOG = catalog
+
+
+def _worker_process_pair(idx_pair):
+    """Process one pair index in a worker and return a compact payload."""
+    idx1, idx2 = idx_pair
+    pair = (_WORKER_CATALOG[idx1], _WORKER_CATALOG[idx2])
+    try:
+        pair_out, fetch_dt, crosscorr_dt = _process_pair(
+            pair,
+            _WORKER_WAVEFORM_PAIR,
+        )
+        return {
+            'status': 'ok',
+            'idx1': idx1,
+            'idx2': idx2,
+            'trace_id': pair_out.trace_id,
+            'lag_samples': pair_out.lag_samples,
+            'cc_max': pair_out.cc_max,
+            'sampling_rate_hz': pair_out.sampling_rate_hz,
+            'fetch_dt': fetch_dt,
+            'crosscorr_dt': crosscorr_dt,
+        }
+    except NoWaveformError as err:
+        return {
+            'status': 'no_waveform',
+            'idx1': idx1,
+            'idx2': idx2,
+            'trace_id': pair[0].trace_id,
+            'message': str(err),
+            'fetch_dt': 0.0,
+            'crosscorr_dt': 0.0,
+        }
+
+
+def _max_pending_futures(nprocs):
+    """Return bounded number of in-flight futures."""
+    return max(MIN_PENDING_FUTURES, MAX_PENDING_MULTIPLIER * nprocs)
+
+
+def _result_to_pair_record(catalog, result):
+    """Convert worker payload to PairRecord and timings."""
+    idx1 = result['idx1']
+    idx2 = result['idx2']
+    fetch_dt = result['fetch_dt']
+    crosscorr_dt = result['crosscorr_dt']
+    if result['status'] == 'ok':
+        pair_record = PairRecord(
+            catalog[idx1],
+            catalog[idx2],
+            result['trace_id'],
+            result['lag_samples'],
+            result['cc_max'],
+            result['sampling_rate_hz'],
+        )
+        return pair_record, fetch_dt, crosscorr_dt
+    msg = result.get('message', '')
+    if msg:
+        logger.warning(msg)
+    pair_record = PairRecord(
+        catalog[idx1],
+        catalog[idx2],
+        result['trace_id'],
+        None,
+        None,
+    )
+    return pair_record, fetch_dt, crosscorr_dt
+
+
+def _process_valid_pair_indices_parallel(
+    catalog,
+    valid_pair_idx,
+    npairs,
+    state,
+    show_pbar,
+    pbar,
+):
+    """Process valid pair indices using a bounded process pool."""
+    nprocs = state['nprocs']
+    worker_cache_size = _effective_worker_cache_size(nprocs)
+    logger.info(
+        'Using parallel pair processing: '
+        f'workers={nprocs:n}, '
+        f'worker_cache_size={worker_cache_size:n}'
+    )
+    batch_of_pairs = []
+    analyzed_pairs = 0
+    max_pending = _max_pending_futures(nprocs)
+    cfg_dict = to_picklable_config_dict(config)
+    pending = set()
+    pair_iter = iter(valid_pair_idx)
+    with ProcessPoolExecutor(
+        max_workers=nprocs,
+        initializer=_worker_initializer,
+        initargs=(cfg_dict, tuple(catalog), worker_cache_size),
+    ) as executor:
+        while len(pending) < max_pending:
+            try:
+                idx_pair = next(pair_iter)
+            except StopIteration:
+                break
+            pending.add(executor.submit(_worker_process_pair, idx_pair))
+        while pending:
+            done, pending = wait(
+                pending,
+                return_when=FIRST_COMPLETED,
+            )
+            for future in done:
+                result = future.result()
+                analyzed_pairs += 1
+                if pbar is not None:
+                    pbar.update()
+                pair_record, fetch_dt, crosscorr_dt = _result_to_pair_record(
+                    catalog,
+                    result,
+                )
+                state['waveform_fetch_time'] += fetch_dt
+                state['crosscorr_time'] += crosscorr_dt
+                state['window_pair_count'] += 1
+                state['window_fetch_time'] += fetch_dt
+                state['window_crosscorr_time'] += crosscorr_dt
+                batch_of_pairs.append(pair_record)
+                _flush_pair_batch_if_needed(batch_of_pairs)
+                _update_noninteractive_progress(
+                    state,
+                    _NullWaveformPairStats(),
+                    show_pbar,
+                    analyzed_pairs,
+                )
+                try:
+                    idx_pair = next(pair_iter)
+                except StopIteration:
+                    continue
+                pending.add(executor.submit(_worker_process_pair, idx_pair))
+    _finalize_pair_processing(
+        batch_of_pairs,
+        pbar,
+        analyzed_pairs,
+        state,
+        _NullWaveformPairStats(),
+    )
+    return analyzed_pairs
+
+
+class _NullWaveformPairStats:
+    """Null object for cache stats when using worker-local caches."""
+
+    @staticmethod
+    def get_cache_stats():
+        """Return empty cache stats used by logging helpers."""
+        return {
+            'trace_cache_hits': 0,
+            'trace_cache_misses': 0,
+            'trace_cache_hit_rate': 0.0,
+            'sorted_trace_ids_cache_hits': 0,
+            'sorted_trace_ids_cache_misses': 0,
+            'sorted_trace_ids_cache_hit_rate': 0.0,
+            'skipped_trace_hits': 0,
+            'trace_cache_evictions': 0,
+            'trace_cache_size': 0,
+            'max_trace_cache_size': 0,
+            'disk_cache_hits': 0,
+            'disk_cache_misses': 0,
+            'disk_cache_writes': 0,
+            'disk_cache_read_errors': 0,
+            'disk_cache_write_errors': 0,
+        }
 
 
 def _build_spatial_index(catalog):
@@ -509,13 +726,22 @@ def _process_valid_pair_indices(
 ):
     """Process valid pairs from index pairs."""
     logger.info('Computing waveform cross-correlation...')
-    waveform_pair = WaveformPair()
-    batch_of_pairs = []
-    analyzed_pairs = 0
     state = _init_pair_processing_state(npairs, initial_processed, total_pairs)
     state['nprocs'] = nprocs
     state['slurm_context'] = slurm_context or {}
     show_pbar, pbar = _init_progress_bar(state)
+    if nprocs > 1 and npairs > 0:
+        return _process_valid_pair_indices_parallel(
+            catalog,
+            valid_pair_idx,
+            npairs,
+            state,
+            show_pbar,
+            pbar,
+        )
+    waveform_pair = WaveformPair()
+    batch_of_pairs = []
+    analyzed_pairs = 0
     for processed, (idx1, idx2) in enumerate(valid_pair_idx, start=1):
         _update_noninteractive_progress(
             state,
