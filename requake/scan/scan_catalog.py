@@ -79,6 +79,60 @@ class _WorkerLogCaptureHandler(logging.Handler):
             self.messages.append(message)
 
 
+class _ParallelCacheStatsCollector:
+    """Collect and aggregate cache stats snapshots from workers."""
+
+    def __init__(self):
+        self._stats_by_pid = {}
+
+    def update_from_result(self, result):
+        """Store the latest cache-stats snapshot for a worker."""
+        worker_pid = result.get('worker_pid')
+        stats = result.get('worker_cache_stats')
+        if worker_pid is None or stats is None:
+            return
+        self._stats_by_pid[worker_pid] = stats
+
+    def get_cache_stats(self):
+        """Return merged cache stats across all workers."""
+        totals = {
+            'trace_cache_hits': 0,
+            'trace_cache_misses': 0,
+            'sorted_trace_ids_cache_hits': 0,
+            'sorted_trace_ids_cache_misses': 0,
+            'skipped_trace_hits': 0,
+            'trace_cache_evictions': 0,
+            'trace_cache_size': 0,
+            'max_trace_cache_size': 0,
+            'disk_cache_hits': 0,
+            'disk_cache_misses': 0,
+            'disk_cache_writes': 0,
+            'disk_cache_read_errors': 0,
+            'disk_cache_write_errors': 0,
+        }
+        for stats in self._stats_by_pid.values():
+            for key in totals:
+                totals[key] += int(stats.get(key, 0))
+        trace_lookups = (
+            totals['trace_cache_hits'] + totals['trace_cache_misses']
+        )
+        sorted_lookups = (
+            totals['sorted_trace_ids_cache_hits']
+            + totals['sorted_trace_ids_cache_misses']
+        )
+        totals['trace_cache_hit_rate'] = (
+            totals['trace_cache_hits'] / trace_lookups
+            if trace_lookups > 0
+            else 0.0
+        )
+        totals['sorted_trace_ids_cache_hit_rate'] = (
+            totals['sorted_trace_ids_cache_hits'] / sorted_lookups
+            if sorted_lookups > 0
+            else 0.0
+        )
+        return totals
+
+
 def _get_slurm_context():
     """Return current Slurm environment variables that are set."""
     context = {}
@@ -223,6 +277,7 @@ def _worker_process_pair(idx_pair):
             'status': 'ok',
             'idx1': idx1,
             'idx2': idx2,
+            'worker_pid': os.getpid(),
             'trace_id': pair_out.trace_id,
             'lag_samples': pair_out.lag_samples,
             'cc_max': pair_out.cc_max,
@@ -230,6 +285,7 @@ def _worker_process_pair(idx_pair):
             'fetch_dt': fetch_dt,
             'crosscorr_dt': crosscorr_dt,
             'worker_messages': tuple(capture_handler.messages),
+            'worker_cache_stats': _WORKER_WAVEFORM_PAIR.get_cache_stats(),
         }
     except NoWaveformError as err:
         root_logger.removeHandler(capture_handler)
@@ -237,11 +293,13 @@ def _worker_process_pair(idx_pair):
             'status': 'no_waveform',
             'idx1': idx1,
             'idx2': idx2,
+            'worker_pid': os.getpid(),
             'trace_id': pair[0].trace_id,
             'message': str(err),
             'fetch_dt': 0.0,
             'crosscorr_dt': 0.0,
             'worker_messages': tuple(capture_handler.messages),
+            'worker_cache_stats': _WORKER_WAVEFORM_PAIR.get_cache_stats(),
         }
 
 
@@ -301,6 +359,7 @@ def _process_valid_pair_indices_parallel(
         f'workers={nprocs:n}, '
         f'worker_cache_size={worker_cache_size:n}'
     )
+    cache_stats = _ParallelCacheStatsCollector()
     batch_of_pairs = []
     analyzed_pairs = 0
     max_pending = _max_pending_futures(nprocs)
@@ -325,6 +384,7 @@ def _process_valid_pair_indices_parallel(
             )
             for future in done:
                 result = future.result()
+                cache_stats.update_from_result(result)
                 analyzed_pairs += 1
                 if pbar is not None:
                     pbar.update()
@@ -341,7 +401,7 @@ def _process_valid_pair_indices_parallel(
                 _flush_pair_batch_if_needed(batch_of_pairs)
                 _update_noninteractive_progress(
                     state,
-                    _NullWaveformPairStats(),
+                    cache_stats,
                     show_pbar,
                     analyzed_pairs,
                 )
@@ -355,34 +415,9 @@ def _process_valid_pair_indices_parallel(
         pbar,
         analyzed_pairs,
         state,
-        _NullWaveformPairStats(),
+        cache_stats,
     )
     return analyzed_pairs
-
-
-class _NullWaveformPairStats:
-    """Null object for cache stats when using worker-local caches."""
-
-    @staticmethod
-    def get_cache_stats():
-        """Return empty cache stats used by logging helpers."""
-        return {
-            'trace_cache_hits': 0,
-            'trace_cache_misses': 0,
-            'trace_cache_hit_rate': 0.0,
-            'sorted_trace_ids_cache_hits': 0,
-            'sorted_trace_ids_cache_misses': 0,
-            'sorted_trace_ids_cache_hit_rate': 0.0,
-            'skipped_trace_hits': 0,
-            'trace_cache_evictions': 0,
-            'trace_cache_size': 0,
-            'max_trace_cache_size': 0,
-            'disk_cache_hits': 0,
-            'disk_cache_misses': 0,
-            'disk_cache_writes': 0,
-            'disk_cache_read_errors': 0,
-            'disk_cache_write_errors': 0,
-        }
 
 
 def _build_spatial_index(catalog):

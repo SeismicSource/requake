@@ -20,6 +20,7 @@ import numpy as np
 
 from requake.config.parse_arguments import parse_arguments
 from requake.scan.scan_catalog import (
+    _ParallelCacheStatsCollector,
     _get_slurm_context,
     _load_existing_pair_ids,
     _log_pair_processing_report,
@@ -393,6 +394,58 @@ class TestScanCatalogResume(unittest.TestCase):
         self.assertIn('total_pairs=110', message)
         self.assertIn('elapsed_s=40.000', message)
         self.assertIn('pairs_per_s=2.5', message)
+
+    def test_parallel_cache_stats_collector_aggregates_workers(self):
+        """Parallel cache collector should merge worker snapshots."""
+        collector = _ParallelCacheStatsCollector()
+        collector.update_from_result(
+            {
+                'worker_pid': 11,
+                'worker_cache_stats': {
+                    'trace_cache_hits': 10,
+                    'trace_cache_misses': 5,
+                    'sorted_trace_ids_cache_hits': 2,
+                    'sorted_trace_ids_cache_misses': 2,
+                    'skipped_trace_hits': 1,
+                    'trace_cache_evictions': 0,
+                    'trace_cache_size': 4,
+                    'max_trace_cache_size': 100,
+                    'disk_cache_hits': 7,
+                    'disk_cache_misses': 1,
+                    'disk_cache_writes': 0,
+                    'disk_cache_read_errors': 0,
+                    'disk_cache_write_errors': 0,
+                },
+            }
+        )
+        collector.update_from_result(
+            {
+                'worker_pid': 22,
+                'worker_cache_stats': {
+                    'trace_cache_hits': 30,
+                    'trace_cache_misses': 10,
+                    'sorted_trace_ids_cache_hits': 3,
+                    'sorted_trace_ids_cache_misses': 1,
+                    'skipped_trace_hits': 2,
+                    'trace_cache_evictions': 1,
+                    'trace_cache_size': 5,
+                    'max_trace_cache_size': 100,
+                    'disk_cache_hits': 10,
+                    'disk_cache_misses': 3,
+                    'disk_cache_writes': 1,
+                    'disk_cache_read_errors': 0,
+                    'disk_cache_write_errors': 0,
+                },
+            }
+        )
+        stats = collector.get_cache_stats()
+        self.assertEqual(stats['trace_cache_hits'], 40)
+        self.assertEqual(stats['trace_cache_misses'], 15)
+        self.assertEqual(stats['trace_cache_size'], 9)
+        self.assertEqual(stats['max_trace_cache_size'], 200)
+        self.assertEqual(stats['disk_cache_hits'], 17)
+        self.assertEqual(stats['disk_cache_misses'], 4)
+        self.assertAlmostEqual(stats['trace_cache_hit_rate'], 40 / 55)
 
 
 if __name__ == '__main__':
