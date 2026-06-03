@@ -68,6 +68,9 @@ def run():
     if args.action == 'wfcache_print':
         from .wfcache import wfcache_print
         wfcache_print()
+    if args.action == 'wfcache_inspect':
+        from .wfcache import wfcache_inspect
+        wfcache_inspect()
     if args.action == 'wfcache_extract':
         from .wfcache import wfcache_extract
         wfcache_extract()

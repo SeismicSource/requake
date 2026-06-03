@@ -27,11 +27,11 @@ class TestWaveformCacheCli(unittest.TestCase):
         self.assertEqual(args.action, 'wfcache_print')
 
     def test_wfcache_inspect_alias(self):
-        """Wfcache inspect should map to wfcache_print action."""
+        """Wfcache inspect should map to wfcache_inspect action."""
         argv = ['requake', 'wfcache', 'inspect', '--json']
         with patch.object(sys, 'argv', argv):
             args = parse_arguments()
-        self.assertEqual(args.action, 'wfcache_print')
+        self.assertEqual(args.action, 'wfcache_inspect')
         self.assertTrue(args.json)
 
     def test_wfcache_reset_failures_action(self):

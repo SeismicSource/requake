@@ -13,9 +13,15 @@ import json
 import logging
 from pathlib import Path
 
+from obspy import UTCDateTime
+
 from ..config import config, rq_exit
 from ..config.parse_arguments import _timespec_to_sec
-from .storage import read_waveform_cache_summary, reset_waveform_failures
+from .storage import (
+    list_waveform_cache_rows,
+    read_waveform_cache_summary,
+    reset_waveform_failures,
+)
 
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -33,12 +39,60 @@ def wfcache_extract():
     """Return a placeholder error for extraction command."""
     logger.error(
         'wfcache extract is not implemented yet. '
-        'This command will be added in a later phase.'
+        'Use "requake wfcache print" with the same filters to preview '
+        'matching rows.'
     )
     rq_exit(1)
 
 
+def _collect_row_filters():
+    """Collect common row filters shared by print and extract."""
+    event_ids = list(getattr(config.args, 'event_id', []) or [])
+    event_id_file = getattr(config.args, 'event_id_file', None)
+    if event_id_file:
+        event_ids.extend(_read_event_ids_file(event_id_file))
+
+    trace_ids = list(getattr(config.args, 'trace_id', []) or [])
+
+    start_time = None
+    start_time_str = getattr(config.args, 'start_time', None)
+    if start_time_str is not None:
+        start_time = UTCDateTime(start_time_str)
+
+    end_time = None
+    end_time_str = getattr(config.args, 'end_time', None)
+    if end_time_str is not None:
+        end_time = UTCDateTime(end_time_str)
+
+    return {
+        'event_ids': event_ids,
+        'trace_ids': trace_ids,
+        'start_time': start_time,
+        'end_time': end_time,
+        'limit': getattr(config.args, 'limit', None),
+    }
+
+
 def wfcache_print():
+    """Print cached waveform rows as file-like entries."""
+    try:
+        row_filters = _collect_row_filters()
+    except Exception as err:  # pylint: disable=broad-except
+        logger.error(err)
+        rq_exit(2)
+    rows = list_waveform_cache_rows(**row_filters)
+    if bool(getattr(config.args, 'json', False)):
+        print(json.dumps(rows, indent=2, sort_keys=True))
+        rq_exit(0)
+    if not rows:
+        print('No cached waveform rows found.')
+        rq_exit(0)
+    for row in rows:
+        print(row['entry'])
+    rq_exit(0)
+
+
+def wfcache_inspect():
     """Print waveform-cache diagnostics and summary."""
     summary = read_waveform_cache_summary(
         integrity=bool(getattr(config.args, 'integrity', False))

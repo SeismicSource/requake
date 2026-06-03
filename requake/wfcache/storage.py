@@ -466,6 +466,67 @@ def read_waveform_cache_summary(integrity=False):
     return summary
 
 
+def list_waveform_cache_rows(
+    event_ids=None,
+    trace_ids=None,
+    start_time=None,
+    end_time=None,
+    limit=None,
+):
+    """Return waveform cache rows formatted as file-like entries."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return []
+    conn = _get_cache_connection(cache_path)
+    clauses = []
+    params = []
+    if event_ids:
+        placeholders = ', '.join('?' for _ in event_ids)
+        clauses.append(f'evid IN ({placeholders})')
+        params.extend(str(event_id) for event_id in event_ids)
+    if trace_ids:
+        placeholders = ', '.join('?' for _ in trace_ids)
+        clauses.append(f'trace_id IN ({placeholders})')
+        params.extend(str(trace_id) for trace_id in trace_ids)
+    if start_time is not None:
+        clauses.append('start_time_ns >= ?')
+        params.append(_utc_to_ns(start_time))
+    if end_time is not None:
+        clauses.append('end_time_ns <= ?')
+        params.append(_utc_to_ns(end_time))
+    where_clause = f" WHERE {' AND '.join(clauses)}" if clauses else ''
+    limit_clause = '' if limit is None else ' LIMIT ?'
+    query = (
+        'SELECT evid, trace_id, start_time_ns, end_time_ns, '
+        'sampling_rate, npts '
+        f'FROM waveform_cache{where_clause} '
+        f'ORDER BY start_time_ns, evid, trace_id{limit_clause}'
+    )
+    if limit is not None:
+        params.append(int(limit))
+    rows = conn.execute(query, tuple(params)).fetchall()
+    output = []
+    for row in rows:
+        row_start_time = str(_ns_to_utc(row['start_time_ns']))
+        row_end_time = str(_ns_to_utc(row['end_time_ns']))
+        entry_name = (
+            f"{row['evid']}__{row['trace_id']}"
+            f'__{row_start_time}__{row_end_time}.mseed'
+        )
+        output.append(
+            {
+                'entry': entry_name,
+                'evid': row['evid'],
+                'trace_id': row['trace_id'],
+                'start_time': row_start_time,
+                'end_time': row_end_time,
+                'sampling_rate': float(row['sampling_rate']),
+                'npts': int(row['npts']),
+            }
+        )
+    return output
+
+
 def reset_waveform_failures(
     event_ids=None,
     older_than_s=None,

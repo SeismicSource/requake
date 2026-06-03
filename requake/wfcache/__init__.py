@@ -11,6 +11,7 @@ Waveform persistent-cache package.
 """
 from .commands import (  # noqa
     wfcache_extract,
+    wfcache_inspect,
     wfcache_prefetch,
     wfcache_print,
     wfcache_reset_failures,
@@ -18,6 +19,7 @@ from .commands import (  # noqa
 from .storage import (  # noqa
     clear_waveform_failure,
     get_waveform_cache_db_path,
+    list_waveform_cache_rows,
     read_waveform_cache_summary,
     read_waveform_from_cache,
     register_waveform_failure,

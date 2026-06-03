@@ -506,6 +506,44 @@ def parse_arguments(progname='requake'):
     wfcache_sub = wfcache.add_subparsers(dest='wfcache_action')
     wfcache_sub.required = True
 
+    wfcache_row_filters = argparse.ArgumentParser(add_help=False)
+    wfcache_row_filters.add_argument(
+        '--event-id',
+        action='append',
+        default=[],
+        help='event ID filter (repeatable)'
+    )
+    wfcache_row_filters.add_argument(
+        '--event-id-file',
+        type=str,
+        default=None,
+        help='path to text file with event IDs'
+    )
+    wfcache_row_filters.add_argument(
+        '--trace-id',
+        action='append',
+        default=[],
+        help='trace-ID filter (repeatable)'
+    )
+    wfcache_row_filters.add_argument(
+        '--start-time',
+        type=str,
+        default=None,
+        help='minimum start time (UTCDateTime-compatible string)'
+    )
+    wfcache_row_filters.add_argument(
+        '--end-time',
+        type=str,
+        default=None,
+        help='maximum end time (UTCDateTime-compatible string)'
+    )
+    wfcache_row_filters.add_argument(
+        '--limit',
+        type=_nonnegative_int,
+        default=None,
+        help='limit number of returned rows'
+    )
+
     wfcache_prefetch = wfcache_sub.add_parser(
         'prefetch',
         help='prefetch waveform windows into the persistent cache'
@@ -514,23 +552,19 @@ def parse_arguments(progname='requake'):
 
     wfcache_print = wfcache_sub.add_parser(
         'print',
-        help='print persistent waveform-cache summary'
-    )
-    wfcache_print.add_argument(
-        '--integrity',
-        action='store_true',
-        help='run PRAGMA integrity_check'
+        parents=[wfcache_row_filters],
+        help='print cached waveform rows'
     )
     wfcache_print.add_argument(
         '--json',
         action='store_true',
-        help='print summary as JSON'
+        help='print rows as JSON'
     )
     wfcache_print.set_defaults(action='wfcache_print')
 
     wfcache_inspect = wfcache_sub.add_parser(
         'inspect',
-        help='alias of wfcache print'
+        help='print persistent waveform-cache summary'
     )
     wfcache_inspect.add_argument(
         '--integrity',
@@ -542,29 +576,12 @@ def parse_arguments(progname='requake'):
         action='store_true',
         help='print summary as JSON'
     )
-    wfcache_inspect.set_defaults(action='wfcache_print')
+    wfcache_inspect.set_defaults(action='wfcache_inspect')
 
     wfcache_extract = wfcache_sub.add_parser(
         'extract',
+        parents=[wfcache_row_filters],
         help='extract cached waveforms to external files'
-    )
-    wfcache_extract.add_argument(
-        '--event-id',
-        action='append',
-        default=[],
-        help='event ID to extract (repeatable)'
-    )
-    wfcache_extract.add_argument(
-        '--event-id-file',
-        type=str,
-        default=None,
-        help='path to text file with event IDs'
-    )
-    wfcache_extract.add_argument(
-        '--trace-id',
-        type=str,
-        default=None,
-        help='optional trace-ID filter'
     )
     wfcache_extract.add_argument(
         '--format',
@@ -578,11 +595,6 @@ def parse_arguments(progname='requake'):
         type=str,
         default='.',
         help='output directory (default: %(default)s)'
-    )
-    wfcache_extract.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='show what would be extracted'
     )
     wfcache_extract.set_defaults(action='wfcache_extract')
 
