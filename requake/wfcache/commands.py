@@ -20,6 +20,7 @@ from ..config.parse_arguments import _timespec_to_sec
 from .storage import (
     list_waveform_cache_rows,
     read_waveform_cache_summary,
+    read_waveform_from_cache,
     reset_waveform_failures,
 )
 
@@ -36,13 +37,54 @@ def wfcache_prefetch():
 
 
 def wfcache_extract():
-    """Return a placeholder error for extraction command."""
-    logger.error(
-        'wfcache extract is not implemented yet. '
-        'Use "requake wfcache print" with the same filters to preview '
-        'matching rows.'
+    """Extract filtered cached waveform rows to waveform files."""
+    try:
+        row_filters = _collect_row_filters()
+    except Exception as err:  # pylint: disable=broad-except
+        logger.error(err)
+        rq_exit(2)
+
+    rows = list_waveform_cache_rows(**row_filters)
+    if not rows:
+        print('No cached waveform rows matched the requested filters.')
+        rq_exit(0)
+
+    output_dir = Path(config.args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_format = str(config.args.format).lower()
+    file_ext = '.mseed' if output_format == 'mseed' else '.sac'
+    obspy_format = 'MSEED' if output_format == 'mseed' else 'SAC'
+
+    written = 0
+    missing = 0
+    failed = 0
+    for row in rows:
+        start_time = UTCDateTime(row['start_time'])
+        end_time = UTCDateTime(row['end_time'])
+        trace = read_waveform_from_cache(
+            row['evid'],
+            row['trace_id'],
+            start_time,
+            end_time,
+        )
+        if trace is None:
+            missing += 1
+            continue
+        output_name = row['entry'].removesuffix('.mseed') + file_ext
+        output_path = output_dir / output_name
+        try:
+            trace.write(str(output_path), format=obspy_format)
+        except Exception as err:  # pylint: disable=broad-except
+            failed += 1
+            logger.error(f'Failed to write {output_path}: {err}')
+            continue
+        written += 1
+
+    print(
+        f'Extracted {written:n} cached waveforms to {output_dir} '
+        f'(missing={missing:n}, failed={failed:n}).'
     )
-    rq_exit(1)
+    rq_exit(0 if failed == 0 else 1)
 
 
 def _collect_row_filters():

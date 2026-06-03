@@ -593,7 +593,7 @@ def parse_arguments(progname='requake'):
     wfcache_extract.add_argument(
         '--output-dir',
         type=str,
-        default='.',
+        default='waveform_cache',
         help='output directory (default: %(default)s)'
     )
     wfcache_extract.set_defaults(action='wfcache_extract')
