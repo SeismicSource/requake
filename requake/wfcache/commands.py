@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 from obspy import UTCDateTime
+from obspy.geodetics import gps2dist_azimuth
 from tqdm import tqdm
 
 from ..config import config, rq_exit
@@ -180,22 +181,30 @@ def _prepare_prefetch_pending_requests(
     }
     prepared = 0
     queued = 0
-    for event in filtered_catalog:
-        traceid_coords = _resolve_prefetch_trace_coords(
-            event,
-            dependencies['get_traceid_coords'],
-            dependencies['MetadataMismatchError'],
+    traceid_coords = _resolve_prefetch_trace_coords_map(
+        filtered_catalog,
+        dependencies['get_traceid_coords'],
+        dependencies['MetadataMismatchError'],
+    )
+    for trace_id in trace_ids:
+        trace_coords = None if traceid_coords is None else traceid_coords.get(
+            trace_id
         )
-        for trace_id in trace_ids:
-            if traceid_coords is None:
+        standard_offsets = _compute_prefetch_standard_offsets(
+            filtered_catalog,
+            trace_id,
+            trace_coords,
+            dependencies['get_arrivals'],
+        )
+        for event in filtered_catalog:
+            if standard_offsets is None:
                 status = 'unavailable'
                 request = None
             else:
                 status, request = _prepare_prefetch_request(
                     event,
                     trace_id,
-                    traceid_coords,
-                    dependencies['get_arrivals'],
+                    standard_offsets,
                 )
             if status == 'pending':
                 pending_by_trace[trace_id].append(request)
@@ -219,19 +228,127 @@ def _prepare_prefetch_pending_requests(
     return pending_by_trace
 
 
-def _resolve_prefetch_trace_coords(
-    event,
+def _resolve_prefetch_trace_coords_map(
+    filtered_catalog,
     get_traceid_coords_func,
     metadata_error,
 ):
-    """Resolve all trace coordinates for one event, once."""
+    """Resolve trace coordinates once for prefetch execution."""
+    if not filtered_catalog:
+        return {}
+    reference_time = filtered_catalog[0].orig_time
     try:
-        return get_traceid_coords_func(event.orig_time)
+        return get_traceid_coords_func(reference_time)
     except metadata_error as err:
         logger.warning(
-            f'Skipping prefetch for event {event.evid}: {_safe_error(err)}'
+            'Skipping prefetch because trace metadata lookup failed: '
+            f'{_safe_error(err)}'
         )
         return None
+
+
+def _compute_prefetch_standard_offsets(
+    filtered_catalog,
+    trace_id,
+    trace_coords,
+    get_arrivals_func,
+):
+    """Compute standardized P-arrival offsets for one trace id."""
+    if trace_coords is None:
+        logger.warning(
+            'Skipping prefetch for trace '
+            f'{trace_id}: missing trace metadata'
+        )
+        return None
+    closest, farthest = _find_closest_and_farthest_events(
+        filtered_catalog,
+        trace_coords,
+    )
+    if closest is None or farthest is None:
+        logger.warning(
+            'Skipping prefetch for trace '
+            f'{trace_id}: no catalog events available'
+        )
+        return None
+    tp_closest = _compute_p_arrival_seconds(
+        closest,
+        trace_id,
+        trace_coords,
+        get_arrivals_func,
+    )
+    if tp_closest is None:
+        return None
+    if closest.evid == farthest.evid:
+        tp_farthest = tp_closest
+    else:
+        tp_farthest = _compute_p_arrival_seconds(
+            farthest,
+            trace_id,
+            trace_coords,
+            get_arrivals_func,
+        )
+        if tp_farthest is None:
+            return None
+    return {
+        'tp_closest_s': min(tp_closest, tp_farthest),
+        'tp_farthest_s': max(tp_closest, tp_farthest),
+    }
+
+
+def _find_closest_and_farthest_events(filtered_catalog, trace_coords):
+    """Return closest and farthest events by hypocentral distance."""
+    closest_event = None
+    farthest_event = None
+    min_distance = None
+    max_distance = None
+    for event in filtered_catalog:
+        distance = _hypocentral_distance_km(event, trace_coords)
+        if min_distance is None or distance < min_distance:
+            min_distance = distance
+            closest_event = event
+        if max_distance is None or distance > max_distance:
+            max_distance = distance
+            farthest_event = event
+    return closest_event, farthest_event
+
+
+def _hypocentral_distance_km(event, trace_coords):
+    """Compute hypocentral distance (km) between event and station."""
+    horizontal_m, _, _ = gps2dist_azimuth(
+        trace_coords['latitude'],
+        trace_coords['longitude'],
+        event.lat,
+        event.lon,
+    )
+    horizontal_km = horizontal_m / 1e3
+    depth_km = max(float(event.depth), 0.0)
+    return (horizontal_km ** 2 + depth_km ** 2) ** 0.5
+
+
+def _compute_p_arrival_seconds(
+    event,
+    trace_id,
+    trace_coords,
+    get_arrivals_func,
+):
+    """Compute P-arrival travel time (seconds) for one event/trace."""
+    ev_depth = max(event.depth, 0)
+    try:
+        p_arrival, _, _, _ = get_arrivals_func(
+            trace_coords['latitude'],
+            trace_coords['longitude'],
+            event.lat,
+            event.lon,
+            ev_depth,
+        )
+    except Exception as err:  # pylint: disable=broad-except
+        logger.warning(
+            'Skipping prefetch for trace '
+            f'{trace_id}: unable to compute arrival for '
+            f'event {event.evid}: {_safe_error(err)}'
+        )
+        return None
+    return float(p_arrival.time)
 
 
 def _report_prefetch_prepare_progress(
@@ -269,15 +386,13 @@ def _resolve_group_window_seconds():
 def _prepare_prefetch_request(
     event,
     trace_id,
-    traceid_coords,
-    get_arrivals_func,
+    standard_offsets,
 ):
     """Prepare one event/trace request, honoring cache and failure state."""
     request = _build_prefetch_request(
         event,
         trace_id,
-        traceid_coords,
-        get_arrivals_func,
+        standard_offsets,
     )
     if request is None:
         return 'unavailable', None
@@ -292,34 +407,16 @@ def _prepare_prefetch_request(
 def _build_prefetch_request(
     event,
     trace_id,
-    traceid_coords,
-    get_arrivals_func,
+    standard_offsets,
 ):
     """Build one prefetch request with event and waveform window."""
-    coords = traceid_coords.get(trace_id)
-    if coords is None:
-        logger.warning(
-            'Skipping prefetch for '
-            f'{event.evid}/{trace_id}: missing trace metadata'
-        )
-        return None
-    ev_depth = max(event.depth, 0)
-    try:
-        p_arrival, _, _, _ = get_arrivals_func(
-            coords['latitude'],
-            coords['longitude'],
-            event.lat,
-            event.lon,
-            ev_depth,
-        )
-    except Exception as err:  # pylint: disable=broad-except
-        logger.warning(
-            'Skipping prefetch for '
-            f'{event.evid}/{trace_id}: {_safe_error(err)}'
-        )
-        return None
-    t0 = event.orig_time + p_arrival.time - config.cc_pre_P
-    t1 = t0 + config.cc_trace_length
+    t0 = (
+        event.orig_time + standard_offsets['tp_closest_s'] - config.cc_pre_P
+    )
+    t1 = (
+        event.orig_time + standard_offsets['tp_farthest_s']
+        + config.cc_trace_length
+    )
     return {
         'event': event,
         'trace_id': trace_id,

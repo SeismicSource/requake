@@ -196,10 +196,12 @@ def read_waveform_from_cache(evid, trace_id, starttime, endtime):
     if cache_path is None or not cache_path.exists():
         return None
     key = _cache_key(evid, trace_id, starttime, endtime)
+    req_start_ns = key[2]
+    req_end_ns = key[3]
     conn = _get_cache_connection(cache_path)
     row = conn.execute(
         '''
-        SELECT data_blob
+        SELECT data_blob, start_time_ns, end_time_ns
         FROM waveform_cache
         WHERE evid = ? AND trace_id = ?
             AND start_time_ns = ? AND end_time_ns = ?
@@ -207,9 +209,37 @@ def read_waveform_from_cache(evid, trace_id, starttime, endtime):
         key,
     ).fetchone()
     if row is None:
+        row = conn.execute(
+            '''
+            SELECT data_blob, start_time_ns, end_time_ns
+            FROM waveform_cache
+            WHERE evid = ? AND trace_id = ?
+                AND start_time_ns <= ? AND end_time_ns >= ?
+            ORDER BY (end_time_ns - start_time_ns) ASC
+            LIMIT 1
+            ''',
+            (
+                key[0],
+                key[1],
+                req_start_ns,
+                req_end_ns,
+            ),
+        ).fetchone()
+    if row is None:
         return None
     st = read(io.BytesIO(row['data_blob']), format='MSEED')
-    return st[0] if st else None
+    if not st:
+        return None
+    tr = st[0]
+    if (
+        int(row['start_time_ns']) != req_start_ns
+        or int(row['end_time_ns']) != req_end_ns
+    ):
+        tr = tr.copy()
+        tr.trim(starttime=starttime, endtime=endtime)
+        if tr.stats.npts <= 0:
+            return None
+    return tr
 
 
 def write_waveform_to_cache(evid, trace_id, starttime, endtime, tr):

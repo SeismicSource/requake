@@ -237,7 +237,7 @@ class TestWaveformCachePrefetch(unittest.TestCase):
             self.assertEqual(mock_get_waveform.call_count, 1)
 
     def test_prefetch_resolves_coords_once_per_event(self):
-        """Prefetch should resolve metadata once per event for all traces."""
+        """Prefetch should resolve metadata once for the full run."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config['catalog_trace_id'] = ['IV.ATFO..HHZ']
             config['cc_pre_P'] = 1.0
@@ -281,7 +281,7 @@ class TestWaveformCachePrefetch(unittest.TestCase):
                 with self.assertRaises(SystemExit) as exit_err:
                     commands_module.wfcache_prefetch()
             self.assertEqual(exit_err.exception.code, 0)
-            self.assertEqual(mock_coords.call_count, len(catalog))
+            self.assertEqual(mock_coords.call_count, 1)
 
 
 if __name__ == '__main__':
