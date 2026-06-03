@@ -780,15 +780,7 @@ def _collect_row_filters():
 
     trace_ids = list(getattr(config.args, 'trace_id', []) or [])
 
-    start_time = None
-    start_time_str = getattr(config.args, 'start_time', None)
-    if start_time_str is not None:
-        start_time = UTCDateTime(start_time_str)
-
-    end_time = None
-    end_time_str = getattr(config.args, 'end_time', None)
-    if end_time_str is not None:
-        end_time = UTCDateTime(end_time_str)
+    start_time, end_time = _resolve_filter_time_range()
 
     return {
         'event_ids': event_ids,
@@ -797,6 +789,19 @@ def _collect_row_filters():
         'end_time': end_time,
         'limit': getattr(config.args, 'limit', None),
     }
+
+
+def _resolve_filter_time_range():
+    """Parse optional start/end time filter arguments."""
+    start_time = _optional_utcdatetime('start_time')
+    end_time = _optional_utcdatetime('end_time')
+    return start_time, end_time
+
+
+def _optional_utcdatetime(attr_name):
+    """Return UTCDateTime from config arg or None when missing."""
+    value = getattr(config.args, attr_name, None)
+    return UTCDateTime(value) if value is not None else None
 
 
 def wfcache_print():
@@ -829,21 +834,7 @@ def wfcache_inspect():
     print(f'waveform cache path: {summary["path"]}')
     print(f'cache exists: {summary["exists"]}')
     if summary['exists']:
-        size_mib = summary['file_size_bytes'] / (1024.0 * 1024.0)
-        print(f'file size: {size_mib:.3f} MiB')
-        print(f'schema version: {summary["schema_version"]}')
-        print(f'waveform rows: {summary["waveform_rows"]:n}')
-        print(
-            'time span: '
-            f'{summary["time_span_start"]} -> {summary["time_span_end"]}'
-        )
-        top_trace_ids = summary['top_trace_ids']
-        if top_trace_ids:
-            print('top trace IDs:')
-            for row in top_trace_ids:
-                print(f'  {row["trace_id"]}: {row["rows"]:n}')
-        if summary['integrity_check'] is not None:
-            print(f'integrity check: {summary["integrity_check"]}')
+        _print_wfcache_details(summary)
     print(
         'negative cache: '
         f'total={summary["failure_rows"]:n}, '
@@ -851,6 +842,25 @@ def wfcache_inspect():
         f'retry-pending={summary["failure_retry_pending_rows"]:n}'
     )
     rq_exit(0)
+
+
+def _print_wfcache_details(summary):
+    """Print waveform-cache details when the cache file exists."""
+    size_mib = summary['file_size_bytes'] / (1024.0 * 1024.0)
+    print(f'file size: {size_mib:.3f} MiB')
+    print(f'schema version: {summary["schema_version"]}')
+    print(f'waveform rows: {summary["waveform_rows"]:n}')
+    print(
+        'time span: '
+        f'{summary["time_span_start"]} -> {summary["time_span_end"]}'
+    )
+    top_trace_ids = summary['top_trace_ids']
+    if top_trace_ids:
+        print('top trace IDs:')
+        for row in top_trace_ids:
+            print(f'  {row["trace_id"]}: {row["rows"]:n}')
+    if summary['integrity_check'] is not None:
+        print(f'integrity check: {summary["integrity_check"]}')
 
 
 def _read_event_ids_file(path):
