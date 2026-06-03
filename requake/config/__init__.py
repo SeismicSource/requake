@@ -9,7 +9,7 @@ Configuration and initialization of the Requake package.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
-from .rq_setup import rq_exit  # noqa
+from .rq_setup import rq_exit, wait_for_sigint_pause  # noqa
 from .generic_printer import generic_printer  # noqa
 # The config object is created in config.py and needs to be populated
 # when using requake from command line, this is done by the configure()

@@ -10,11 +10,13 @@ Setup functions for Requake.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import contextlib
+import multiprocessing
 import sys
 import os
 import shutil
 import logging
 import signal
+import time
 import tqdm
 from .._version import get_versions
 from ..database.db import get_db_path
@@ -31,6 +33,10 @@ PYTHON_VERSION_STR = None
 NUMPY_VERSION_STR = None
 SCIPY_VERSION_STR = None
 OBSPY_VERSION_STR = None
+SIGINT_CONFIRM_WINDOW_S = 2.0
+SIGINT_PAUSE_POLL_S = 0.05
+_LAST_SIGINT_TS = None
+_SIGINT_PAUSE_UNTIL_TS = None
 
 
 def _check_library_versions():
@@ -330,8 +336,45 @@ def rq_exit(retval=0, abort=False, progname='requake'):
 
 
 def sigint_handler(_sig, _frame):
-    """Abort gracefully."""
-    rq_exit(1, abort=True)
+    """Ask for confirmation on first Ctrl+C and abort on second."""
+    global _LAST_SIGINT_TS  # pylint: disable=global-statement
+    global _SIGINT_PAUSE_UNTIL_TS  # pylint: disable=global-statement
+
+    if multiprocessing.current_process().name != 'MainProcess':
+        signal.default_int_handler(_sig, _frame)
+        return
+
+    now = time.monotonic()
+    if (
+        _LAST_SIGINT_TS is not None
+        and now - _LAST_SIGINT_TS <= SIGINT_CONFIRM_WINDOW_S
+    ):
+        rq_exit(1, abort=True)
+    _LAST_SIGINT_TS = now
+    _SIGINT_PAUSE_UNTIL_TS = now + SIGINT_CONFIRM_WINDOW_S
+    print(
+        '\nCtrl+C pressed. '
+        f'Press Ctrl+C again within {SIGINT_CONFIRM_WINDOW_S:g}s '
+        'to abort.'
+    )
 
 
-signal.signal(signal.SIGINT, sigint_handler)
+def wait_for_sigint_pause():
+    """Block while the first Ctrl+C confirmation window is active."""
+    global _SIGINT_PAUSE_UNTIL_TS  # pylint: disable=global-statement
+
+    if multiprocessing.current_process().name != 'MainProcess':
+        return
+    while _SIGINT_PAUSE_UNTIL_TS is not None:
+        if time.monotonic() >= _SIGINT_PAUSE_UNTIL_TS:
+            _SIGINT_PAUSE_UNTIL_TS = None
+            break
+        time.sleep(SIGINT_PAUSE_POLL_S)
+
+
+if multiprocessing.current_process().name == 'MainProcess':
+    signal.signal(signal.SIGINT, sigint_handler)
+else:
+    # Workers must ignore SIGINT from startup to avoid pool breakage during
+    # spawn, before the worker initializer runs.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
