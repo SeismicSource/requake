@@ -1,0 +1,502 @@
+# -*- coding: utf8 -*-
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""
+SQLite-backed waveform cache storage.
+
+:copyright:
+    2021-2026 Claudio Satriano <satriano@ipgp.fr>
+:license:
+    GNU General Public License v3.0 or later
+    (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
+"""
+import io
+import os
+import sqlite3
+from contextlib import suppress
+from pathlib import Path
+
+import numpy as np
+from obspy import Stream, UTCDateTime, read
+
+from ..config import config
+
+SCHEMA_VERSION = 1
+DEFAULT_FAILURE_MAX_RETRIES = 3
+DEFAULT_FAILURE_BACKOFF_S = 600.0
+
+_CACHE_CONN = None
+_CACHE_CONN_PATH = None
+_CACHE_CONN_PID = None
+
+
+def _utc_to_ns(value):
+    """Convert UTCDateTime to epoch nanoseconds."""
+    return int(round(float(value.timestamp) * 1e9))
+
+
+def _ns_to_utc(value):
+    """Convert epoch nanoseconds to UTCDateTime."""
+    return UTCDateTime(float(value) / 1e9)
+
+
+def get_waveform_cache_db_path():
+    """Return path to the SQLite waveform cache database file."""
+    if not bool(getattr(config, 'catalog_waveform_disk_cache_enabled', True)):
+        return None
+    args = getattr(config, 'args', None)
+    outdir = getattr(args, 'outdir', None)
+    if outdir is None:
+        return None
+    outdir_path = Path(outdir)
+    outdir_path.mkdir(parents=True, exist_ok=True)
+    return outdir_path / 'waveform_cache.sqlite'
+
+
+def _connect_cache_db(cache_path):
+    """Open a SQLite connection with conservative tuning."""
+    conn = sqlite3.connect(str(cache_path), timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA synchronous=NORMAL')
+    conn.execute('PRAGMA busy_timeout=30000')
+    _ensure_schema(conn)
+    return conn
+
+
+def _close_cached_connection():
+    """Close the process-local cached SQLite connection."""
+    global _CACHE_CONN  # pylint: disable=global-statement
+    global _CACHE_CONN_PATH  # pylint: disable=global-statement
+    global _CACHE_CONN_PID  # pylint: disable=global-statement
+
+    if _CACHE_CONN is not None:
+        _CACHE_CONN.close()
+    _CACHE_CONN = None
+    _CACHE_CONN_PATH = None
+    _CACHE_CONN_PID = None
+
+
+def _get_cache_connection(cache_path):
+    """Return process-local cached SQLite connection for cache_path."""
+    global _CACHE_CONN  # pylint: disable=global-statement
+    global _CACHE_CONN_PATH  # pylint: disable=global-statement
+    global _CACHE_CONN_PID  # pylint: disable=global-statement
+
+    current_pid = os.getpid()
+    if (
+        _CACHE_CONN is not None
+        and _CACHE_CONN_PATH == cache_path
+        and _CACHE_CONN_PID == current_pid
+    ):
+        return _CACHE_CONN
+    _close_cached_connection()
+    _CACHE_CONN = _connect_cache_db(cache_path)
+    _CACHE_CONN_PATH = cache_path
+    _CACHE_CONN_PID = current_pid
+    return _CACHE_CONN
+
+
+def _ensure_schema(conn):
+    """Create schema and validate schema version."""
+    conn.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS cache_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        '''
+    )
+    conn.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS waveform_cache (
+            evid TEXT NOT NULL,
+            trace_id TEXT NOT NULL,
+            start_time_ns INTEGER NOT NULL,
+            end_time_ns INTEGER NOT NULL,
+            sampling_rate REAL NOT NULL,
+            npts INTEGER NOT NULL,
+            data_blob BLOB NOT NULL,
+            created_at_ns INTEGER NOT NULL,
+            accessed_at_ns INTEGER NOT NULL,
+            PRIMARY KEY (evid, trace_id, start_time_ns, end_time_ns)
+        )
+        '''
+    )
+    conn.execute(
+        '''
+        CREATE INDEX IF NOT EXISTS idx_waveform_cache_trace_time
+        ON waveform_cache (trace_id, start_time_ns, end_time_ns)
+        '''
+    )
+    conn.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS waveform_failures (
+            evid TEXT NOT NULL,
+            trace_id TEXT NOT NULL,
+            start_time_ns INTEGER NOT NULL,
+            end_time_ns INTEGER NOT NULL,
+            retry_count INTEGER NOT NULL,
+            max_retries INTEGER NOT NULL,
+            last_error TEXT,
+            first_failure_ns INTEGER NOT NULL,
+            last_failure_ns INTEGER NOT NULL,
+            next_retry_after_ns INTEGER,
+            PRIMARY KEY (evid, trace_id, start_time_ns, end_time_ns)
+        )
+        '''
+    )
+    version = int(conn.execute('PRAGMA user_version').fetchone()[0])
+    if version not in (0, SCHEMA_VERSION):
+        raise RuntimeError(
+            'Unsupported waveform-cache schema version: '
+            f'{version} (expected {SCHEMA_VERSION}).'
+        )
+    if version == 0:
+        conn.execute(f'PRAGMA user_version={SCHEMA_VERSION}')
+        conn.execute(
+            '''
+            INSERT OR REPLACE INTO cache_meta (key, value)
+            VALUES ('schema_version', ?)
+            ''',
+            (str(SCHEMA_VERSION),),
+        )
+        conn.commit()
+
+
+def _cache_key(evid, trace_id, starttime, endtime):
+    """Build SQL key tuple for waveform cache tables."""
+    return (
+        str(evid),
+        str(trace_id),
+        _utc_to_ns(starttime),
+        _utc_to_ns(endtime),
+    )
+
+
+def _trace_to_mseed_blob(tr):
+    """Serialize trace to MiniSEED bytes using STEIM2 integer encoding."""
+    tr_cache = tr.copy()
+    mseed_stats = getattr(tr_cache.stats, 'mseed', None)
+    if mseed_stats is not None:
+        mseed_stats.pop('encoding', None)
+    data = np.asarray(tr_cache.data)
+    if not np.issubdtype(data.dtype, np.integer):
+        data = np.rint(data)
+    data = np.clip(data, np.iinfo(np.int32).min, np.iinfo(np.int32).max)
+    tr_cache.data = data.astype(np.int32)
+    stream = Stream([tr_cache])
+    buffer = io.BytesIO()
+    stream.write(buffer, format='MSEED', encoding='STEIM2')
+    return buffer.getvalue()
+
+
+def read_waveform_from_cache(evid, trace_id, starttime, endtime):
+    """Read a waveform from SQLite cache, returning None on miss."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return None
+    key = _cache_key(evid, trace_id, starttime, endtime)
+    conn = _get_cache_connection(cache_path)
+    row = conn.execute(
+        '''
+        SELECT data_blob
+        FROM waveform_cache
+        WHERE evid = ? AND trace_id = ?
+            AND start_time_ns = ? AND end_time_ns = ?
+        ''',
+        key,
+    ).fetchone()
+    if row is None:
+        return None
+    st = read(io.BytesIO(row['data_blob']), format='MSEED')
+    return st[0] if st else None
+
+
+def write_waveform_to_cache(evid, trace_id, starttime, endtime, tr):
+    """Write one waveform window to SQLite cache."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None:
+        return False
+    blob = _trace_to_mseed_blob(tr)
+    key = _cache_key(evid, trace_id, starttime, endtime)
+    now_ns = _utc_to_ns(UTCDateTime())
+    conn = _get_cache_connection(cache_path)
+    cursor = conn.execute(
+        '''
+        INSERT OR IGNORE INTO waveform_cache (
+            evid,
+            trace_id,
+            start_time_ns,
+            end_time_ns,
+            sampling_rate,
+            npts,
+            data_blob,
+            created_at_ns,
+            accessed_at_ns
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        (
+            *key,
+            float(tr.stats.sampling_rate),
+            int(tr.stats.npts),
+            sqlite3.Binary(blob),
+            now_ns,
+            now_ns,
+        ),
+    )
+    conn.commit()
+    return cursor.rowcount > 0
+
+
+def _failure_limits():
+    """Return configured failure cache retry limits."""
+    max_retries = int(
+        getattr(
+            config,
+            'catalog_waveform_cache_failure_max_retries',
+            DEFAULT_FAILURE_MAX_RETRIES,
+        )
+    )
+    base_backoff_s = float(
+        getattr(
+            config,
+            'catalog_waveform_cache_failure_backoff_s',
+            DEFAULT_FAILURE_BACKOFF_S,
+        )
+    )
+    return max(max_retries, 0), max(base_backoff_s, 0.0)
+
+
+def should_skip_waveform_download(evid, trace_id, starttime, endtime):
+    """Return (skip, reason) from persistent failure cache."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return False, ''
+    key = _cache_key(evid, trace_id, starttime, endtime)
+    now_ns = _utc_to_ns(UTCDateTime())
+    conn = _get_cache_connection(cache_path)
+    row = conn.execute(
+        '''
+        SELECT retry_count, max_retries, next_retry_after_ns, last_error
+        FROM waveform_failures
+        WHERE evid = ? AND trace_id = ?
+            AND start_time_ns = ? AND end_time_ns = ?
+        ''',
+        key,
+    ).fetchone()
+    if row is None:
+        return False, ''
+    retry_count = int(row['retry_count'])
+    max_retries = int(row['max_retries'])
+    next_retry_after_ns = row['next_retry_after_ns']
+    if retry_count >= max_retries:
+        return True, f'retry limit reached ({retry_count}/{max_retries})'
+    if next_retry_after_ns is not None and now_ns < int(next_retry_after_ns):
+        last_error = row['last_error'] or ''
+        retry_after = _ns_to_utc(next_retry_after_ns)
+        return (
+            True,
+            f'next retry after {retry_after} '
+            f'(last error: {last_error})',
+        )
+    return False, ''
+
+
+def register_waveform_failure(evid, trace_id, starttime, endtime, error):
+    """Persist one waveform download failure with backoff."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None:
+        return
+    key = _cache_key(evid, trace_id, starttime, endtime)
+    max_retries, backoff_base_s = _failure_limits()
+    now_ns = _utc_to_ns(UTCDateTime())
+    conn = _get_cache_connection(cache_path)
+    row = conn.execute(
+        '''
+        SELECT retry_count, first_failure_ns
+        FROM waveform_failures
+        WHERE evid = ? AND trace_id = ?
+            AND start_time_ns = ? AND end_time_ns = ?
+        ''',
+        key,
+    ).fetchone()
+    retry_count = 1 if row is None else int(row['retry_count']) + 1
+    first_failure_ns = (
+        now_ns if row is None else int(row['first_failure_ns'])
+    )
+    delay_s = backoff_base_s * (2 ** max(retry_count - 1, 0))
+    next_retry_after_ns = now_ns + int(delay_s * 1e9)
+    conn.execute(
+        '''
+        INSERT INTO waveform_failures (
+            evid,
+            trace_id,
+            start_time_ns,
+            end_time_ns,
+            retry_count,
+            max_retries,
+            last_error,
+            first_failure_ns,
+            last_failure_ns,
+            next_retry_after_ns
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(evid, trace_id, start_time_ns, end_time_ns)
+        DO UPDATE SET
+            retry_count = excluded.retry_count,
+            max_retries = excluded.max_retries,
+            last_error = excluded.last_error,
+            last_failure_ns = excluded.last_failure_ns,
+            next_retry_after_ns = excluded.next_retry_after_ns
+        ''',
+        (
+            *key,
+            retry_count,
+            max_retries,
+            str(error),
+            first_failure_ns,
+            now_ns,
+            next_retry_after_ns,
+        ),
+    )
+    conn.commit()
+
+
+def clear_waveform_failure(evid, trace_id, starttime, endtime):
+    """Remove waveform failure state for one cache key."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return
+    key = _cache_key(evid, trace_id, starttime, endtime)
+    conn = _get_cache_connection(cache_path)
+    conn.execute(
+        '''
+        DELETE FROM waveform_failures
+        WHERE evid = ? AND trace_id = ?
+            AND start_time_ns = ? AND end_time_ns = ?
+        ''',
+        key,
+    )
+    conn.commit()
+
+
+def read_waveform_cache_summary(integrity=False):
+    """Return summary dict for waveform cache diagnostics."""
+    cache_path = get_waveform_cache_db_path()
+    summary = {
+        'path': str(cache_path) if cache_path is not None else None,
+        'exists': False,
+        'file_size_bytes': 0,
+        'schema_version': None,
+        'waveform_rows': 0,
+        'time_span_start': None,
+        'time_span_end': None,
+        'top_trace_ids': [],
+        'integrity_check': None,
+        'failure_rows': 0,
+        'failure_exhausted_rows': 0,
+        'failure_retry_pending_rows': 0,
+    }
+    if cache_path is None or not cache_path.exists():
+        return summary
+    summary['exists'] = True
+    summary['file_size_bytes'] = cache_path.stat().st_size
+    now_ns = _utc_to_ns(UTCDateTime())
+    conn = _get_cache_connection(cache_path)
+    summary['schema_version'] = int(
+        conn.execute('PRAGMA user_version').fetchone()[0]
+    )
+    row = conn.execute(
+        '''
+        SELECT
+            COUNT(*) AS nrows,
+            MIN(start_time_ns) AS min_start,
+            MAX(end_time_ns) AS max_end
+        FROM waveform_cache
+        '''
+    ).fetchone()
+    summary['waveform_rows'] = int(row['nrows'])
+    if row['min_start'] is not None:
+        summary['time_span_start'] = str(_ns_to_utc(row['min_start']))
+        summary['time_span_end'] = str(_ns_to_utc(row['max_end']))
+    top_rows = conn.execute(
+        '''
+        SELECT trace_id, COUNT(*) AS nrows
+        FROM waveform_cache
+        GROUP BY trace_id
+        ORDER BY nrows DESC
+        LIMIT 10
+        '''
+    ).fetchall()
+    summary['top_trace_ids'] = [
+        {'trace_id': r['trace_id'], 'rows': int(r['nrows'])}
+        for r in top_rows
+    ]
+    fail_row = conn.execute(
+        '''
+        SELECT
+            COUNT(*) AS nrows,
+            SUM(CASE WHEN retry_count >= max_retries THEN 1 ELSE 0 END)
+                AS exhausted,
+            SUM(
+                CASE
+                    WHEN next_retry_after_ns IS NOT NULL
+                        AND next_retry_after_ns > ?
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS pending
+        FROM waveform_failures
+        ''',
+        (now_ns,),
+    ).fetchone()
+    summary['failure_rows'] = int(fail_row['nrows'])
+    summary['failure_exhausted_rows'] = int(fail_row['exhausted'] or 0)
+    summary['failure_retry_pending_rows'] = int(
+        fail_row['pending'] or 0
+    )
+    if integrity:
+        with suppress(sqlite3.DatabaseError):
+            integrity_row = conn.execute(
+                'PRAGMA integrity_check'
+            ).fetchone()
+            if integrity_row is not None:
+                summary['integrity_check'] = str(integrity_row[0])
+    return summary
+
+
+def reset_waveform_failures(
+    event_ids=None,
+    older_than_s=None,
+    dry_run=False,
+    clear_all=False,
+):
+    """Reset failure-cache rows and return number of affected rows."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return 0
+    clauses = []
+    params = []
+    if event_ids:
+        placeholders = ', '.join('?' for _ in event_ids)
+        clauses.append(f'evid IN ({placeholders})')
+        params.extend(str(event_id) for event_id in event_ids)
+    if older_than_s is not None:
+        cutoff_ns = _utc_to_ns(UTCDateTime()) - int(older_than_s * 1e9)
+        clauses.append('last_failure_ns < ?')
+        params.append(cutoff_ns)
+    where_clause = ''
+    if clauses and not clear_all:
+        where_clause = f" WHERE {' AND '.join(clauses)}"
+    query = f'SELECT COUNT(*) FROM waveform_failures{where_clause}'
+    conn = _get_cache_connection(cache_path)
+    affected = int(conn.execute(query, tuple(params)).fetchone()[0])
+    if dry_run:
+        return affected
+    conn.execute(
+        f'DELETE FROM waveform_failures{where_clause}',
+        params,
+    )
+    conn.commit()
+    return affected

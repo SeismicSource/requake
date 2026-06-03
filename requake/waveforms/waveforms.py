@@ -11,7 +11,6 @@ Functions for fetching and processing waveforms.
 """
 import logging
 from pathlib import Path
-import re
 import numpy as np
 from obspy import read
 from obspy import Stream, UTCDateTime
@@ -20,6 +19,13 @@ from obspy.signal.cross_correlation import correlate, xcorr_max
 from obspy.clients.fdsn.header import FDSNException, FDSNNoDataException
 from scipy.stats import median_abs_deviation
 from ..config import config, rq_exit
+from ..wfcache import (
+    clear_waveform_failure,
+    read_waveform_from_cache,
+    register_waveform_failure,
+    should_skip_waveform_download,
+    write_waveform_to_cache,
+)
 from .station_metadata import get_traceid_coords, MetadataMismatchError
 from .arrivals import get_arrivals
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -62,88 +68,40 @@ def get_waveform_cache_stats():
     return dict(WAVEFORM_CACHE_STATS)
 
 
-def _get_waveform_disk_cache_dir():
-    """Return the directory used for persistent waveform cache."""
-    if not bool(getattr(config, 'catalog_waveform_disk_cache_enabled', True)):
-        return None
-    args = getattr(config, 'args', None)
-    outdir = getattr(args, 'outdir', None)
-    if outdir is None:
-        return None
-    cache_dir = Path(outdir) / 'waveform_cache'
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir
-
-
-def _get_waveform_disk_cache_path(evid, traceid, starttime, endtime):
-    """Build the on-disk cache path for an event waveform window."""
-    cache_dir = _get_waveform_disk_cache_dir()
-    if cache_dir is None:
-        return None
-    cache_parts = (
-        str(evid),
-        traceid,
-        str(starttime),
-        str(endtime),
-    )
-    cache_stem = '__'.join(
-        re.sub(r'[^A-Za-z0-9._-]+', '_', part).strip('._')
-        for part in cache_parts
-    )
-    return cache_dir / f'{cache_stem}.mseed'
-
-
 def _read_waveform_from_disk_cache(evid, traceid, starttime, endtime):
     """Read a waveform window from persistent cache when available."""
-    cache_path = _get_waveform_disk_cache_path(
-        evid, traceid, starttime, endtime
-    )
-    if cache_path is None:
-        return None
-    if not cache_path.exists():
-        _increment_waveform_cache_stat('disk_cache_misses')
-        return None
     try:
-        st = read(str(cache_path))
+        tr = read_waveform_from_cache(evid, traceid, starttime, endtime)
     except Exception as err:  # pylint: disable=broad-except
         _increment_waveform_cache_stat('disk_cache_read_errors')
         logger.warning(
-            f'Ignoring unreadable waveform cache file {cache_path}: {err}'
+            'Ignoring unreadable waveform cache row '
+            f'for {evid}/{traceid}: {err}'
         )
-        cache_path.unlink(missing_ok=True)
         return None
-    if not st:
-        _increment_waveform_cache_stat('disk_cache_read_errors')
-        cache_path.unlink(missing_ok=True)
+    if tr is None:
+        _increment_waveform_cache_stat('disk_cache_misses')
         return None
     _increment_waveform_cache_stat('disk_cache_hits')
-    return st[0]
+    return tr
 
 
 def _write_waveform_to_disk_cache(evid, traceid, starttime, endtime, tr):
     """Persist a waveform window to disk cache."""
-    cache_path = _get_waveform_disk_cache_path(
-        evid, traceid, starttime, endtime
-    )
-    if cache_path is None or cache_path.exists():
-        return False
-    tmp_path = cache_path.with_suffix('.tmp')
-    tr_cache = tr.copy()
-    mseed_stats = getattr(tr_cache.stats, 'mseed', None)
-    if mseed_stats is not None:
-        mseed_stats.pop('encoding', None)
     try:
-        tr_cache.write(str(tmp_path), format='MSEED')
-        tmp_path.replace(cache_path)
+        written = write_waveform_to_cache(
+            evid, traceid, starttime, endtime, tr
+        )
     except Exception as err:  # pylint: disable=broad-except
         _increment_waveform_cache_stat('disk_cache_write_errors')
         logger.warning(
-            f'Unable to write waveform cache file {cache_path}: {err}'
+            'Unable to write waveform cache row '
+            f'for {evid}/{traceid}: {err}'
         )
-        tmp_path.unlink(missing_ok=True)
         return False
-    _increment_waveform_cache_stat('disk_cache_writes')
-    return True
+    if written:
+        _increment_waveform_cache_stat('disk_cache_writes')
+    return written
 
 
 def get_waveform_from_client(traceid, starttime, endtime):
@@ -261,9 +219,33 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
     tr = _read_waveform_from_disk_cache(evid, traceid, t0, t1)
     if tr is not None:
         return tr
+    skip_download, skip_reason = should_skip_waveform_download(
+        evid,
+        traceid,
+        t0,
+        t1,
+    )
+    if skip_download:
+        raise NoWaveformError(
+            f'Skipping download for event {evid} and trace_id {traceid}: '
+            f'{skip_reason}'
+        )
     try:
         tr = get_waveform_from_client(traceid, t0, t1)
     except NoWaveformError as err:
+        try:
+            register_waveform_failure(
+                evid,
+                traceid,
+                t0,
+                t1,
+                _error_message(err),
+            )
+        except Exception as cache_err:  # pylint: disable=broad-except
+            logger.warning(
+                'Unable to update waveform failure cache: '
+                f'{_error_message(cache_err)}'
+            )
         msg = _error_message(err)
         raise NoWaveformError(
             f'Unable to get waveform data for event {evid} '
@@ -271,6 +253,13 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
             'Skipping event.\n'
             f'Error message: {msg}'
         ) from err
+    try:
+        clear_waveform_failure(evid, traceid, t0, t1)
+    except Exception as cache_err:  # pylint: disable=broad-except
+        logger.warning(
+            'Unable to clear waveform failure cache: '
+            f'{_error_message(cache_err)}'
+        )
     _write_waveform_to_disk_cache(evid, traceid, t0, t1, tr)
     return tr
 

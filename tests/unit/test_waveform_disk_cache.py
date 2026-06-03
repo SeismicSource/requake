@@ -11,6 +11,7 @@ Unit tests for persistent waveform disk cache.
 """
 
 import tempfile
+import sqlite3
 import unittest
 import warnings
 from argparse import Namespace
@@ -48,6 +49,8 @@ class TestWaveformDiskCache(unittest.TestCase):
         self.config_keys = (
             'args',
             'catalog_waveform_disk_cache_enabled',
+            'catalog_waveform_cache_failure_max_retries',
+            'catalog_waveform_cache_failure_backoff_s',
             'cc_pre_P',
             'cc_trace_length',
         )
@@ -90,11 +93,13 @@ class TestWaveformDiskCache(unittest.TestCase):
 
             self.assertEqual(mock_get_waveform.call_count, 1)
             np.testing.assert_allclose(first.data, second.data)
-            cache_dir = Path(tmpdir) / 'waveform_cache'
-            cache_files = list(cache_dir.glob('*.mseed'))
-            self.assertEqual(len(cache_files), 1)
-            self.assertIn('ev1', cache_files[0].stem)
-            self.assertIn('IV.ATFO..HHZ', cache_files[0].stem)
+            cache_file = Path(tmpdir) / 'waveform_cache.sqlite'
+            self.assertTrue(cache_file.exists())
+            with sqlite3.connect(cache_file) as conn:
+                rows = conn.execute(
+                    'SELECT COUNT(*) FROM waveform_cache'
+                ).fetchone()[0]
+            self.assertEqual(rows, 1)
 
             stats = waveform_module.get_waveform_cache_stats()
             self.assertEqual(stats['disk_cache_hits'], 1)
@@ -126,6 +131,32 @@ class TestWaveformDiskCache(unittest.TestCase):
             self.assertFalse(
                 any('encoding specified' in str(w.message) for w in caught)
             )
+
+    def test_failure_cache_prevents_immediate_retry(self):
+        """Repeated failures should be skipped by persistent cache state."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config['catalog_waveform_disk_cache_enabled'] = True
+            config['catalog_waveform_cache_failure_max_retries'] = 10
+            config['catalog_waveform_cache_failure_backoff_s'] = 3600.0
+            config['args'] = Namespace(outdir=tmpdir)
+            config['cc_pre_P'] = 1.0
+            config['cc_trace_length'] = 4.0
+
+            p_arrival_time = UTCDateTime('2020-01-01T00:00:05')
+            with patch.object(
+                waveform_module,
+                'get_waveform_from_client',
+                side_effect=waveform_module.NoWaveformError('no data'),
+            ) as mock_get_waveform:
+                with self.assertRaises(waveform_module.NoWaveformError):
+                    waveform_module._get_event_waveform_from_client(
+                        'ev1', 'IV.ATFO..HHZ', p_arrival_time
+                    )
+                with self.assertRaises(waveform_module.NoWaveformError):
+                    waveform_module._get_event_waveform_from_client(
+                        'ev1', 'IV.ATFO..HHZ', p_arrival_time
+                    )
+            self.assertEqual(mock_get_waveform.call_count, 1)
 
     def test_client_bad_gateway_raises_no_waveform_error(self):
         """Client HTTP 502 must be converted into NoWaveformError."""

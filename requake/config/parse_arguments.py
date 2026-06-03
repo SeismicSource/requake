@@ -498,6 +498,129 @@ def parse_arguments(progname='requake'):
              '"A" header field'
     )
     # ---
+    # --- wfcache
+    wfcache = subparser.add_parser(
+        'wfcache',
+        help='manage persistent waveform cache'
+    )
+    wfcache_sub = wfcache.add_subparsers(dest='wfcache_action')
+    wfcache_sub.required = True
+
+    wfcache_prefetch = wfcache_sub.add_parser(
+        'prefetch',
+        help='prefetch waveform windows into the persistent cache'
+    )
+    wfcache_prefetch.set_defaults(action='wfcache_prefetch')
+
+    wfcache_print = wfcache_sub.add_parser(
+        'print',
+        help='print persistent waveform-cache summary'
+    )
+    wfcache_print.add_argument(
+        '--integrity',
+        action='store_true',
+        help='run PRAGMA integrity_check'
+    )
+    wfcache_print.add_argument(
+        '--json',
+        action='store_true',
+        help='print summary as JSON'
+    )
+    wfcache_print.set_defaults(action='wfcache_print')
+
+    wfcache_inspect = wfcache_sub.add_parser(
+        'inspect',
+        help='alias of wfcache print'
+    )
+    wfcache_inspect.add_argument(
+        '--integrity',
+        action='store_true',
+        help='run PRAGMA integrity_check'
+    )
+    wfcache_inspect.add_argument(
+        '--json',
+        action='store_true',
+        help='print summary as JSON'
+    )
+    wfcache_inspect.set_defaults(action='wfcache_print')
+
+    wfcache_extract = wfcache_sub.add_parser(
+        'extract',
+        help='extract cached waveforms to external files'
+    )
+    wfcache_extract.add_argument(
+        '--event-id',
+        action='append',
+        default=[],
+        help='event ID to extract (repeatable)'
+    )
+    wfcache_extract.add_argument(
+        '--event-id-file',
+        type=str,
+        default=None,
+        help='path to text file with event IDs'
+    )
+    wfcache_extract.add_argument(
+        '--trace-id',
+        type=str,
+        default=None,
+        help='optional trace-ID filter'
+    )
+    wfcache_extract.add_argument(
+        '--format',
+        type=str,
+        choices=['mseed', 'sac'],
+        default='mseed',
+        help='output format (default: %(default)s)'
+    )
+    wfcache_extract.add_argument(
+        '--output-dir',
+        type=str,
+        default='.',
+        help='output directory (default: %(default)s)'
+    )
+    wfcache_extract.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='show what would be extracted'
+    )
+    wfcache_extract.set_defaults(action='wfcache_extract')
+
+    wfcache_reset = wfcache_sub.add_parser(
+        'reset-failures',
+        help='reset persistent waveform failure-cache rows'
+    )
+    wfcache_reset.add_argument(
+        '--event-id',
+        action='append',
+        default=[],
+        help='event ID to reset (repeatable)'
+    )
+    wfcache_reset.add_argument(
+        '--event-id-file',
+        type=str,
+        default=None,
+        help='path to text file with event IDs to reset'
+    )
+    wfcache_reset.add_argument(
+        '--all',
+        action='store_true',
+        help='reset all failure rows'
+    )
+    wfcache_reset.add_argument(
+        '--older-than',
+        type=str,
+        default=None,
+        metavar='DURATION',
+        help='reset rows older than DURATION (e.g., 6h, 7d)'
+    )
+    wfcache_reset.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='show affected rows without deleting'
+    )
+    wfcache_reset.set_defaults(action='wfcache_reset_failures')
+    # ---
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
     if args.action is None:
