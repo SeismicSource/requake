@@ -2,7 +2,7 @@
 
 Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
-## [unreleased]
+## [0.8.2] - 2026-06-03
 
 Note: you might want to run `requake update_config` to update your config file
 to the latest version.
@@ -187,7 +187,7 @@ Mostly a bugfix release with a slightly improved trace plotting.
 
 - Initial release, not yet feature complete
 
-[unreleased]: https://github.com/SeismicSource/requake/compare/v0.8.1...HEAD
+[0.8.2]: https://github.com/SeismicSource/requake/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/SeismicSource/requake/compare/v0.8...v0.8.1
 [0.8]: https://github.com/SeismicSource/requake/compare/v0.7.3...v0.8
 [0.7.3]: https://github.com/SeismicSource/requake/compare/v0.7.2...v0.7.3
