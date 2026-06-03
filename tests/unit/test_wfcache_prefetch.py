@@ -236,6 +236,53 @@ class TestWaveformCachePrefetch(unittest.TestCase):
             self.assertEqual(exit_err.exception.code, 0)
             self.assertEqual(mock_get_waveform.call_count, 1)
 
+    def test_prefetch_resolves_coords_once_per_event(self):
+        """Prefetch should resolve metadata once per event for all traces."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config['catalog_trace_id'] = ['IV.ATFO..HHZ']
+            config['cc_pre_P'] = 1.0
+            config['cc_trace_length'] = 4.0
+            config['args'] = Namespace(
+                outdir=tmpdir,
+                event_id=[],
+                event_id_file=None,
+                trace_id=['IV.ATFO..HHZ', 'IV.RM33..HHN'],
+                max_events=None,
+                batch_size=10,
+                group_window='1h',
+            )
+            catalog = [_build_event('ev1'), _build_event('ev2')]
+            with patch(
+                'requake.catalog.read_stored_catalog',
+                return_value=catalog,
+            ), patch(
+                'requake.catalog.fix_non_locatable_events',
+            ), patch(
+                'requake.waveforms.station_metadata.get_traceid_coords',
+                side_effect=_build_traceid_coords,
+            ) as mock_coords, patch(
+                'requake.waveforms.arrivals.get_arrivals',
+                side_effect=_build_arrivals,
+            ), patch(
+                'requake.waveforms.get_waveform_from_client',
+                return_value=_build_group_trace(),
+            ), patch(
+                'requake.wfcache.commands.read_waveform_from_cache',
+                return_value=None,
+            ), patch(
+                'requake.wfcache.commands.should_skip_waveform_download',
+                return_value=(False, ''),
+            ), patch(
+                'requake.wfcache.commands.write_waveform_to_cache',
+                return_value=True,
+            ), patch(
+                'requake.wfcache.commands.clear_waveform_failure',
+            ):
+                with self.assertRaises(SystemExit) as exit_err:
+                    commands_module.wfcache_prefetch()
+            self.assertEqual(exit_err.exception.code, 0)
+            self.assertEqual(mock_coords.call_count, len(catalog))
+
 
 if __name__ == '__main__':
     unittest.main()

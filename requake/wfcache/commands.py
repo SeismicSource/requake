@@ -63,17 +63,35 @@ def wfcache_prefetch():
         f'({nevents:n} events x {len(trace_ids):n} trace IDs).'
     )
     progress_ctx = _init_prefetch_progress(total_attempts)
+    pending_by_trace = _prepare_prefetch_pending_requests(
+        filtered_catalog,
+        trace_ids,
+        dependencies,
+        progress_ctx,
+        total_attempts,
+        batch_size,
+        counters,
+    )
     for trace_id in trace_ids:
-        _prefetch_trace_windows(
-            trace_id,
-            filtered_catalog,
+        groups = _group_prefetch_requests(
+            pending_by_trace[trace_id],
             group_window_s,
-            dependencies,
-            progress_ctx,
-            total_attempts,
-            batch_size,
-            counters,
         )
+        for group in groups:
+            statuses = _download_prefetch_group(
+                trace_id,
+                group,
+                dependencies['get_waveform_from_client'],
+                dependencies['NoWaveformError'],
+            )
+            for status in statuses:
+                _record_prefetch_status(
+                    progress_ctx,
+                    total_attempts,
+                    batch_size,
+                    counters,
+                    status,
+                )
 
     pbar = progress_ctx['pbar']
     if pbar is not None:
@@ -147,52 +165,95 @@ def _prepare_prefetch_scope(catalog, event_ids):
     return trace_ids, filtered_catalog
 
 
-def _prefetch_trace_windows(
-    trace_id,
+def _prepare_prefetch_pending_requests(
     filtered_catalog,
-    group_window_s,
+    trace_ids,
     dependencies,
     progress_ctx,
     total_attempts,
     batch_size,
     counters,
 ):
-    """Prefetch all windows for one trace id using grouped downloads."""
-    pending_requests = []
+    """Prepare pending grouped requests while accounting cache hits/misses."""
+    pending_by_trace = {
+        trace_id: [] for trace_id in trace_ids
+    }
+    prepared = 0
+    queued = 0
     for event in filtered_catalog:
-        status, request = _prepare_prefetch_request(
+        traceid_coords = _resolve_prefetch_trace_coords(
             event,
-            trace_id,
             dependencies['get_traceid_coords'],
-            dependencies['get_arrivals'],
             dependencies['MetadataMismatchError'],
         )
-        if status == 'pending':
-            pending_requests.append(request)
-            continue
-        _record_prefetch_status(
-            progress_ctx,
-            total_attempts,
-            batch_size,
-            counters,
-            status,
-        )
-    groups = _group_prefetch_requests(pending_requests, group_window_s)
-    for group in groups:
-        statuses = _download_prefetch_group(
-            trace_id,
-            group,
-            dependencies['get_waveform_from_client'],
-            dependencies['NoWaveformError'],
-        )
-        for status in statuses:
-            _record_prefetch_status(
+        for trace_id in trace_ids:
+            if traceid_coords is None:
+                status = 'unavailable'
+                request = None
+            else:
+                status, request = _prepare_prefetch_request(
+                    event,
+                    trace_id,
+                    traceid_coords,
+                    dependencies['get_arrivals'],
+                )
+            if status == 'pending':
+                pending_by_trace[trace_id].append(request)
+                queued += 1
+            else:
+                _record_prefetch_status(
+                    progress_ctx,
+                    total_attempts,
+                    batch_size,
+                    counters,
+                    status,
+                )
+            prepared += 1
+            _report_prefetch_prepare_progress(
                 progress_ctx,
+                prepared,
                 total_attempts,
                 batch_size,
-                counters,
-                status,
+                queued,
             )
+    return pending_by_trace
+
+
+def _resolve_prefetch_trace_coords(
+    event,
+    get_traceid_coords_func,
+    metadata_error,
+):
+    """Resolve all trace coordinates for one event, once."""
+    try:
+        return get_traceid_coords_func(event.orig_time)
+    except metadata_error as err:
+        logger.warning(
+            f'Skipping prefetch for event {event.evid}: {_safe_error(err)}'
+        )
+        return None
+
+
+def _report_prefetch_prepare_progress(
+    progress_ctx,
+    prepared,
+    total_attempts,
+    batch_size,
+    queued,
+):
+    """Report prefetch preparation progress before grouped downloads start."""
+    if prepared % batch_size != 0 and prepared != total_attempts:
+        return
+    if progress_ctx['show_pbar']:
+        progress_ctx['pbar'].set_postfix_str(
+            f'preparing={prepared:n}/{total_attempts:n} '
+            f'queued={queued:n}'
+        )
+        return
+    logger.info(
+        f'Prefetch preparation: {prepared:n}/{total_attempts:n} '
+        f'windows inspected, queued={queued:n}'
+    )
 
 
 def _resolve_group_window_seconds():
@@ -208,17 +269,15 @@ def _resolve_group_window_seconds():
 def _prepare_prefetch_request(
     event,
     trace_id,
-    get_traceid_coords_func,
+    traceid_coords,
     get_arrivals_func,
-    metadata_error,
 ):
     """Prepare one event/trace request, honoring cache and failure state."""
     request = _build_prefetch_request(
         event,
         trace_id,
-        get_traceid_coords_func,
+        traceid_coords,
         get_arrivals_func,
-        metadata_error,
     )
     if request is None:
         return 'unavailable', None
@@ -233,19 +292,10 @@ def _prepare_prefetch_request(
 def _build_prefetch_request(
     event,
     trace_id,
-    get_traceid_coords_func,
+    traceid_coords,
     get_arrivals_func,
-    metadata_error,
 ):
     """Build one prefetch request with event and waveform window."""
-    try:
-        traceid_coords = get_traceid_coords_func(event.orig_time)
-    except metadata_error as err:
-        logger.warning(
-            'Skipping prefetch for '
-            f'{event.evid}/{trace_id}: {_safe_error(err)}'
-        )
-        return None
     coords = traceid_coords.get(trace_id)
     if coords is None:
         logger.warning(
