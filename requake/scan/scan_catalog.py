@@ -12,6 +12,7 @@ Catalog-based repeater scan for Requake.
 import sys
 import time
 import logging
+from concurrent.futures.process import BrokenProcessPool
 from ..config import (
     config,
     rq_exit,
@@ -202,10 +203,18 @@ def scan_catalog():
             logger.info('Scan aborted by user')
             rq_exit(0)
         continue_scan = action == 'continue'
-    npairs = _process_pairs(
-        catalog,
-        continue_scan=continue_scan,
-        slurm_context=slurm_context,
-    )
+    try:
+        npairs = _process_pairs(
+            catalog,
+            continue_scan=continue_scan,
+            slurm_context=slurm_context,
+        )
+    except BrokenProcessPool as err:
+        logger.error(
+            'Parallel scan stopped because a worker process terminated '
+            'unexpectedly.'
+        )
+        logger.debug(f'Broken process pool details: {err}')
+        rq_exit(1, abort=True)
     logger.info(f'Processed {npairs:n} event pairs')
     logger.info(f'Done! Output written to {get_db_path()}')

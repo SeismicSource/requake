@@ -14,6 +14,7 @@ import os
 import signal
 import time
 import traceback
+from concurrent.futures.process import BrokenProcessPool
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 
 from ..config import (
@@ -21,6 +22,7 @@ from ..config import (
     from_picklable_config_dict,
     rq_exit,
     to_picklable_config_dict,
+    wait_for_sigint_pause,
 )
 from ..database.pairs import PairRecord, write_pair_records
 from ..waveforms import (
@@ -48,6 +50,18 @@ MIN_WORKER_CACHE_SIZE = 2
 
 _WORKER_WAVEFORM_PAIR = None
 _WORKER_CATALOG = None
+
+
+def _safe_exception_message(err):
+    """Return a single-line message for any exception object."""
+    try:
+        message = str(err)
+    except Exception as str_err:  # pylint: disable=broad-except
+        return (
+            f'Unable to format {type(err).__name__} message: '
+            f'{type(str_err).__name__} while converting to string.'
+        )
+    return message.replace('\n', ' ')
 
 
 class _WorkerLogCaptureHandler(logging.Handler):
@@ -220,14 +234,15 @@ def worker_process_pair(idx_pair):
     root_logger = logging.getLogger()
     capture_handler = _WorkerLogCaptureHandler()
     root_logger.addHandler(capture_handler)
-    idx1, idx2 = idx_pair
-    pair = (_WORKER_CATALOG[idx1], _WORKER_CATALOG[idx2])
+    idx1 = idx2 = None
+    pair = None
     try:
+        idx1, idx2 = idx_pair
+        pair = (_WORKER_CATALOG[idx1], _WORKER_CATALOG[idx2])
         pair_out, fetch_dt, crosscorr_dt = _process_pair(
             pair,
             _WORKER_WAVEFORM_PAIR,
         )
-        root_logger.removeHandler(capture_handler)
         return {
             'status': 'ok',
             'idx1': idx1,
@@ -248,21 +263,23 @@ def worker_process_pair(idx_pair):
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
-            'trace_id': pair[0].trace_id,
-            'message': str(err),
+            'trace_id': pair[0].trace_id if pair is not None else None,
+            'message': _safe_exception_message(err),
             'fetch_dt': 0.0,
             'crosscorr_dt': 0.0,
             'worker_messages': tuple(capture_handler.messages),
             'worker_cache_stats': _WORKER_WAVEFORM_PAIR.get_cache_stats(),
         }
-    except Exception as err:  # pylint: disable=broad-except
+    except BaseException as err:  # pylint: disable=broad-except
         return {
             'status': 'error',
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
-            'trace_id': pair[0].trace_id,
-            'message': f'{type(err).__name__}: {err}',
+            'trace_id': pair[0].trace_id if pair is not None else None,
+            'message': (
+                f'{type(err).__name__}: {_safe_exception_message(err)}'
+            ),
             'traceback': traceback.format_exc(),
             'fetch_dt': 0.0,
             'crosscorr_dt': 0.0,
@@ -421,45 +438,61 @@ def process_valid_pair_indices_parallel(
         initializer=_worker_initializer,
         initargs=(cfg_dict, tuple(catalog), worker_cache_size),
     ) as executor:
-        while len(pending) < max_pending:
-            try:
-                idx_pair = next(pair_iter)
-            except StopIteration:
-                break
-            pending.add(executor.submit(worker_process_pair, idx_pair))
-        while pending:
-            done, pending = wait(
-                pending,
-                return_when=FIRST_COMPLETED,
-            )
-            for future in done:
-                result = future.result()
-                cache_stats.update_from_result(result)
-                analyzed_pairs += 1
-                if pbar is not None:
-                    pbar.update()
-                pair_record, fetch_dt, crosscorr_dt = result_to_pair_record(
-                    catalog,
-                    result,
-                )
-                state['waveform_fetch_time'] += fetch_dt
-                state['crosscorr_time'] += crosscorr_dt
-                state['window_pair_count'] += 1
-                state['window_fetch_time'] += fetch_dt
-                state['window_crosscorr_time'] += crosscorr_dt
-                batch_of_pairs.append(pair_record)
-                _flush_pair_batch_if_needed(batch_of_pairs)
-                update_noninteractive_progress(
-                    state,
-                    cache_stats,
-                    show_pbar,
-                    analyzed_pairs,
-                )
+        try:
+            wait_for_sigint_pause()
+            while len(pending) < max_pending:
                 try:
                     idx_pair = next(pair_iter)
                 except StopIteration:
-                    continue
+                    break
                 pending.add(executor.submit(worker_process_pair, idx_pair))
+            while pending:
+                wait_for_sigint_pause()
+                done, pending = wait(
+                    pending,
+                    return_when=FIRST_COMPLETED,
+                )
+                for future in done:
+                    wait_for_sigint_pause()
+                    result = future.result()
+                    cache_stats.update_from_result(result)
+                    analyzed_pairs += 1
+                    if pbar is not None:
+                        pbar.update()
+                    pair_record, fetch_dt, crosscorr_dt = (
+                        result_to_pair_record(
+                            catalog,
+                            result,
+                        )
+                    )
+                    state['waveform_fetch_time'] += fetch_dt
+                    state['crosscorr_time'] += crosscorr_dt
+                    state['window_pair_count'] += 1
+                    state['window_fetch_time'] += fetch_dt
+                    state['window_crosscorr_time'] += crosscorr_dt
+                    batch_of_pairs.append(pair_record)
+                    _flush_pair_batch_if_needed(batch_of_pairs)
+                    update_noninteractive_progress(
+                        state,
+                        cache_stats,
+                        show_pbar,
+                        analyzed_pairs,
+                    )
+                    try:
+                        idx_pair = next(pair_iter)
+                    except StopIteration:
+                        continue
+                    pending.add(executor.submit(worker_process_pair, idx_pair))
+        except KeyboardInterrupt:
+            logger.info('Interrupted by user. Aborting parallel scan...')
+            rq_exit(1, abort=True)
+        except BrokenProcessPool as err:
+            logger.info(
+                'Process pool interrupted while spawning/running workers. '
+                'Aborting scan.'
+            )
+            logger.debug(f'Broken process pool details: {err}')
+            rq_exit(1, abort=True)
     _finalize_pair_processing(
         batch_of_pairs,
         pbar,
