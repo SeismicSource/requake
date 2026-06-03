@@ -17,13 +17,16 @@ from .commands import (  # noqa
     wfcache_reset_failures,
 )
 from .storage import (  # noqa
+    begin_cache_write_batch,
     clear_waveform_failure,
+    commit_cache_write_batch,
     get_waveform_cache_db_path,
     list_waveform_cache_rows,
     read_waveform_cache_summary,
     read_waveform_from_cache,
     register_waveform_failure,
     reset_waveform_failures,
+    run_wal_checkpoint,
     should_skip_waveform_download,
     write_waveform_to_cache,
 )

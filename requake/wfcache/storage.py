@@ -11,6 +11,7 @@ SQLite-backed waveform cache storage.
 """
 import io
 import os
+import atexit
 import sqlite3
 from contextlib import suppress
 from pathlib import Path
@@ -27,6 +28,9 @@ DEFAULT_FAILURE_BACKOFF_S = 600.0
 _CACHE_CONN = None
 _CACHE_CONN_PATH = None
 _CACHE_CONN_PID = None
+_CACHE_SCHEMA_VERIFIED = set()
+_CACHE_BATCH_ACTIVE = False
+_FAILURE_LIMITS = None
 
 
 def _utc_to_ns(value):
@@ -59,7 +63,7 @@ def _connect_cache_db(cache_path):
     conn.execute('PRAGMA journal_mode=WAL')
     conn.execute('PRAGMA synchronous=NORMAL')
     conn.execute('PRAGMA busy_timeout=30000')
-    _ensure_schema(conn)
+    _ensure_schema(conn, str(cache_path))
     return conn
 
 
@@ -74,6 +78,9 @@ def _close_cached_connection():
     _CACHE_CONN = None
     _CACHE_CONN_PATH = None
     _CACHE_CONN_PID = None
+
+
+atexit.register(_close_cached_connection)
 
 
 def _get_cache_connection(cache_path):
@@ -96,8 +103,10 @@ def _get_cache_connection(cache_path):
     return _CACHE_CONN
 
 
-def _ensure_schema(conn):
+def _ensure_schema(conn, cache_path_str):
     """Create schema and validate schema version."""
+    if cache_path_str in _CACHE_SCHEMA_VERIFIED:
+        return
     conn.execute(
         '''
         CREATE TABLE IF NOT EXISTS cache_meta (
@@ -161,6 +170,7 @@ def _ensure_schema(conn):
             (str(SCHEMA_VERSION),),
         )
         conn.commit()
+    _CACHE_SCHEMA_VERIFIED.add(cache_path_str)
 
 
 def _cache_key(evid, trace_id, starttime, endtime):
@@ -275,12 +285,52 @@ def write_waveform_to_cache(evid, trace_id, starttime, endtime, tr):
             now_ns,
         ),
     )
-    conn.commit()
+    if not _CACHE_BATCH_ACTIVE:
+        conn.commit()
     return cursor.rowcount > 0
+
+
+def begin_cache_write_batch():
+    """Start a batched-write transaction for grouped inserts."""
+    global _CACHE_BATCH_ACTIVE  # pylint: disable=global-statement
+    if _CACHE_BATCH_ACTIVE:
+        return
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None:
+        return
+    conn = _get_cache_connection(cache_path)
+    conn.execute('BEGIN IMMEDIATE')
+    _CACHE_BATCH_ACTIVE = True
+
+
+def commit_cache_write_batch():
+    """Commit and finalize a batched-write transaction."""
+    global _CACHE_BATCH_ACTIVE  # pylint: disable=global-statement
+    if not _CACHE_BATCH_ACTIVE:
+        return
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None:
+        _CACHE_BATCH_ACTIVE = False
+        return
+    conn = _get_cache_connection(cache_path)
+    conn.commit()
+    _CACHE_BATCH_ACTIVE = False
+
+
+def run_wal_checkpoint(mode='passive'):
+    """Run WAL checkpoint to keep the WAL file bounded."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return
+    conn = _get_cache_connection(cache_path)
+    conn.execute(f'PRAGMA wal_checkpoint({mode})')
 
 
 def _failure_limits():
     """Return configured failure cache retry limits."""
+    global _FAILURE_LIMITS  # pylint: disable=global-statement
+    if _FAILURE_LIMITS is not None:
+        return _FAILURE_LIMITS
     max_retries = int(
         getattr(
             config,
@@ -295,7 +345,8 @@ def _failure_limits():
             DEFAULT_FAILURE_BACKOFF_S,
         )
     )
-    return max(max_retries, 0), max(base_backoff_s, 0.0)
+    _FAILURE_LIMITS = max(max_retries, 0), max(base_backoff_s, 0.0)
+    return _FAILURE_LIMITS
 
 
 def should_skip_waveform_download(evid, trace_id, starttime, endtime):
@@ -432,7 +483,6 @@ def read_waveform_cache_summary(integrity=False):
         return summary
     summary['exists'] = True
     summary['file_size_bytes'] = cache_path.stat().st_size
-    now_ns = _utc_to_ns(UTCDateTime())
     conn = _get_cache_connection(cache_path)
     summary['schema_version'] = int(
         conn.execute('PRAGMA user_version').fetchone()[0]
@@ -463,6 +513,7 @@ def read_waveform_cache_summary(integrity=False):
         {'trace_id': r['trace_id'], 'rows': int(r['nrows'])}
         for r in top_rows
     ]
+    now_ns = _utc_to_ns(UTCDateTime())
     fail_row = conn.execute(
         '''
         SELECT

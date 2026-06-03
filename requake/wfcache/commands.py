@@ -21,12 +21,15 @@ from tqdm import tqdm
 from ..config import config, rq_exit
 from ..config.parse_arguments import _timespec_to_sec
 from .storage import (
+    begin_cache_write_batch,
     clear_waveform_failure,
+    commit_cache_write_batch,
     list_waveform_cache_rows,
     read_waveform_cache_summary,
     read_waveform_from_cache,
     register_waveform_failure,
     reset_waveform_failures,
+    run_wal_checkpoint,
     should_skip_waveform_download,
     write_waveform_to_cache,
 )
@@ -109,6 +112,7 @@ def wfcache_prefetch():
             f'(unexpected errors={counters["unexpected_errors"]:n})'
         )
     print(summary)
+    run_wal_checkpoint()
     rq_exit(0 if counters['unexpected_errors'] == 0 else 1)
 
 
@@ -528,10 +532,13 @@ def _download_prefetch_group(
         )
         _register_prefetch_group_failure(requests, err)
         return ['failed'] * len(requests)
-    return [
+    begin_cache_write_batch()
+    statuses = [
         _cut_and_cache_prefetch_request(group_trace, request)
         for request in requests
     ]
+    commit_cache_write_batch()
+    return statuses
 
 
 def _register_prefetch_group_failure(requests, error):
