@@ -4,6 +4,9 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+Note: you might want to run `requake update_config` to update your config file
+to the latest version.
+
 - Parallel processing of earthquake pairs in `scan_catalog`. On by default
   with automatic detection of the number of worker processes. This can be
   configured with the `catalog_scan_nprocs` config option.
