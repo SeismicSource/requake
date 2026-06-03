@@ -11,9 +11,12 @@ CLI commands for waveform cache management.
 """
 import json
 import logging
+import sys
+from copy import copy
 from pathlib import Path
 
 from obspy import UTCDateTime
+from tqdm import tqdm
 
 from ..config import config, rq_exit
 from ..config.parse_arguments import _timespec_to_sec
@@ -28,12 +31,188 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
 def wfcache_prefetch():
-    """Return a placeholder error for explicit prefetch command."""
-    logger.error(
-        'wfcache prefetch is not implemented yet. '
-        'This command will be added in a later phase.'
+    """Prefetch waveform windows from stored catalog into cache."""
+    from ..catalog import fix_non_locatable_events, read_stored_catalog
+    from ..waveforms import NoWaveformError, get_event_waveform
+
+    try:
+        catalog = read_stored_catalog()
+    except (ValueError, FileNotFoundError) as err:
+        logger.error(err)
+        rq_exit(1)
+    try:
+        fix_non_locatable_events(catalog)
+    except Exception as err:  # pylint: disable=broad-except
+        logger.error(err)
+        rq_exit(1)
+
+    event_ids = set(getattr(config.args, 'event_id', []) or [])
+    event_id_file = getattr(config.args, 'event_id_file', None)
+    if event_id_file:
+        event_ids.update(_read_event_ids_file(event_id_file))
+
+    trace_ids = _resolve_prefetch_trace_ids()
+    if not trace_ids:
+        logger.error('No trace IDs available for prefetch.')
+        rq_exit(1)
+
+    filtered_catalog = _filter_prefetch_catalog(catalog, event_ids)
+
+    nevents = len(filtered_catalog)
+    if nevents == 0:
+        print('No catalog events matched prefetch filters.')
+        rq_exit(0)
+
+    batch_size = max(int(getattr(config.args, 'batch_size', 500)), 1)
+    total_attempts = nevents * len(trace_ids)
+    fetched = 0
+    unavailable = 0
+    unexpected_errors = 0
+    attempted = 0
+
+    logger.info(
+        f'Prefetching {total_attempts:n} waveform windows '
+        f'({nevents:n} events x {len(trace_ids):n} trace IDs).'
     )
-    rq_exit(1)
+    progress_ctx = _init_prefetch_progress(total_attempts)
+    for event in filtered_catalog:
+        for trace_id in trace_ids:
+            attempted += 1
+            status = _prefetch_one_waveform(
+                event,
+                trace_id,
+                get_event_waveform,
+                NoWaveformError,
+            )
+            if status == 'fetched':
+                fetched += 1
+            elif status == 'unavailable':
+                unavailable += 1
+            else:
+                unavailable += 1
+                unexpected_errors += 1
+            _update_prefetch_progress(
+                progress_ctx,
+                attempted,
+                total_attempts,
+                batch_size,
+                fetched,
+                unavailable,
+                unexpected_errors,
+            )
+
+    pbar = progress_ctx['pbar']
+    if pbar is not None:
+        pbar.close()
+
+    summary = (
+        f'Prefetch complete: attempted={attempted:n}, '
+        f'fetched={fetched:n}, unavailable={unavailable:n}'
+    )
+    if unexpected_errors > 0:
+        summary += f' (unexpected errors={unexpected_errors:n})'
+    print(summary)
+    rq_exit(0 if unexpected_errors == 0 else 1)
+
+
+def _resolve_prefetch_trace_ids():
+    """Resolve trace IDs to use for prefetch."""
+    trace_ids = list(getattr(config.args, 'trace_id', []) or [])
+    return trace_ids or list(getattr(config, 'catalog_trace_id', []))
+
+
+def _init_prefetch_progress(total_attempts):
+    """Initialize progress context for prefetch command."""
+    show_pbar = sys.stderr.isatty()
+    pbar = None
+    if show_pbar:
+        pbar = tqdm(
+            total=total_attempts,
+            unit='traces',
+            unit_scale=True,
+            desc=f'Prefetching {total_attempts:n} waveform windows',
+        )
+    return {
+        'show_pbar': show_pbar,
+        'pbar': pbar,
+    }
+
+
+def _update_prefetch_progress(
+    progress_ctx,
+    attempted,
+    total_attempts,
+    batch_size,
+    fetched,
+    unavailable,
+    unexpected_errors,
+):
+    """Update prefetch progress display/logging."""
+    if progress_ctx['show_pbar']:
+        pbar = progress_ctx['pbar']
+        pbar.update(1)
+        pbar.set_postfix_str(
+            f'fetched={fetched:n} '
+            f'unavailable={unavailable:n}'
+        )
+        return
+    _log_prefetch_progress(
+        attempted,
+        total_attempts,
+        batch_size,
+        fetched,
+        unavailable,
+        unexpected_errors,
+    )
+
+
+def _filter_prefetch_catalog(catalog, event_ids):
+    """Apply event-id and max-events filters to catalog."""
+    filtered_catalog = [
+        ev for ev in catalog
+        if not event_ids or ev.evid in event_ids
+    ]
+    max_events = getattr(config.args, 'max_events', None)
+    if max_events is not None:
+        return filtered_catalog[:max_events]
+    return filtered_catalog
+
+
+def _prefetch_one_waveform(event, trace_id, fetch_func, no_waveform_error):
+    """Prefetch one waveform and return status string."""
+    event_prefetch = copy(event)
+    event_prefetch.trace_id = trace_id
+    try:
+        trace = fetch_func(event_prefetch)
+    except no_waveform_error:
+        return 'unavailable'
+    except Exception as err:  # pylint: disable=broad-except
+        logger.warning(
+            f'Unexpected prefetch error for {event.evid}/{trace_id}: {err}'
+        )
+        return 'failed'
+    return 'fetched' if trace is not None else 'unavailable'
+
+
+def _log_prefetch_progress(
+    attempted,
+    total_attempts,
+    batch_size,
+    fetched,
+    unavailable,
+    unexpected_errors,
+):
+    """Log periodic prefetch progress for non-interactive runs."""
+    if attempted % batch_size != 0 and attempted != total_attempts:
+        return
+    logger.info(
+        f'Prefetch progress: {attempted:n}/{total_attempts:n} '
+        f'(fetched={fetched:n}, unavailable={unavailable:n})'
+    )
+    if unexpected_errors > 0:
+        logger.info(
+            f'Prefetch unexpected errors so far: {unexpected_errors:n}'
+        )
 
 
 def wfcache_extract():

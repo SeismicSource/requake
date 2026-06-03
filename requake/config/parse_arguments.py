@@ -548,6 +548,36 @@ def parse_arguments(progname='requake'):
         'prefetch',
         help='prefetch waveform windows into the persistent cache'
     )
+    wfcache_prefetch.add_argument(
+        '--event-id',
+        action='append',
+        default=[],
+        help='event ID filter (repeatable)'
+    )
+    wfcache_prefetch.add_argument(
+        '--event-id-file',
+        type=str,
+        default=None,
+        help='path to text file with event IDs'
+    )
+    wfcache_prefetch.add_argument(
+        '--trace-id',
+        action='append',
+        default=[],
+        help='trace-ID filter (repeatable)'
+    )
+    wfcache_prefetch.add_argument(
+        '--max-events',
+        type=_nonnegative_int,
+        default=None,
+        help='maximum number of catalog events to prefetch'
+    )
+    wfcache_prefetch.add_argument(
+        '--batch-size',
+        type=_nonnegative_int,
+        default=500,
+        help='progress logging batch size (default: %(default)s)'
+    )
     wfcache_prefetch.set_defaults(action='wfcache_prefetch')
 
     wfcache_print = wfcache_sub.add_parser(
