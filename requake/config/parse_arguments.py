@@ -578,6 +578,14 @@ def parse_arguments(progname='requake'):
         default=500,
         help='progress logging batch size (default: %(default)s)'
     )
+    wfcache_prefetch.add_argument(
+        '--group-window',
+        type=str,
+        default='1h',
+        metavar='DURATION',
+        help='max grouped download span (e.g., 30m, 1h; default: '
+             '%(default)s)'
+    )
     wfcache_prefetch.set_defaults(action='wfcache_prefetch')
 
     wfcache_print = wfcache_sub.add_parser(

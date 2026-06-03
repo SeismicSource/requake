@@ -12,7 +12,6 @@ CLI commands for waveform cache management.
 import json
 import logging
 import sys
-from copy import copy
 from pathlib import Path
 
 from obspy import UTCDateTime
@@ -21,10 +20,14 @@ from tqdm import tqdm
 from ..config import config, rq_exit
 from ..config.parse_arguments import _timespec_to_sec
 from .storage import (
+    clear_waveform_failure,
     list_waveform_cache_rows,
     read_waveform_cache_summary,
     read_waveform_from_cache,
+    register_waveform_failure,
     reset_waveform_failures,
+    should_skip_waveform_download,
+    write_waveform_to_cache,
 )
 
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -32,31 +35,13 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 def wfcache_prefetch():
     """Prefetch waveform windows from stored catalog into cache."""
-    from ..catalog import fix_non_locatable_events, read_stored_catalog
-    from ..waveforms import NoWaveformError, get_event_waveform
-
-    try:
-        catalog = read_stored_catalog()
-    except (ValueError, FileNotFoundError) as err:
-        logger.error(err)
-        rq_exit(1)
-    try:
-        fix_non_locatable_events(catalog)
-    except Exception as err:  # pylint: disable=broad-except
-        logger.error(err)
-        rq_exit(1)
-
-    event_ids = set(getattr(config.args, 'event_id', []) or [])
-    event_id_file = getattr(config.args, 'event_id_file', None)
-    if event_id_file:
-        event_ids.update(_read_event_ids_file(event_id_file))
-
-    trace_ids = _resolve_prefetch_trace_ids()
-    if not trace_ids:
-        logger.error('No trace IDs available for prefetch.')
-        rq_exit(1)
-
-    filtered_catalog = _filter_prefetch_catalog(catalog, event_ids)
+    dependencies = _load_prefetch_dependencies()
+    catalog = _read_prefetch_catalog(
+        dependencies['read_stored_catalog'],
+        dependencies['fix_non_locatable_events'],
+    )
+    event_ids = _collect_prefetch_event_ids()
+    trace_ids, filtered_catalog = _prepare_prefetch_scope(catalog, event_ids)
 
     nevents = len(filtered_catalog)
     if nevents == 0:
@@ -64,55 +49,437 @@ def wfcache_prefetch():
         rq_exit(0)
 
     batch_size = max(int(getattr(config.args, 'batch_size', 500)), 1)
+    group_window_s = _resolve_group_window_seconds()
     total_attempts = nevents * len(trace_ids)
-    fetched = 0
-    unavailable = 0
-    unexpected_errors = 0
-    attempted = 0
+    counters = {
+        'fetched': 0,
+        'unavailable': 0,
+        'unexpected_errors': 0,
+        'attempted': 0,
+    }
 
     logger.info(
         f'Prefetching {total_attempts:n} waveform windows '
         f'({nevents:n} events x {len(trace_ids):n} trace IDs).'
     )
     progress_ctx = _init_prefetch_progress(total_attempts)
-    for event in filtered_catalog:
-        for trace_id in trace_ids:
-            attempted += 1
-            status = _prefetch_one_waveform(
-                event,
-                trace_id,
-                get_event_waveform,
-                NoWaveformError,
-            )
-            if status == 'fetched':
-                fetched += 1
-            elif status == 'unavailable':
-                unavailable += 1
-            else:
-                unavailable += 1
-                unexpected_errors += 1
-            _update_prefetch_progress(
-                progress_ctx,
-                attempted,
-                total_attempts,
-                batch_size,
-                fetched,
-                unavailable,
-                unexpected_errors,
-            )
+    for trace_id in trace_ids:
+        _prefetch_trace_windows(
+            trace_id,
+            filtered_catalog,
+            group_window_s,
+            dependencies,
+            progress_ctx,
+            total_attempts,
+            batch_size,
+            counters,
+        )
 
     pbar = progress_ctx['pbar']
     if pbar is not None:
         pbar.close()
 
     summary = (
-        f'Prefetch complete: attempted={attempted:n}, '
-        f'fetched={fetched:n}, unavailable={unavailable:n}'
+        f'Prefetch complete: attempted={counters["attempted"]:n}, '
+        f'fetched={counters["fetched"]:n}, '
+        f'unavailable={counters["unavailable"]:n}'
     )
-    if unexpected_errors > 0:
-        summary += f' (unexpected errors={unexpected_errors:n})'
+    if counters['unexpected_errors'] > 0:
+        summary += (
+            ' '
+            f'(unexpected errors={counters["unexpected_errors"]:n})'
+        )
     print(summary)
-    rq_exit(0 if unexpected_errors == 0 else 1)
+    rq_exit(0 if counters['unexpected_errors'] == 0 else 1)
+
+
+def _load_prefetch_dependencies():
+    """Load prefetch-only imports lazily to avoid circular imports."""
+    from ..catalog import fix_non_locatable_events, read_stored_catalog
+    from ..waveforms import NoWaveformError, get_waveform_from_client
+    from ..waveforms.arrivals import get_arrivals
+    from ..waveforms.station_metadata import (
+        MetadataMismatchError,
+        get_traceid_coords,
+    )
+    return {
+        'fix_non_locatable_events': fix_non_locatable_events,
+        'read_stored_catalog': read_stored_catalog,
+        'NoWaveformError': NoWaveformError,
+        'get_waveform_from_client': get_waveform_from_client,
+        'get_arrivals': get_arrivals,
+        'MetadataMismatchError': MetadataMismatchError,
+        'get_traceid_coords': get_traceid_coords,
+    }
+
+
+def _read_prefetch_catalog(read_catalog_func, fix_catalog_func):
+    """Read stored catalog and sanitize non-locatable events."""
+    try:
+        catalog = read_catalog_func()
+    except (ValueError, FileNotFoundError) as err:
+        logger.error(err)
+        rq_exit(1)
+    try:
+        fix_catalog_func(catalog)
+    except Exception as err:  # pylint: disable=broad-except
+        logger.error(err)
+        rq_exit(1)
+    return catalog
+
+
+def _collect_prefetch_event_ids():
+    """Collect event-id filters from CLI and optional file."""
+    event_ids = set(getattr(config.args, 'event_id', []) or [])
+    event_id_file = getattr(config.args, 'event_id_file', None)
+    if event_id_file:
+        event_ids.update(_read_event_ids_file(event_id_file))
+    return event_ids
+
+
+def _prepare_prefetch_scope(catalog, event_ids):
+    """Resolve trace IDs and filtered catalog for prefetch."""
+    trace_ids = _resolve_prefetch_trace_ids()
+    if not trace_ids:
+        logger.error('No trace IDs available for prefetch.')
+        rq_exit(1)
+    filtered_catalog = _filter_prefetch_catalog(catalog, event_ids)
+    return trace_ids, filtered_catalog
+
+
+def _prefetch_trace_windows(
+    trace_id,
+    filtered_catalog,
+    group_window_s,
+    dependencies,
+    progress_ctx,
+    total_attempts,
+    batch_size,
+    counters,
+):
+    """Prefetch all windows for one trace id using grouped downloads."""
+    pending_requests = []
+    for event in filtered_catalog:
+        status, request = _prepare_prefetch_request(
+            event,
+            trace_id,
+            dependencies['get_traceid_coords'],
+            dependencies['get_arrivals'],
+            dependencies['MetadataMismatchError'],
+        )
+        if status == 'pending':
+            pending_requests.append(request)
+            continue
+        _record_prefetch_status(
+            progress_ctx,
+            total_attempts,
+            batch_size,
+            counters,
+            status,
+        )
+    groups = _group_prefetch_requests(pending_requests, group_window_s)
+    for group in groups:
+        statuses = _download_prefetch_group(
+            trace_id,
+            group,
+            dependencies['get_waveform_from_client'],
+            dependencies['NoWaveformError'],
+        )
+        for status in statuses:
+            _record_prefetch_status(
+                progress_ctx,
+                total_attempts,
+                batch_size,
+                counters,
+                status,
+            )
+
+
+def _resolve_group_window_seconds():
+    """Parse grouped-download span from CLI arguments."""
+    group_window_spec = getattr(config.args, 'group_window', '1h')
+    try:
+        return max(float(_timespec_to_sec(group_window_spec)), 0.0)
+    except ValueError as err:
+        logger.error(err)
+        rq_exit(2)
+
+
+def _prepare_prefetch_request(
+    event,
+    trace_id,
+    get_traceid_coords_func,
+    get_arrivals_func,
+    metadata_error,
+):
+    """Prepare one event/trace request, honoring cache and failure state."""
+    request = _build_prefetch_request(
+        event,
+        trace_id,
+        get_traceid_coords_func,
+        get_arrivals_func,
+        metadata_error,
+    )
+    if request is None:
+        return 'unavailable', None
+    cached_trace = _read_prefetch_cache(request)
+    if cached_trace is not None:
+        return 'fetched', None
+    if _should_skip_prefetch_download(request):
+        return 'unavailable', None
+    return 'pending', request
+
+
+def _build_prefetch_request(
+    event,
+    trace_id,
+    get_traceid_coords_func,
+    get_arrivals_func,
+    metadata_error,
+):
+    """Build one prefetch request with event and waveform window."""
+    try:
+        traceid_coords = get_traceid_coords_func(event.orig_time)
+    except metadata_error as err:
+        logger.warning(
+            'Skipping prefetch for '
+            f'{event.evid}/{trace_id}: {_safe_error(err)}'
+        )
+        return None
+    coords = traceid_coords.get(trace_id)
+    if coords is None:
+        logger.warning(
+            'Skipping prefetch for '
+            f'{event.evid}/{trace_id}: missing trace metadata'
+        )
+        return None
+    ev_depth = max(event.depth, 0)
+    try:
+        p_arrival, _, _, _ = get_arrivals_func(
+            coords['latitude'],
+            coords['longitude'],
+            event.lat,
+            event.lon,
+            ev_depth,
+        )
+    except Exception as err:  # pylint: disable=broad-except
+        logger.warning(
+            'Skipping prefetch for '
+            f'{event.evid}/{trace_id}: {_safe_error(err)}'
+        )
+        return None
+    t0 = event.orig_time + p_arrival.time - config.cc_pre_P
+    t1 = t0 + config.cc_trace_length
+    return {
+        'event': event,
+        'trace_id': trace_id,
+        'start_time': t0,
+        'end_time': t1,
+    }
+
+
+def _read_prefetch_cache(request):
+    """Read one prefetch request from cache, returning None on miss."""
+    event = request['event']
+    trace_id = request['trace_id']
+    t0 = request['start_time']
+    t1 = request['end_time']
+    try:
+        return read_waveform_from_cache(event.evid, trace_id, t0, t1)
+    except Exception as err:  # pylint: disable=broad-except
+        logger.warning(
+            'Ignoring unreadable waveform cache row '
+            f'for {event.evid}/{trace_id}: {_safe_error(err)}'
+        )
+        return None
+
+
+def _should_skip_prefetch_download(request):
+    """Check negative cache before attempting a grouped download."""
+    event = request['event']
+    trace_id = request['trace_id']
+    t0 = request['start_time']
+    t1 = request['end_time']
+    try:
+        skip_download, skip_reason = should_skip_waveform_download(
+            event.evid,
+            trace_id,
+            t0,
+            t1,
+        )
+    except Exception as err:  # pylint: disable=broad-except
+        logger.warning(
+            'Unable to read waveform failure cache '
+            f'for {event.evid}/{trace_id}: {_safe_error(err)}'
+        )
+        return False
+    if skip_download:
+        logger.info(
+            f'Skipping download for {event.evid}/{trace_id}: {skip_reason}'
+        )
+    return skip_download
+
+
+def _group_prefetch_requests(requests, max_span_s):
+    """Group pending requests into larger windows for one trace ID."""
+    if not requests:
+        return []
+    sorted_requests = sorted(
+        requests,
+        key=lambda request: float(request['start_time'].timestamp),
+    )
+    groups = []
+    current_group = None
+    for request in sorted_requests:
+        if current_group is None:
+            current_group = _new_prefetch_group(request)
+            continue
+        next_end = max(current_group['end_time'], request['end_time'])
+        span_s = next_end - current_group['start_time']
+        if span_s <= max_span_s:
+            current_group['requests'].append(request)
+            current_group['end_time'] = next_end
+            continue
+        groups.append(current_group)
+        current_group = _new_prefetch_group(request)
+    groups.append(current_group)
+    return groups
+
+
+def _new_prefetch_group(request):
+    """Create one grouped-download container."""
+    return {
+        'start_time': request['start_time'],
+        'end_time': request['end_time'],
+        'requests': [request],
+    }
+
+
+def _download_prefetch_group(
+    trace_id,
+    group,
+    get_waveform_from_client_func,
+    no_waveform_error,
+):
+    """Download one grouped window and cut/cache all member requests."""
+    start_time = group['start_time']
+    end_time = group['end_time']
+    requests = group['requests']
+    try:
+        group_trace = get_waveform_from_client_func(
+            trace_id,
+            start_time,
+            end_time,
+        )
+    except no_waveform_error as err:
+        _register_prefetch_group_failure(requests, err)
+        return ['unavailable'] * len(requests)
+    except Exception as err:  # pylint: disable=broad-except
+        logger.warning(
+            'Unexpected prefetch error for grouped request '
+            f'{trace_id} {start_time} -> {end_time}: {_safe_error(err)}'
+        )
+        _register_prefetch_group_failure(requests, err)
+        return ['failed'] * len(requests)
+    return [
+        _cut_and_cache_prefetch_request(group_trace, request)
+        for request in requests
+    ]
+
+
+def _register_prefetch_group_failure(requests, error):
+    """Register one grouped download failure for each member request."""
+    error_message = _safe_error(error)
+    for request in requests:
+        event = request['event']
+        trace_id = request['trace_id']
+        t0 = request['start_time']
+        t1 = request['end_time']
+        try:
+            register_waveform_failure(
+                event.evid,
+                trace_id,
+                t0,
+                t1,
+                error_message,
+            )
+        except Exception as cache_err:  # pylint: disable=broad-except
+            logger.warning(
+                'Unable to update waveform failure cache: '
+                f'{_safe_error(cache_err)}'
+            )
+
+
+def _cut_and_cache_prefetch_request(group_trace, request):
+    """Cut one local event window from grouped trace and cache it."""
+    event = request['event']
+    trace_id = request['trace_id']
+    t0 = request['start_time']
+    t1 = request['end_time']
+    trace_cut = group_trace.copy()
+    trace_cut.trim(starttime=t0, endtime=t1)
+    if trace_cut.stats.npts <= 0:
+        _register_prefetch_group_failure(
+            [request],
+            ValueError('no samples in grouped download cut'),
+        )
+        return 'unavailable'
+    try:
+        write_waveform_to_cache(event.evid, trace_id, t0, t1, trace_cut)
+    except Exception as err:  # pylint: disable=broad-except
+        logger.warning(
+            f'Unable to write waveform cache row for '
+            f'{event.evid}/{trace_id}: {_safe_error(err)}'
+        )
+        return 'failed'
+    try:
+        clear_waveform_failure(event.evid, trace_id, t0, t1)
+    except Exception as cache_err:  # pylint: disable=broad-except
+        logger.warning(
+            'Unable to clear waveform failure cache: '
+            f'{_safe_error(cache_err)}'
+        )
+    return 'fetched'
+
+
+def _safe_error(err):
+    """Build one-line exception message for logs and failure cache."""
+    try:
+        return str(err).replace('\n', ' ')
+    except Exception as str_err:  # pylint: disable=broad-except
+        err_type = type(err).__name__
+        str_err_type = type(str_err).__name__
+        return (
+            f'Unable to format {err_type} message '
+            f'({str_err_type} raised while converting to string).'
+        )
+
+
+def _record_prefetch_status(
+    progress_ctx,
+    total_attempts,
+    batch_size,
+    counters,
+    status,
+):
+    """Accumulate counters and refresh progress reporting."""
+    counters['attempted'] += 1
+    if status == 'fetched':
+        counters['fetched'] += 1
+    elif status == 'unavailable':
+        counters['unavailable'] += 1
+    else:
+        counters['unavailable'] += 1
+        counters['unexpected_errors'] += 1
+    _update_prefetch_progress(
+        progress_ctx,
+        counters['attempted'],
+        total_attempts,
+        batch_size,
+        counters['fetched'],
+        counters['unavailable'],
+        counters['unexpected_errors'],
+    )
 
 
 def _resolve_prefetch_trace_ids():
@@ -176,22 +543,6 @@ def _filter_prefetch_catalog(catalog, event_ids):
     if max_events is not None:
         return filtered_catalog[:max_events]
     return filtered_catalog
-
-
-def _prefetch_one_waveform(event, trace_id, fetch_func, no_waveform_error):
-    """Prefetch one waveform and return status string."""
-    event_prefetch = copy(event)
-    event_prefetch.trace_id = trace_id
-    try:
-        trace = fetch_func(event_prefetch)
-    except no_waveform_error:
-        return 'unavailable'
-    except Exception as err:  # pylint: disable=broad-except
-        logger.warning(
-            f'Unexpected prefetch error for {event.evid}/{trace_id}: {err}'
-        )
-        return 'failed'
-    return 'fetched' if trace is not None else 'unavailable'
 
 
 def _log_prefetch_progress(
