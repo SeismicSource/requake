@@ -304,6 +304,35 @@ def write_waveform_to_cache(evid, trace_id, starttime, endtime, tr):
     return cursor.rowcount > 0
 
 
+def write_cache_meta(key, value):
+    """Store a key-value pair in cache_meta."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None:
+        return
+    conn = _get_cache_connection(cache_path)
+    conn.execute(
+        '''
+        INSERT OR REPLACE INTO cache_meta (key, value)
+        VALUES (?, ?)
+        ''',
+        (str(key), str(value)),
+    )
+    conn.commit()
+
+
+def read_cache_meta(key):
+    """Read a value from cache_meta, returning None if absent."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return None
+    conn = _get_cache_connection(cache_path)
+    row = conn.execute(
+        'SELECT value FROM cache_meta WHERE key = ?',
+        (str(key),),
+    ).fetchone()
+    return row['value'] if row is not None else None
+
+
 def begin_cache_write_batch():
     """Start a batched-write transaction for grouped inserts."""
     global _CACHE_BATCH_ACTIVE  # pylint: disable=global-statement

@@ -21,6 +21,7 @@ from scipy.stats import median_abs_deviation
 from ..config import config, rq_exit
 from ..wfcache import (
     clear_waveform_failure,
+    read_cache_meta,
     read_waveform_from_cache,
     register_waveform_failure,
     should_skip_waveform_download,
@@ -196,7 +197,9 @@ def _get_arrivals_and_distance(
     return p_arrival_time, s_arrival_time, distance, dist_deg
 
 
-def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
+def _get_event_waveform_from_client(
+    evid, traceid, p_arrival_time, orig_time=None
+):
     """
     Get a waveform for a given event and trace id via a waveform client.
 
@@ -206,16 +209,30 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
     :type traceid: str
     :param p_arrival_time: P arrival time
     :type p_arrival_time: obspy.UTCDateTime
+    :param orig_time: event origin time (needed for standardized windows)
+    :type orig_time: obspy.UTCDateTime or None
 
     :return: waveform trace
     :rtype: obspy.Trace
 
     :raises NoWaveformError: if no waveform data is available
     """
-    pre_p = config.cc_pre_P
-    trace_length = config.cc_trace_length
-    t0 = p_arrival_time - pre_p
-    t1 = t0 + trace_length
+    # When standardized offsets have been persisted by a prefetch run,
+    # use them to produce cache keys identical to those written by the
+    # prefetcher.  Otherwise fall back to per-event arrival computation.
+    if orig_time is not None:
+        tp_min_s = read_cache_meta(f'tp_min_{traceid}')
+        tp_max_s = read_cache_meta(f'tp_max_{traceid}')
+    else:
+        tp_min_s = tp_max_s = None
+    if tp_min_s is not None and tp_max_s is not None:
+        t0 = orig_time + float(tp_min_s)
+        t1 = orig_time + float(tp_max_s)
+    else:
+        pre_p = config.cc_pre_P
+        trace_length = config.cc_trace_length
+        t0 = p_arrival_time - pre_p
+        t1 = t0 + trace_length
     # Three-tier decision for each waveform request:
     # 1. Positive cache hit  → return immediately.
     # 2. Negative cache hit  → skip (backoff / retry-limit logic).
@@ -398,7 +415,8 @@ def get_event_waveform(ev):
     except NoWaveformError as err1:
         waveform_errors.append(str(err1))
         try:
-            tr = _get_event_waveform_from_client(evid, traceid, p_arrival_time)
+            tr = _get_event_waveform_from_client(
+                evid, traceid, p_arrival_time, orig_time)
         except NoWaveformError as err2:
             waveform_errors.append(str(err2))
             msg = ' '.join(waveform_errors)

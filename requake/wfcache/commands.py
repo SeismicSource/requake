@@ -31,6 +31,7 @@ from .storage import (
     reset_waveform_failures,
     run_wal_checkpoint,
     should_skip_waveform_download,
+    write_cache_meta,
     write_waveform_to_cache,
 )
 
@@ -179,7 +180,13 @@ def _prepare_prefetch_pending_requests(
     batch_size,
     counters,
 ):
-    """Prepare pending grouped requests while accounting cache hits/misses."""
+    """Prepare pending grouped requests while accounting cache hits/misses.
+
+    Events are processed in catalog order (chronological by orig_time),
+    which matches the order scan_catalog consumes pairs.  This ensures
+    that when the two processes run in parallel, the earliest events
+    are cached before scan_catalog reaches them.
+    """
     pending_by_trace = {
         trace_id: [] for trace_id in trace_ids
     }
@@ -200,6 +207,17 @@ def _prepare_prefetch_pending_requests(
             trace_coords,
             dependencies['get_arrivals'],
         )
+        # Persist standardized window offsets so that independent
+        # processes (e.g. scan_catalog) can use the same window.
+        if standard_offsets is not None:
+            write_cache_meta(
+                f'tp_min_{trace_id}',
+                str(standard_offsets['tp_closest_s']),
+            )
+            write_cache_meta(
+                f'tp_max_{trace_id}',
+                str(standard_offsets['tp_farthest_s']),
+            )
         for event in filtered_catalog:
             if standard_offsets is None:
                 status = 'unavailable'
