@@ -137,10 +137,17 @@ def resolve_scan_catalog_nprocs(npairs, slurm_context):
     return effective_nprocs
 
 
-def progress_summary(current, total, start_time):
-    """Return a compact progress summary string."""
-    elapsed = max(time.monotonic() - start_time, 1e-9)
-    rate = current / elapsed
+def progress_summary(current, total, start_time, rate=None):
+    """Return a compact progress summary string.
+
+    When *rate* is ``None`` (default), the pairs-per-second rate is
+    computed as ``current / elapsed``.  Pass an explicit *rate* to
+    override this, e.g. to report a window-based rate that excludes
+    pairs processed before the current run.
+    """
+    if rate is None:
+        elapsed = max(time.monotonic() - start_time, 1e-9)
+        rate = current / elapsed
     percent = 100.0 * current / total if total else 0.0
     return (
         f'{current:n}/{total:n} ({percent:.1f}%) '
@@ -239,15 +246,19 @@ def _log_noninteractive_progress(
     """
     if time.monotonic() < next_log_time:
         return next_log_time, False
+    window_elapsed = max(time.monotonic() - window_start_time, 1e-9)
+    window_rate = window_pair_count / window_elapsed
     slurm_suffix = slurm_progress_suffix(slurm_context)
+    summary = progress_summary(
+        processed, npairs, window_start_time, rate=window_rate,
+    )
     logger.info(
-        'Processing pairs: '
-        f'{progress_summary(processed, npairs, window_start_time)} '
+        f'Processing pairs: {summary} '
         f'[workers={nprocs:n}{slurm_suffix}]'
     )
     log_pair_timing_split(
         window_pair_count,
-        time.monotonic() - window_start_time,
+        window_elapsed,
         window_fetch_time,
         window_crosscorr_time,
     )
