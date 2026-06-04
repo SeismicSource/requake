@@ -267,6 +267,7 @@ def configure(args):
     # update config with the contents of config_obj
     config.update(config_obj)
     config.args = args
+    config.args.outdir = os.path.abspath(config.args.outdir)
     config.scan_catalog_pairs_file = os.path.join(
         config.args.outdir, 'requake.event_pairs.csv'
     )

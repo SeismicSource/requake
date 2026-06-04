@@ -18,8 +18,11 @@ import numpy as np
 from obspy import Trace, UTCDateTime
 
 from requake.config import config
+from requake.wfcache import storage as storage_mod
 from requake.wfcache.storage import (
     read_waveform_from_cache,
+    register_waveform_failure,
+    should_skip_waveform_download,
     write_waveform_to_cache,
 )
 
@@ -46,6 +49,8 @@ class TestWaveformCacheStorageLookup(unittest.TestCase):
         self.config_keys = (
             'args',
             'catalog_waveform_disk_cache_enabled',
+            'catalog_waveform_cache_failure_max_retries',
+            'catalog_waveform_cache_failure_backoff_s',
         )
         self.original_config = {
             key: config.get(key, MISSING) for key in self.config_keys
@@ -92,6 +97,38 @@ class TestWaveformCacheStorageLookup(unittest.TestCase):
                 places=6,
             )
             self.assertEqual(cut_trace.stats.npts, 6)
+
+    def test_failure_skip_via_covering_window(self):
+        """Negative cache should skip via covering windows as well."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config['catalog_waveform_disk_cache_enabled'] = True
+            config['catalog_waveform_cache_failure_max_retries'] = 0
+            config['catalog_waveform_cache_failure_backoff_s'] = 0
+            # Invalidate cached failure limits
+            storage_mod._FAILURE_LIMITS = None
+            config['args'] = Namespace(outdir=tmpdir)
+
+            start = UTCDateTime('2020-01-01T00:00:00')
+            wide_end = start + 30
+            register_waveform_failure(
+                'ev1',
+                'IV.ATFO..HHZ',
+                start,
+                wide_end,
+                'no data',
+            )
+
+            # Exact window within the stored covering failure
+            req_start = start + 5
+            req_end = start + 10
+            skip, reason = should_skip_waveform_download(
+                'ev1',
+                'IV.ATFO..HHZ',
+                req_start,
+                req_end,
+            )
+            self.assertTrue(skip)
+            self.assertIn('retry limit reached', reason)
 
 
 if __name__ == '__main__':

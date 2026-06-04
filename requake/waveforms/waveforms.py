@@ -216,6 +216,13 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
     trace_length = config.cc_trace_length
     t0 = p_arrival_time - pre_p
     t1 = t0 + trace_length
+    # Three-tier decision for each waveform request:
+    # 1. Positive cache hit  → return immediately.
+    # 2. Negative cache hit  → skip (backoff / retry-limit logic).
+    # 3. require_prefetch    → silent skip: when enabled, absence
+    #    from both caches means the prefetch already tried and
+    #    failed, so a live request would be wasted.
+    # 4. Otherwise            → live HTTP fetch.
     tr = _read_waveform_from_disk_cache(evid, traceid, t0, t1)
     if tr is not None:
         return tr
@@ -230,6 +237,13 @@ def _get_event_waveform_from_client(evid, traceid, p_arrival_time):
             f'Skipping download for event {evid} and trace_id {traceid}: '
             f'{skip_reason}'
         )
+    # If user configured to require prefetch, silenty skip with an empty
+    # NoWaveformError.
+    require_prefetch = bool(
+        getattr(config, 'catalog_waveform_require_prefetch', False)
+    )
+    if require_prefetch:
+        raise NoWaveformError()
     try:
         tr = get_waveform_from_client(traceid, t0, t1)
     except NoWaveformError as err:
@@ -324,6 +338,15 @@ def get_event_waveform(ev):
 
     :raises NoWaveformError: if no waveform data is available
     """
+    # Early exit: if this (evid, trace_id) pair has already exhausted
+    # its retry budget in the persistent negative cache, skip
+    # immediately without any I/O.
+    from ..wfcache import has_exhausted_failure
+    if ev.trace_id and has_exhausted_failure(ev.evid, ev.trace_id):
+        raise NoWaveformError(
+            f'Skipping event {ev.evid} / {ev.trace_id} '
+            '- persistent negative cache'
+        )
     evid = ev.evid
     ev_lat = ev.lat
     ev_lon = ev.lon

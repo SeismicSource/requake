@@ -21,6 +21,7 @@ from .storage import (  # noqa
     clear_waveform_failure,
     commit_cache_write_batch,
     get_waveform_cache_db_path,
+    has_exhausted_failure,
     list_waveform_cache_rows,
     read_waveform_cache_summary,
     read_waveform_from_cache,

@@ -25,11 +25,16 @@ SCHEMA_VERSION = 1
 DEFAULT_FAILURE_MAX_RETRIES = 3
 DEFAULT_FAILURE_BACKOFF_S = 600.0
 
+# One SQLite connection is cached per (path, pid) so that every process
+# reuses the same handle.  The pid guard is essential: after os.fork()
+# (used by ProcessPoolExecutor), the child inherits the parent's file
+# descriptors but must NOT use them — we open a fresh connection instead.
 _CACHE_CONN = None
 _CACHE_CONN_PATH = None
 _CACHE_CONN_PID = None
 _CACHE_SCHEMA_VERIFIED = set()
 _CACHE_BATCH_ACTIVE = False
+# Cached return value of _failure_limits() for this process.
 _FAILURE_LIMITS = None
 
 
@@ -218,13 +223,18 @@ def read_waveform_from_cache(evid, trace_id, starttime, endtime):
         ''',
         key,
     ).fetchone()
+    # Exact-match miss: try a covering-window lookup with ±10 s
+    # tolerance.  This handles cases where the prefetch stored a
+    # slightly different time window (e.g. because of config changes
+    # or nanosecond rounding in _utc_to_ns).
     if row is None:
         row = conn.execute(
             '''
             SELECT data_blob, start_time_ns, end_time_ns
             FROM waveform_cache
             WHERE evid = ? AND trace_id = ?
-                AND start_time_ns <= ? AND end_time_ns >= ?
+                AND start_time_ns <= ? + 10000000000
+                AND end_time_ns + 10000000000 >= ?
             ORDER BY (end_time_ns - start_time_ns) ASC
             LIMIT 1
             ''',
@@ -285,6 +295,10 @@ def write_waveform_to_cache(evid, trace_id, starttime, endtime, tr):
             now_ns,
         ),
     )
+    # During a batched-write transaction (used by wfcache prefetch),
+    # defer commit to commit_cache_write_batch().  Outside of a batch
+    # we commit immediately so that other processes / threads see the
+    # new row right away.
     if not _CACHE_BATCH_ACTIVE:
         conn.commit()
     return cursor.rowcount > 0
@@ -327,7 +341,12 @@ def run_wal_checkpoint(mode='passive'):
 
 
 def _failure_limits():
-    """Return configured failure cache retry limits."""
+    """Return configured failure cache retry limits.
+
+    The result is cached at module level because config values are
+    immutable after startup.  Use reset_waveform_failures() to clear
+    the cached tuple after a config change.
+    """
     global _FAILURE_LIMITS  # pylint: disable=global-statement
     if _FAILURE_LIMITS is not None:
         return _FAILURE_LIMITS
@@ -349,12 +368,43 @@ def _failure_limits():
     return _FAILURE_LIMITS
 
 
+def has_exhausted_failure(evid, trace_id):
+    """
+    Return True if (evid, trace_id) has exhausted its allowed retries.
+
+    Compares retry_count against the minimum of the stored max_retries
+    and the current config max_retries, so that a tighter current
+    policy (e.g. max_retries=0) correctly supersedes a more permissive
+    value that was stored by an earlier run.
+    """
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return False
+    conn = _get_cache_connection(cache_path)
+    # Use MIN(stored, current) so that a stricter current policy
+    # (e.g. max_retries=0 set after a prefetch run that used
+    # max_retries=3) correctly marks older rows as exhausted.
+    current_max_retries, _ = _failure_limits()
+    row = conn.execute(
+        '''
+        SELECT 1 FROM waveform_failures
+        WHERE evid = ? AND trace_id = ?
+            AND retry_count >= MIN(max_retries, ?)
+        LIMIT 1
+        ''',
+        (str(evid), str(trace_id), current_max_retries),
+    ).fetchone()
+    return row is not None
+
+
 def should_skip_waveform_download(evid, trace_id, starttime, endtime):
     """Return (skip, reason) from persistent failure cache."""
     cache_path = get_waveform_cache_db_path()
     if cache_path is None or not cache_path.exists():
         return False, ''
     key = _cache_key(evid, trace_id, starttime, endtime)
+    req_start_ns = key[2]
+    req_end_ns = key[3]
     now_ns = _utc_to_ns(UTCDateTime())
     conn = _get_cache_connection(cache_path)
     row = conn.execute(
@@ -366,6 +416,26 @@ def should_skip_waveform_download(evid, trace_id, starttime, endtime):
         ''',
         key,
     ).fetchone()
+    # Covering-window fallback (same ±10 s tolerance as the positive
+    # cache lookup — see read_waveform_from_cache).
+    if row is None:
+        row = conn.execute(
+            '''
+            SELECT retry_count, max_retries, next_retry_after_ns, last_error
+            FROM waveform_failures
+            WHERE evid = ? AND trace_id = ?
+                AND start_time_ns <= ? + 10000000000
+                AND end_time_ns + 10000000000 >= ?
+            ORDER BY (end_time_ns - start_time_ns) ASC
+            LIMIT 1
+            ''',
+            (
+                key[0],
+                key[1],
+                req_start_ns,
+                req_end_ns,
+            ),
+        ).fetchone()
     if row is None:
         return False, ''
     retry_count = int(row['retry_count'])
@@ -402,10 +472,12 @@ def register_waveform_failure(evid, trace_id, starttime, endtime, error):
         ''',
         key,
     ).fetchone()
+    # Increment retry count (or start at 1 for a brand-new failure).
     retry_count = 1 if row is None else int(row['retry_count']) + 1
     first_failure_ns = (
         now_ns if row is None else int(row['first_failure_ns'])
     )
+    # Exponential backoff: delay = base * 2^(retry_count - 1).
     delay_s = backoff_base_s * (2 ** max(retry_count - 1, 0))
     next_retry_after_ns = now_ns + int(delay_s * 1e9)
     conn.execute(

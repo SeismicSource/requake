@@ -327,7 +327,7 @@ def result_to_pair_record(catalog, result):
             if worker_tb:
                 logger.debug(f'Worker traceback: {worker_tb}')
         else:
-            logger.warning(msg)
+            logger.debug(msg)
     pair_record = PairRecord(
         catalog[idx1],
         catalog[idx2],
@@ -402,8 +402,7 @@ def _process_candidate_pair(pair, waveform_pair, batch_of_pairs, state):
         logger.error(msg)
         rq_exit(1)
     except NoWaveformError as msg:
-        if str(msg):
-            logger.warning(msg)
+        logger.debug(msg)
         batch_of_pairs.append(
             PairRecord(pair[0], pair[1], pair[0].trace_id, None, None)
         )

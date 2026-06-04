@@ -15,6 +15,7 @@ from obspy import Stream
 from obspy.geodetics import gps2dist_azimuth
 from obspy.taup import TauPyModel
 from ..config import config
+from ..wfcache import has_exhausted_failure, register_waveform_failure
 from .waveforms import (
     get_event_waveform,
     get_waveform_cache_stats,
@@ -22,6 +23,25 @@ from .waveforms import (
 )
 from .station_metadata import get_traceid_coords, MetadataMismatchError
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
+
+
+def _persist_pair_stream_failure(ev):
+    """Register a failure in the persistent negative cache.
+
+    Uses a wide ±1 h window around the event origin so that the
+    failure covers any reasonable scan time window, regardless of
+    cc_pre_P / cc_trace_length settings.
+    """
+    try:
+        register_waveform_failure(
+            ev.evid,
+            ev.trace_id,
+            ev.orig_time - 3600,
+            ev.orig_time + 3600,
+            'marked unavailable during pair-stream processing',
+        )
+    except Exception:  # pylint: disable=broad-except
+        pass
 
 
 class WaveformPair:
@@ -198,7 +218,15 @@ class WaveformPair:
         st = Stream()
         for ev in pair:
             cache_key = f'{ev.evid}_{ev.trace_id}'
+            # In-memory skip set: once an event fails, all subsequent
+            # pairs that include it are silently skipped.
             if cache_key in self.skipped_evids_traceids:
+                self.skipped_trace_hits += 1
+                continue
+            # Persistent negative cache: skip events that have
+            # already exhausted their retry budget.
+            if has_exhausted_failure(ev.evid, ev.trace_id):
+                self.skipped_evids_traceids.add(cache_key)
                 self.skipped_trace_hits += 1
                 continue
             tr = self._cache_get(cache_key)
@@ -212,7 +240,11 @@ class WaveformPair:
                 self._cache_put(cache_key, tr)
                 st.append(tr)
             except NoWaveformError as err:
+                # Mark failed in both the in-memory skip set (for
+                # this run) and the persistent negative cache (for
+                # future runs).
                 self.skipped_evids_traceids.add(cache_key)
+                _persist_pair_stream_failure(ev)
                 msg = str(err).replace('\n', ' ')
                 logger.warning(
                     f'No waveform data for event {ev.evid} and trace_id '
@@ -243,7 +275,23 @@ class WaveformPair:
         self.trace_id_attempts.clear()
 
         ev1.trace_id = ev2.trace_id = self._get_trace_id(ev1)
+        # Guard: check both events against the persistent negative
+        # cache BEFORE any download.  This is checked again inside
+        # _get_pair_stream, but the upfront check avoids even
+        # touching the per-event fetch machinery.
+        if has_exhausted_failure(ev1.evid, ev1.trace_id):
+            raise NoWaveformError(
+                f'Event {ev1.evid} / {ev1.trace_id} exhausted '
+                'in persistent negative cache'
+            )
+        if has_exhausted_failure(ev2.evid, ev2.trace_id):
+            raise NoWaveformError(
+                f'Event {ev2.evid} / {ev2.trace_id} exhausted '
+                'in persistent negative cache'
+            )
         st = None
+        # Retry loop: when _get_pair_stream fails (e.g. trace_id has
+        # no data), try the next-closest trace_id before giving up.
         while True:
             try:
                 st = self._get_pair_stream(pair)
@@ -254,6 +302,8 @@ class WaveformPair:
                 except NoWaveformError:
                     break
         if st is None:
-            # die silently
-            raise NoWaveformError
+            raise NoWaveformError(
+                f'No waveform data available for pair '
+                f'({ev1.evid}, {ev2.evid})'
+            )
         return st
