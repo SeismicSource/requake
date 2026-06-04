@@ -659,14 +659,15 @@ def list_waveform_cache_rows(
     conn = _get_cache_connection(cache_path)
     clauses = []
     params = []
-    if event_ids:
-        placeholders = ', '.join('?' for _ in event_ids)
-        clauses.append(f'evid IN ({placeholders})')
-        params.extend(str(event_id) for event_id in event_ids)
-    if trace_ids:
-        placeholders = ', '.join('?' for _ in trace_ids)
-        clauses.append(f'trace_id IN ({placeholders})')
-        params.extend(str(trace_id) for trace_id in trace_ids)
+
+    def _add_in_clause(column, values):
+        if values:
+            placeholders = ', '.join('?' for _ in values)
+            clauses.append(f'{column} IN ({placeholders})')
+            params.extend(str(v) for v in values)
+
+    _add_in_clause('evid', event_ids)
+    _add_in_clause('trace_id', trace_ids)
     if start_time is not None:
         clauses.append('start_time_ns >= ?')
         params.append(_utc_to_ns(start_time))

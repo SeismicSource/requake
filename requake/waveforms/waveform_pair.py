@@ -9,6 +9,7 @@ Classes to handle waveform pairs for Requake.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
+import contextlib
 import logging
 from collections import defaultdict, OrderedDict
 from obspy import Stream
@@ -32,7 +33,7 @@ def _persist_pair_stream_failure(ev):
     failure covers any reasonable scan time window, regardless of
     cc_pre_P / cc_trace_length settings.
     """
-    try:
+    with contextlib.suppress(Exception):
         register_waveform_failure(
             ev.evid,
             ev.trace_id,
@@ -40,8 +41,6 @@ def _persist_pair_stream_failure(ev):
             ev.orig_time + 3600,
             'marked unavailable during pair-stream processing',
         )
-    except Exception:  # pylint: disable=broad-except
-        pass
 
 
 class WaveformPair:
