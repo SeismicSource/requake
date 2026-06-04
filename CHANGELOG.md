@@ -4,6 +4,19 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+Note: you should run `requake update_config` to update your config file
+to the latest version.
+
+The waveform disk cache is now a single SQLite database
+(`OUTDIR/waveform_cache.sqlite`) with a persistent negative cache that
+remembers failed downloads across runs, eliminating redundant HTTP requests.
+
+- New `wfcache` CLI: `prefetch`, `print`/`inspect`, `extract`,
+  `reset-failures`.
+- New config: `catalog_waveform_cache_failure_max_retries`,
+  `catalog_waveform_cache_failure_backoff_s`,
+  `catalog_waveform_require_prefetch`.
+
 ## [0.8.2] - 2026-06-03
 
 Note: you might want to run `requake update_config` to update your config file
