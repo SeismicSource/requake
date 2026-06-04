@@ -13,10 +13,41 @@ import os
 import sys
 import locale
 import shutil
+import hashlib
 from datetime import datetime
 from .configobj import ConfigObj, ParseError
 from .configobj.validate import Validator
 locale.setlocale(locale.LC_ALL, '')
+
+
+_seen_msgs = set()
+
+
+def log_once(logger, level, msg, *args, **kwargs):
+    """
+    Log a message only once.
+
+    :param logger: Logger object.
+    :type logger: logging.Logger
+    :param level: Log level.
+    :type level: str
+    :param msg: Message to log.
+    :type msg: str
+    :param args: Arguments for the message.
+    :param kwargs: Keyword arguments for the message.
+    """
+    text = str(msg)
+    digest = hashlib.blake2b(
+        text.encode('utf-8'),
+        digest_size=8,
+    ).digest()
+    if digest in _seen_msgs:
+        return
+    _seen_msgs.add(digest)
+    log_fn = getattr(logger, level, None)
+    if log_fn is None:
+        raise ValueError(f'Invalid log level: {level}')
+    log_fn(text, *args, **kwargs)
 
 
 def err_exit(msg):

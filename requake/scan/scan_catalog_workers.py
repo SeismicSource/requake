@@ -24,6 +24,7 @@ from ..config import (
     to_picklable_config_dict,
     wait_for_sigint_pause,
 )
+from ..config.utils import log_once
 from ..database.pairs import PairRecord, write_pair_records
 from ..waveforms import (
     MetadataMismatchError,
@@ -402,7 +403,7 @@ def _process_candidate_pair(pair, waveform_pair, batch_of_pairs, state):
         logger.error(msg)
         rq_exit(1)
     except NoWaveformError as msg:
-        logger.debug(msg)
+        log_once(logger, 'debug', msg)
         batch_of_pairs.append(
             PairRecord(pair[0], pair[1], pair[0].trace_id, None, None)
         )
