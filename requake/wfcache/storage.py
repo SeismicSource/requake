@@ -25,6 +25,48 @@ SCHEMA_VERSION = 1
 DEFAULT_FAILURE_MAX_RETRIES = 3
 DEFAULT_FAILURE_BACKOFF_S = 600.0
 
+WAVEFORM_CACHE_SCHEMA = [
+    '''
+    CREATE TABLE IF NOT EXISTS cache_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE IF NOT EXISTS waveform_cache (
+        evid TEXT NOT NULL,
+        trace_id TEXT NOT NULL,
+        start_time_ns INTEGER NOT NULL,
+        end_time_ns INTEGER NOT NULL,
+        sampling_rate REAL NOT NULL,
+        npts INTEGER NOT NULL,
+        data_blob BLOB NOT NULL,
+        created_at_ns INTEGER NOT NULL,
+        accessed_at_ns INTEGER NOT NULL,
+        PRIMARY KEY (evid, trace_id, start_time_ns, end_time_ns)
+    )
+    ''',
+    (
+        'CREATE INDEX IF NOT EXISTS idx_waveform_cache_trace_time '
+        'ON waveform_cache (trace_id, start_time_ns, end_time_ns)'
+    ),
+    '''
+    CREATE TABLE IF NOT EXISTS waveform_failures (
+        evid TEXT NOT NULL,
+        trace_id TEXT NOT NULL,
+        start_time_ns INTEGER NOT NULL,
+        end_time_ns INTEGER NOT NULL,
+        retry_count INTEGER NOT NULL,
+        max_retries INTEGER NOT NULL,
+        last_error TEXT,
+        first_failure_ns INTEGER NOT NULL,
+        last_failure_ns INTEGER NOT NULL,
+        next_retry_after_ns INTEGER,
+        PRIMARY KEY (evid, trace_id, start_time_ns, end_time_ns)
+    )
+    ''',
+]
+
 # One SQLite connection is cached per (path, pid) so that every process
 # reuses the same handle.  The pid guard is essential: after os.fork()
 # (used by ProcessPoolExecutor), the child inherits the parent's file
@@ -109,56 +151,11 @@ def _get_cache_connection(cache_path):
 
 
 def _ensure_schema(conn, cache_path_str):
-    """Create schema and validate schema version."""
+    """Create tables and validate schema version."""
     if cache_path_str in _CACHE_SCHEMA_VERIFIED:
         return
-    conn.execute(
-        '''
-        CREATE TABLE IF NOT EXISTS cache_meta (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )
-        '''
-    )
-    conn.execute(
-        '''
-        CREATE TABLE IF NOT EXISTS waveform_cache (
-            evid TEXT NOT NULL,
-            trace_id TEXT NOT NULL,
-            start_time_ns INTEGER NOT NULL,
-            end_time_ns INTEGER NOT NULL,
-            sampling_rate REAL NOT NULL,
-            npts INTEGER NOT NULL,
-            data_blob BLOB NOT NULL,
-            created_at_ns INTEGER NOT NULL,
-            accessed_at_ns INTEGER NOT NULL,
-            PRIMARY KEY (evid, trace_id, start_time_ns, end_time_ns)
-        )
-        '''
-    )
-    conn.execute(
-        '''
-        CREATE INDEX IF NOT EXISTS idx_waveform_cache_trace_time
-        ON waveform_cache (trace_id, start_time_ns, end_time_ns)
-        '''
-    )
-    conn.execute(
-        '''
-        CREATE TABLE IF NOT EXISTS waveform_failures (
-            evid TEXT NOT NULL,
-            trace_id TEXT NOT NULL,
-            start_time_ns INTEGER NOT NULL,
-            end_time_ns INTEGER NOT NULL,
-            retry_count INTEGER NOT NULL,
-            max_retries INTEGER NOT NULL,
-            last_error TEXT,
-            first_failure_ns INTEGER NOT NULL,
-            last_failure_ns INTEGER NOT NULL,
-            next_retry_after_ns INTEGER,
-            PRIMARY KEY (evid, trace_id, start_time_ns, end_time_ns)
-        )
-        '''
-    )
+    for statement in WAVEFORM_CACHE_SCHEMA:
+        conn.execute(statement)
     version = int(conn.execute('PRAGMA user_version').fetchone()[0])
     if version not in (0, SCHEMA_VERSION):
         raise RuntimeError(
