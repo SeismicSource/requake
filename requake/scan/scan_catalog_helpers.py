@@ -232,9 +232,13 @@ def _log_noninteractive_progress(
     nprocs,
     slurm_context,
 ):
-    """Log non-interactive progress periodically and return next log time."""
+    """Log non-interactive progress periodically.
+
+    Returns ``(next_log_time, did_log)`` where ``did_log`` is ``True``
+    only when the message was actually emitted.
+    """
     if time.monotonic() < next_log_time:
-        return next_log_time
+        return next_log_time, False
     slurm_suffix = slurm_progress_suffix(slurm_context)
     logger.info(
         'Processing pairs: '
@@ -248,7 +252,7 @@ def _log_noninteractive_progress(
         window_crosscorr_time,
     )
     log_cache_stats(waveform_pair)
-    return next_log_time + 60.0
+    return next_log_time + 60.0, True
 
 
 def init_pair_processing_state(npairs, initial_processed, total_pairs):
@@ -299,7 +303,7 @@ def update_noninteractive_progress(
     if show_pbar:
         return
     processed_total = state['initial_processed'] + processed
-    state['next_log_time'] = _log_noninteractive_progress(
+    next_log_time, did_log = _log_noninteractive_progress(
         processed_total,
         state['total_pairs'],
         state['window_start_time'],
@@ -311,7 +315,9 @@ def update_noninteractive_progress(
         state['nprocs'],
         state['slurm_context'],
     )
-    state['window_start_time'] = time.monotonic()
-    state['window_pair_count'] = 0
-    state['window_fetch_time'] = 0.0
-    state['window_crosscorr_time'] = 0.0
+    state['next_log_time'] = next_log_time
+    if did_log:
+        state['window_start_time'] = time.monotonic()
+        state['window_pair_count'] = 0
+        state['window_fetch_time'] = 0.0
+        state['window_crosscorr_time'] = 0.0
