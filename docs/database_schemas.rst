@@ -2,9 +2,10 @@ Database Schemas
 ----------------
 
 Requake stores scan outputs in a SQLite database named ``requake.sqlite`` in
-the selected output directory.
+the selected output directory.  A separate ``waveform_cache.sqlite`` file in
+the same directory holds the persistent waveform cache.
 
-The database currently contains seven domain tables:
+The main database currently contains seven domain tables:
 
 - ``catalog``
 - ``event_keys``
@@ -203,3 +204,84 @@ Indexes:
 
 - ``idx_template_detections_family`` on ``template_detections(family_number)``
 - ``idx_template_detections_trace`` on ``template_detections(trace_id)``
+
+Waveform Cache Database
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The waveform cache is stored in a separate SQLite file,
+``waveform_cache.sqlite``, located in the output directory.  It contains
+prefetched waveform windows and a persistent record of download failures.
+
+The file uses its own ``PRAGMA user_version`` (currently ``1``) and the
+same WAL / ``busy_timeout`` settings as the main database.
+
+cache_meta Table
+~~~~~~~~~~~~~~~~
+
+.. code-block:: sql
+
+   CREATE TABLE IF NOT EXISTS cache_meta (
+       key TEXT PRIMARY KEY,
+       value TEXT NOT NULL
+   )
+
+Key-value metadata.  Currently stores:
+
+- ``schema_version`` — cache schema version.
+- ``tp_min_{trace_id}``, ``tp_max_{trace_id}`` — standardized waveform
+  window offsets (in seconds) for a given trace ID.  Written by
+  ``wfcache prefetch`` and consumed by ``scan_catalog`` to produce
+  identical cache keys across independent processes.
+
+waveform_cache Table
+~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: sql
+
+   CREATE TABLE IF NOT EXISTS waveform_cache (
+       evid TEXT NOT NULL,
+       trace_id TEXT NOT NULL,
+       start_time_ns INTEGER NOT NULL,
+       end_time_ns INTEGER NOT NULL,
+       sampling_rate REAL NOT NULL,
+       npts INTEGER NOT NULL,
+       data_blob BLOB NOT NULL,
+       created_at_ns INTEGER NOT NULL,
+       accessed_at_ns INTEGER NOT NULL,
+       PRIMARY KEY (evid, trace_id, start_time_ns, end_time_ns)
+   )
+
+One row per cached waveform window.  ``data_blob`` stores the waveform as
+MiniSEED bytes with STEIM2 integer encoding.  ``start_time_ns`` and
+``end_time_ns`` use UTC epoch nanoseconds.
+
+Indexes:
+
+- ``idx_waveform_cache_trace_time`` on
+  ``waveform_cache(trace_id, start_time_ns, end_time_ns)``
+
+waveform_failures Table
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: sql
+
+   CREATE TABLE IF NOT EXISTS waveform_failures (
+       evid TEXT NOT NULL,
+       trace_id TEXT NOT NULL,
+       start_time_ns INTEGER NOT NULL,
+       end_time_ns INTEGER NOT NULL,
+       retry_count INTEGER NOT NULL,
+       max_retries INTEGER NOT NULL,
+       last_error TEXT,
+       first_failure_ns INTEGER NOT NULL,
+       last_failure_ns INTEGER NOT NULL,
+       next_retry_after_ns INTEGER,
+       PRIMARY KEY (evid, trace_id, start_time_ns, end_time_ns)
+   )
+
+Persistent negative cache.  When a waveform download fails, a row is
+inserted (or updated via ``ON CONFLICT`` upsert) with an incremented
+``retry_count`` and an exponentially-growing ``next_retry_after_ns``
+backoff.  Once ``retry_count >= max_retries`` the download is considered
+exhausted and skipped by all subsequent runs until the failure is manually
+reset via ``wfcache reset-failures``.
