@@ -1,18 +1,39 @@
-# Repository Agent Rules
+# AGENTS.md
 
-These rules apply to AI agents working in this repository.
+## Coding Style
 
 - Keep lines under 80 characters.
-- Use single quotes for regular strings whenever possible.
-- Always privilege f-strings.
+- Prefer single quotes for string literals.
+- Prefer f-strings over other formatting methods.
 - Use triple double quotes for docstrings.
-- In multiline docstrings, put the opening `"""` on its own line.
-- For large code changes, always perform a second review pass before
-  finalizing (re-read modified files, simplify where possible, and
-  re-run checks).
-- Run `flake8` on the changed Python files before finalizing work.
-- Run `sourcery review` on the modified files before finalizing work.
-- Fix reported issues locally instead of relying on CI to catch them.
+- In multi-line docstrings, place the opening """ on its own line.
 
-For local enforcement, use `scripts/setup_local_hooks.sh` once per clone.
-After that, the pre-commit hook runs the local style checks automatically.
+## Before Finalizing
+
+For any non-trivial change:
+
+1. Re-read all modified files.
+2. Simplify code where possible.
+3. Re-run relevant tests and checks.
+4. Fix issues locally rather than relying on CI.
+
+Required checks:
+
+```bash
+flake8 <modified_python_files> && sourcery review <modified_files>
+```
+
+## Commits
+
+- Keep commit messages short.
+- Follow the style of recent commits in the repository.
+
+## Local Setup
+
+Run once per clone:
+
+```bash
+scripts/setup_local_hooks.sh 
+```
+
+This installs the pre-commit hook used to enforce local style checks.
