@@ -41,7 +41,7 @@ from .scan_catalog_helpers import (
     log_pair_timing_split,
     progress_summary,
     update_noninteractive_progress,
-    _get_rss_mb,
+    _get_memory_mb,
 )
 
 logger = logging.getLogger('scan_catalog')
@@ -262,7 +262,7 @@ def worker_process_pair(idx_pair):
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
-            'rss_mb': _get_rss_mb(),
+            'rss_mb': _get_memory_mb(fast=True),
             'trace_id': pair_out.trace_id,
             'lag_samples': pair_out.lag_samples,
             'cc_max': pair_out.cc_max,
@@ -278,7 +278,7 @@ def worker_process_pair(idx_pair):
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
-            'rss_mb': _get_rss_mb(),
+            'rss_mb': _get_memory_mb(fast=True),
             'trace_id': pair[0].trace_id if pair is not None else None,
             'message': _safe_exception_message(err),
             'fetch_dt': 0.0,
@@ -292,7 +292,7 @@ def worker_process_pair(idx_pair):
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
-            'rss_mb': _get_rss_mb(),
+            'rss_mb': _get_memory_mb(fast=True),
             'trace_id': pair[0].trace_id if pair is not None else None,
             'message': (
                 f'{type(err).__name__}: {_safe_exception_message(err)}'

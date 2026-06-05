@@ -24,7 +24,7 @@ logger = logging.getLogger('scan_catalog')
 _MEMORY_LOG_INTERVAL_S = 300.0  # log memory every 5 minutes
 
 
-def _get_rss_mb():
+def _get_memory_mb(fast=False):
     """Return current process memory usage in MiB, or -1 when unavailable.
 
     Memory metrics glossary
@@ -44,22 +44,34 @@ def _get_rss_mb():
     with only 1/65 of those shared pages.  This gives a much more
     realistic measure of per-worker memory cost.
 
+    .. warning::
+
+       Reading ``smaps_rollup`` is expensive — the kernel must walk
+       the process page table.  When *fast* is ``True``, Pss is
+       skipped entirely.  Use ``fast=True`` in hot paths (e.g. worker
+       loops) and ``fast=False`` for periodic parent-side logging.
+
     Fallback order
     --------------
-    1. ``/proc/self/smaps_rollup`` Pss (Linux — best for fork-heavy
-       workloads)
+    1. ``/proc/self/smaps_rollup`` Pss (Linux; skipped when
+       ``fast=True``)
     2. ``psutil`` RSS (cross-platform)
     3. ``/proc/self/status`` VmRSS (Linux, no psutil)
     4. Return -1 (no memory data available — logging is silently
        suppressed)
     """
-    # Linux-only: Pss is the most accurate metric for fork-heavy workloads.
-    with suppress(Exception):
-        with open('/proc/self/smaps_rollup', 'r', encoding='utf-8') as fh:
-            for line in fh:
-                if line.startswith('Pss:'):
-                    parts = line.split()
-                    return float(parts[1]) / 1024.0  # kB -> MiB
+    # Linux-only: Pss is the most accurate metric for fork-heavy
+    # workloads, but reading smaps_rollup walks the page table and is
+    # too slow for per-pair worker calls.
+    if not fast:
+        with suppress(Exception):
+            with open(
+                '/proc/self/smaps_rollup', 'r', encoding='utf-8',
+            ) as fh:
+                for line in fh:
+                    if line.startswith('Pss:'):
+                        parts = line.split()
+                        return float(parts[1]) / 1024.0  # kB -> MiB
     # Cross-platform: psutil works on Linux, macOS, and Windows.
     with suppress(Exception):
         import psutil
@@ -76,7 +88,7 @@ def _get_rss_mb():
 
 def log_memory_usage(prefix=''):
     """Log current process memory usage (Pss on Linux, RSS elsewhere)."""
-    mem_mb = _get_rss_mb()
+    mem_mb = _get_memory_mb(fast=False)
     if mem_mb < 0:
         return
     label = f'{prefix} ' if prefix else ''
