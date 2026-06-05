@@ -11,6 +11,7 @@ Runtime helpers for catalog-based repeater scans.
 """
 import logging
 import os
+import resource
 import sys
 import time
 from contextlib import suppress
@@ -86,6 +87,14 @@ def _get_memory_mb(fast=False):
                 if line.startswith('VmRSS:'):
                     parts = line.split()
                     return float(parts[1]) / 1024.0  # kB -> MiB
+    # macOS / BSD fallback via getrusage(2).
+    with suppress(Exception):
+        rss_bytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        if rss_bytes > 0:
+            # macOS returns bytes; Linux returns KiB.  Heuristic:
+            # values > 10 GiB are surely bytes.
+            divisor = 1024.0 * 1024.0 if rss_bytes > 10 * 1024**3 else 1024.0
+            return rss_bytes / divisor
     return -1.0
 
 
