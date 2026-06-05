@@ -340,23 +340,13 @@ def _log_noninteractive_progress(
     return next_log_time + 60.0, True
 
 
-def _log_memory_if_due(state, label='', waveform_pair=None):
+def _log_memory_if_due(state, label=''):
     """Log memory usage when the configured interval has elapsed."""
     now = time.monotonic()
     if now < state['next_memory_log_time']:
         return
     state['next_memory_log_time'] = now + _MEMORY_LOG_INTERVAL_S
     log_memory_usage(prefix=label)
-    if waveform_pair is not None:
-        total_worker_rss = getattr(
-            waveform_pair, 'get_total_worker_rss_mb', lambda: -1.0
-        )()
-        if total_worker_rss > 0:
-            logger.info(
-                f'[MEM] {label} worker total: {total_worker_rss:,.0f} MiB'
-                if label
-                else f'[MEM] worker total: {total_worker_rss:,.0f} MiB'
-            )
 
 
 def init_pair_processing_state(npairs, initial_processed, total_pairs):
@@ -406,9 +396,7 @@ def update_noninteractive_progress(
 ):
     """Periodically log progress in non-interactive mode."""
     if show_pbar:
-        _log_memory_if_due(
-            state, label='[parent]', waveform_pair=waveform_pair,
-        )
+        _log_memory_if_due(state, label='[parent]')
         return
     processed_total = state['initial_processed'] + processed
     next_log_time, did_log = _log_noninteractive_progress(
@@ -429,4 +417,4 @@ def update_noninteractive_progress(
         state['window_pair_count'] = 0
         state['window_fetch_time'] = 0.0
         state['window_crosscorr_time'] = 0.0
-    _log_memory_if_due(state, label='[parent]', waveform_pair=waveform_pair)
+    _log_memory_if_due(state, label='[parent]')

@@ -86,26 +86,14 @@ class ParallelCacheStatsCollector:
     def __init__(self):
         """Initialize the per-worker cache-stats registry."""
         self._stats_by_pid = {}
-        self._rss_by_pid = {}
 
     def update_from_result(self, result):
-        """Store the latest cache-stats snapshot and RSS for a worker."""
+        """Store the latest cache-stats snapshot for a worker."""
         worker_pid = result.get('worker_pid')
-        if worker_pid is None:
-            return
         stats = result.get('worker_cache_stats')
-        rss_mb = result.get('rss_mb')
-        if stats is not None:
-            self._stats_by_pid[worker_pid] = stats
-        if rss_mb is not None and rss_mb > 0:
-            self._rss_by_pid[worker_pid] = rss_mb
-
-    def get_total_worker_rss_mb(self):
-        """Return total RSS across all known workers, or -1."""
-        return (
-            sum(self._rss_by_pid.values()) if self._rss_by_pid
-            else -1.0
-        )
+        if worker_pid is None or stats is None:
+            return
+        self._stats_by_pid[worker_pid] = stats
 
     def get_cache_stats(self):
         """Return merged cache stats across all workers."""
