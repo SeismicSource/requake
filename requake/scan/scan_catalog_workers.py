@@ -49,6 +49,9 @@ logger = logging.getLogger('scan_catalog')
 MIN_PENDING_FUTURES = 32
 MAX_PENDING_MULTIPLIER = 2
 MIN_WORKER_CACHE_SIZE = 2
+# Recycle workers every ~500K pairs to limit memory fragmentation.
+# At ~1,500 pairs/s this resets the pool roughly every 5–6 minutes.
+WORKER_RECYCLE_CHUNK_SIZE = 500_000
 
 _WORKER_WAVEFORM_PAIR = None
 _WORKER_CATALOG = None
@@ -414,29 +417,86 @@ def _process_candidate_pair(pair, waveform_pair, batch_of_pairs, state):
         _flush_pair_batch_if_needed(batch_of_pairs)
 
 
-def process_valid_pair_indices_parallel(
+def _handle_future_result(
+    result,
     catalog,
-    valid_pair_idx,
-    npairs,
+    cache_stats,
+    total_analyzed,
     state,
     show_pbar,
     pbar,
+    batch_of_pairs,
 ):
-    """Process valid pair indices using a bounded process pool."""
-    nprocs = state['nprocs']
-    worker_cache_size = effective_worker_cache_size(nprocs)
-    logger.info(
-        'Using parallel pair processing: '
-        f'workers={nprocs:n}, '
-        f'worker_cache_size={worker_cache_size:n}'
+    """Update counters and batch from a single completed future."""
+    cache_stats.update_from_result(result)
+    total_analyzed[0] += 1
+    if pbar is not None:
+        pbar.update()
+    pair_record, fetch_dt, crosscorr_dt = result_to_pair_record(
+        catalog, result,
     )
-    cache_stats = ParallelCacheStatsCollector()
+    state['waveform_fetch_time'] += fetch_dt
+    state['crosscorr_time'] += crosscorr_dt
+    state['window_pair_count'] += 1
+    state['window_fetch_time'] += fetch_dt
+    state['window_crosscorr_time'] += crosscorr_dt
+    batch_of_pairs.append(pair_record)
+    _flush_pair_batch_if_needed(batch_of_pairs)
+    update_noninteractive_progress(
+        state, cache_stats, show_pbar, total_analyzed[0],
+    )
+
+
+def _drain_pending_futures(
+    pending,
+    catalog,
+    cache_stats,
+    total_analyzed,
+    state,
+    show_pbar,
+    pbar,
+    batch_of_pairs,
+):
+    """Drain all remaining pending futures before recycling the pool."""
+    while pending:
+        wait_for_sigint_pause()
+        done, pending = wait(pending, return_when=FIRST_COMPLETED)
+        for future in done:
+            _handle_future_result(
+                future.result(),
+                catalog,
+                cache_stats,
+                total_analyzed,
+                state,
+                show_pbar,
+                pbar,
+                batch_of_pairs,
+            )
+
+
+def _process_pair_chunk(
+    valid_pair_idx_iter,
+    chunk_size,
+    nprocs,
+    cfg_dict,
+    catalog,
+    worker_cache_size,
+    cache_stats,
+    state,
+    show_pbar,
+    pbar,
+    total_analyzed,
+):
+    """Process one chunk of pairs with a fresh ProcessPoolExecutor.
+
+    After the chunk completes, all workers exit, releasing fragmented
+    memory back to the OS.  *total_analyzed* is a single-element list
+    used to carry the running pair count across chunks.
+    """
     batch_of_pairs = []
-    analyzed_pairs = 0
+    chunk_start = total_analyzed[0]
     max_pending = max_pending_futures(nprocs)
-    cfg_dict = to_picklable_config_dict(config)
     pending = set()
-    pair_iter = iter(valid_pair_idx)
     with ProcessPoolExecutor(
         max_workers=nprocs,
         initializer=_worker_initializer,
@@ -446,10 +506,12 @@ def process_valid_pair_indices_parallel(
             wait_for_sigint_pause()
             while len(pending) < max_pending:
                 try:
-                    idx_pair = next(pair_iter)
+                    idx_pair = next(valid_pair_idx_iter)
                 except StopIteration:
                     break
-                pending.add(executor.submit(worker_process_pair, idx_pair))
+                pending.add(
+                    executor.submit(worker_process_pair, idx_pair)
+                )
             while pending:
                 wait_for_sigint_pause()
                 done, pending = wait(
@@ -458,53 +520,103 @@ def process_valid_pair_indices_parallel(
                 )
                 for future in done:
                     wait_for_sigint_pause()
-                    result = future.result()
-                    cache_stats.update_from_result(result)
-                    analyzed_pairs += 1
-                    if pbar is not None:
-                        pbar.update()
-                    pair_record, fetch_dt, crosscorr_dt = (
-                        result_to_pair_record(
-                            catalog,
-                            result,
-                        )
-                    )
-                    state['waveform_fetch_time'] += fetch_dt
-                    state['crosscorr_time'] += crosscorr_dt
-                    state['window_pair_count'] += 1
-                    state['window_fetch_time'] += fetch_dt
-                    state['window_crosscorr_time'] += crosscorr_dt
-                    batch_of_pairs.append(pair_record)
-                    _flush_pair_batch_if_needed(batch_of_pairs)
-                    update_noninteractive_progress(
-                        state,
+                    _handle_future_result(
+                        future.result(),
+                        catalog,
                         cache_stats,
+                        total_analyzed,
+                        state,
                         show_pbar,
-                        analyzed_pairs,
+                        pbar,
+                        batch_of_pairs,
                     )
+                    if total_analyzed[0] - chunk_start >= chunk_size:
+                        _drain_pending_futures(
+                            pending,
+                            catalog,
+                            cache_stats,
+                            total_analyzed,
+                            state,
+                            show_pbar,
+                            pbar,
+                            batch_of_pairs,
+                        )
+                        return batch_of_pairs, False
                     try:
-                        idx_pair = next(pair_iter)
+                        idx_pair = next(valid_pair_idx_iter)
                     except StopIteration:
                         continue
-                    pending.add(executor.submit(worker_process_pair, idx_pair))
+                    pending.add(
+                        executor.submit(worker_process_pair, idx_pair)
+                    )
         except KeyboardInterrupt:
-            logger.info('Interrupted by user. Aborting parallel scan...')
+            logger.info(
+                'Interrupted by user. Aborting parallel scan...'
+            )
             rq_exit(1, abort=True)
         except BrokenProcessPool as err:
             logger.info(
-                'Process pool interrupted while spawning/running workers. '
-                'Aborting scan.'
+                'Process pool interrupted while spawning/running '
+                'workers. Aborting scan.'
             )
             logger.debug(f'Broken process pool details: {err}')
             rq_exit(1, abort=True)
+    return batch_of_pairs, True
+
+
+def process_valid_pair_indices_parallel(
+    catalog,
+    valid_pair_idx,
+    npairs,
+    state,
+    show_pbar,
+    pbar,
+):
+    """Process valid pair indices, recycling workers after each chunk."""
+    nprocs = state['nprocs']
+    worker_cache_size = effective_worker_cache_size(nprocs)
+    logger.info(
+        'Using parallel pair processing: '
+        f'workers={nprocs:n}, '
+        f'worker_cache_size={worker_cache_size:n}, '
+        f'recycle every {WORKER_RECYCLE_CHUNK_SIZE:n} pairs'
+    )
+    cache_stats = ParallelCacheStatsCollector()
+    batch_of_pairs = []
+    total_analyzed = [0]
+    cfg_dict = to_picklable_config_dict(config)
+    pair_iter = iter(valid_pair_idx)
+    chunk = 0
+    done = False
+    while not done:
+        chunk += 1
+        chunk_batch, done = _process_pair_chunk(
+            pair_iter,
+            WORKER_RECYCLE_CHUNK_SIZE,
+            nprocs,
+            cfg_dict,
+            catalog,
+            worker_cache_size,
+            cache_stats,
+            state,
+            show_pbar,
+            pbar,
+            total_analyzed,
+        )
+        batch_of_pairs.extend(chunk_batch)
+        if not done:
+            logger.info(
+                f'Worker pool recycled after chunk {chunk} '
+                f'({total_analyzed[0]:n} pairs processed so far)'
+            )
     _finalize_pair_processing(
         batch_of_pairs,
         pbar,
-        analyzed_pairs,
+        total_analyzed[0],
         state,
         cache_stats,
     )
-    return analyzed_pairs
+    return total_analyzed[0]
 
 
 def process_valid_pair_indices(
