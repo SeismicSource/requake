@@ -92,7 +92,7 @@ def log_memory_usage(prefix=''):
     if mem_mb < 0:
         return
     label = f'{prefix} ' if prefix else ''
-    logger.info(f'[MEM] {label}{mem_mb:,.0f} MiB')
+    logger.debug(f'[MEM] {label}{mem_mb:,.0f} MiB')
 
 
 SLURM_CONTEXT_KEYS = (
