@@ -27,10 +27,31 @@ _MEMORY_LOG_INTERVAL_S = 300.0  # log memory every 5 minutes
 def _get_rss_mb():
     """Return current process memory usage in MiB, or -1 when unavailable.
 
-    On Linux, prefers Pss from ``/proc/self/smaps_rollup``, which
-    divides shared pages proportionally — important when many worker
-    processes share fork-copied pages.  Falls back to ``psutil`` (all
-    platforms), then ``/proc/self/status`` VmRSS (Linux).
+    Memory metrics glossary
+    -----------------------
+    **VmRSS** (``/proc/self/status``) — Resident Set Size: total
+    physical RAM currently occupied by the process.  Includes shared
+    pages (libraries, fork-copied data) at their full size, so it
+    double-counts memory shared across workers.
+
+    **RSS** (``psutil``) — same as VmRSS, but obtained via the
+    cross-platform ``psutil`` library.
+
+    **Pss** (``/proc/self/smaps_rollup``) — Proportional Set Size:
+    like RSS, but shared pages are divided evenly among the processes
+    that share them.  In a fork-heavy workload (e.g. 64 workers that
+    all inherited the parent's catalog), each worker's Pss credits it
+    with only 1/65 of those shared pages.  This gives a much more
+    realistic measure of per-worker memory cost.
+
+    Fallback order
+    --------------
+    1. ``/proc/self/smaps_rollup`` Pss (Linux — best for fork-heavy
+       workloads)
+    2. ``psutil`` RSS (cross-platform)
+    3. ``/proc/self/status`` VmRSS (Linux, no psutil)
+    4. Return -1 (no memory data available — logging is silently
+       suppressed)
     """
     # Linux-only: Pss is the most accurate metric for fork-heavy workloads.
     with suppress(Exception):
@@ -320,7 +341,7 @@ def _log_memory_if_due(state, label='', waveform_pair=None):
         )()
         if total_worker_rss > 0:
             logger.info(
-                f'[MEM] {label}worker total: {total_worker_rss:,.0f} MiB'
+                f'[MEM] {label} worker total: {total_worker_rss:,.0f} MiB'
                 if label
                 else f'[MEM] worker total: {total_worker_rss:,.0f} MiB'
             )
