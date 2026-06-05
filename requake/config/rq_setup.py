@@ -28,6 +28,12 @@ from .utils import (
 # Note: modules are lazily imported to speed up the startup time.
 # pylint: disable=relative-beyond-top-level,import-outside-toplevel
 
+
+def _memory_log_filter(record):
+    """Suppress requake.memory logger records from console handlers."""
+    return not record.name.startswith('requake.memory')
+
+
 logger = None  # pylint: disable=invalid-name
 PYTHON_VERSION_STR = None
 NUMPY_VERSION_STR = None
@@ -112,6 +118,7 @@ def _setup_tqdm_logging(logger_root):
                 self.handleError(record)
     console = TqdmLoggingHandler()
     console.setLevel(logging.INFO)
+    console.addFilter(_memory_log_filter)
     # Add logger color coding on all platforms but win32
     if sys.platform != 'win32' and sys.stdout.isatty():
         console.emit = _color_handler_emit(console.emit)
@@ -151,6 +158,7 @@ def _setup_logging(progname, action_name):
     else:
         console = logging.StreamHandler()
         console.setLevel(logging.INFO)
+        console.addFilter(_memory_log_filter)
         formatter = logging.Formatter('%(levelname)-8s %(message)s')
         console.setFormatter(formatter)
         logger_root.addHandler(console)
