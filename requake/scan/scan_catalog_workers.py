@@ -41,6 +41,7 @@ from .scan_catalog_helpers import (
     log_pair_timing_split,
     progress_summary,
     update_noninteractive_progress,
+    _get_rss_mb,
 )
 
 logger = logging.getLogger('scan_catalog')
@@ -85,14 +86,26 @@ class ParallelCacheStatsCollector:
     def __init__(self):
         """Initialize the per-worker cache-stats registry."""
         self._stats_by_pid = {}
+        self._rss_by_pid = {}
 
     def update_from_result(self, result):
-        """Store the latest cache-stats snapshot for a worker."""
+        """Store the latest cache-stats snapshot and RSS for a worker."""
         worker_pid = result.get('worker_pid')
-        stats = result.get('worker_cache_stats')
-        if worker_pid is None or stats is None:
+        if worker_pid is None:
             return
-        self._stats_by_pid[worker_pid] = stats
+        stats = result.get('worker_cache_stats')
+        rss_mb = result.get('rss_mb')
+        if stats is not None:
+            self._stats_by_pid[worker_pid] = stats
+        if rss_mb is not None and rss_mb > 0:
+            self._rss_by_pid[worker_pid] = rss_mb
+
+    def get_total_worker_rss_mb(self):
+        """Return total RSS across all known workers, or -1."""
+        return (
+            sum(self._rss_by_pid.values()) if self._rss_by_pid
+            else -1.0
+        )
 
     def get_cache_stats(self):
         """Return merged cache stats across all workers."""
@@ -249,6 +262,7 @@ def worker_process_pair(idx_pair):
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
+            'rss_mb': _get_rss_mb(),
             'trace_id': pair_out.trace_id,
             'lag_samples': pair_out.lag_samples,
             'cc_max': pair_out.cc_max,
@@ -264,6 +278,7 @@ def worker_process_pair(idx_pair):
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
+            'rss_mb': _get_rss_mb(),
             'trace_id': pair[0].trace_id if pair is not None else None,
             'message': _safe_exception_message(err),
             'fetch_dt': 0.0,
@@ -277,6 +292,7 @@ def worker_process_pair(idx_pair):
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
+            'rss_mb': _get_rss_mb(),
             'trace_id': pair[0].trace_id if pair is not None else None,
             'message': (
                 f'{type(err).__name__}: {_safe_exception_message(err)}'

@@ -63,6 +63,10 @@ class WaveformPair:
         self.tr_cache = OrderedDict()
         self.trace_id_attempts = defaultdict(list)
         self.sorted_trace_ids_cache = {}
+        self.max_sorted_trace_ids_cache_size = max(
+            self.max_trace_cache_size * 2,
+            100,
+        )
         self.trace_cache_hits = 0
         self.trace_cache_misses = 0
         self.sorted_trace_ids_cache_hits = 0
@@ -166,6 +170,14 @@ class WaveformPair:
             )
             distances[trace_id] = distance
         sorted_trace_ids = tuple(sorted(distances, key=distances.get))
+        if len(self.sorted_trace_ids_cache) >= (
+            self.max_sorted_trace_ids_cache_size
+        ):
+            # Evict oldest entry to keep cache bounded
+            with contextlib.suppress(StopIteration):
+                self.sorted_trace_ids_cache.pop(
+                    next(iter(self.sorted_trace_ids_cache))
+                )
         self.sorted_trace_ids_cache[cache_key] = sorted_trace_ids
         return sorted_trace_ids
 

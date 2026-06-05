@@ -21,6 +21,35 @@ from ..config import config, rq_exit
 
 logger = logging.getLogger('scan_catalog')
 
+_MEMORY_LOG_INTERVAL_S = 300.0  # log memory every 5 minutes
+
+
+def _get_rss_mb():
+    """Return current process RSS in MiB, or -1 when unavailable.
+
+    Tries ``psutil`` first, then ``/proc/self/status`` on Linux.
+    """
+    with suppress(Exception):
+        import psutil
+        return psutil.Process().memory_info().rss / (1024 * 1024)
+    with suppress(Exception):
+        with open('/proc/self/status', 'r', encoding='utf-8') as fh:
+            for line in fh:
+                if line.startswith('VmRSS:'):
+                    parts = line.split()
+                    return float(parts[1]) / 1024.0  # kB -> MiB
+    return -1.0
+
+
+def log_memory_usage(prefix=''):
+    """Log current process RSS when psutil or /proc is available."""
+    rss_mb = _get_rss_mb()
+    if rss_mb < 0:
+        return
+    label = f'{prefix} ' if prefix else ''
+    logger.info(f'{label}memory: {rss_mb:,.0f} MiB RSS')
+
+
 SLURM_CONTEXT_KEYS = (
     'SLURM_JOB_ID',
     'SLURM_JOB_NAME',
@@ -266,6 +295,25 @@ def _log_noninteractive_progress(
     return next_log_time + 60.0, True
 
 
+def _log_memory_if_due(state, label='', waveform_pair=None):
+    """Log memory usage when the configured interval has elapsed."""
+    now = time.monotonic()
+    if now < state['next_memory_log_time']:
+        return
+    state['next_memory_log_time'] = now + _MEMORY_LOG_INTERVAL_S
+    log_memory_usage(prefix=label)
+    if waveform_pair is not None:
+        total_worker_rss = getattr(
+            waveform_pair, 'get_total_worker_rss_mb', lambda: -1.0
+        )()
+        if total_worker_rss > 0:
+            logger.info(
+                f'{label} worker RSS total: {total_worker_rss:,.0f} MiB'
+                if label
+                else f'worker RSS total: {total_worker_rss:,.0f} MiB'
+            )
+
+
 def init_pair_processing_state(npairs, initial_processed, total_pairs):
     """Build mutable state for pair processing."""
     if total_pairs is None:
@@ -274,6 +322,7 @@ def init_pair_processing_state(npairs, initial_processed, total_pairs):
     return {
         'start_time': start_time,
         'next_log_time': start_time + 60.0,
+        'next_memory_log_time': start_time + _MEMORY_LOG_INTERVAL_S,
         'waveform_fetch_time': 0.0,
         'crosscorr_time': 0.0,
         'window_start_time': start_time,
@@ -312,6 +361,9 @@ def update_noninteractive_progress(
 ):
     """Periodically log progress in non-interactive mode."""
     if show_pbar:
+        _log_memory_if_due(
+            state, label='[parent]', waveform_pair=waveform_pair,
+        )
         return
     processed_total = state['initial_processed'] + processed
     next_log_time, did_log = _log_noninteractive_progress(
@@ -332,3 +384,4 @@ def update_noninteractive_progress(
         state['window_pair_count'] = 0
         state['window_fetch_time'] = 0.0
         state['window_crosscorr_time'] = 0.0
+    _log_memory_if_due(state, label='[parent]', waveform_pair=waveform_pair)

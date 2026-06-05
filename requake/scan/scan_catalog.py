@@ -36,6 +36,7 @@ from .scan_catalog_pairs import (
 )
 from .scan_catalog_helpers import (
     get_slurm_context,
+    log_memory_usage,
     log_slurm_runtime_context,
     resolve_scan_catalog_nprocs,
 )
@@ -151,6 +152,7 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
     logger.info(f'Final pairs: {npairs:n}')
     logger.info(f'Pair ratio: {ratio:.6f} ({ratio:.2%})')
     log_pair_grouping_stats(valid_pair_idx)
+    log_memory_usage(prefix='[parent before processing]')
     logger.info(
         f'Processing {npairs:n} event pairs '
         f'({skipped_npairs:n}/{total_valid_pairs:n} already processed)'
@@ -169,6 +171,7 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
             f'Skipped {skipped_npairs:n} event pairs already present '
             'in the database'
         )
+    log_memory_usage(prefix='[parent after processing]')
     return analyzed_npairs
 
 
