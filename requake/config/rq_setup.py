@@ -30,8 +30,8 @@ from .utils import (
 
 
 def _memory_log_filter(record):
-    """Suppress requake.memory logger records from console handlers."""
-    return not record.name.startswith('requake.memory')
+    """Suppress [MEM] messages from TTY console handlers."""
+    return '[MEM]' not in record.getMessage()
 
 
 logger = None  # pylint: disable=invalid-name
@@ -158,7 +158,6 @@ def _setup_logging(progname, action_name):
     else:
         console = logging.StreamHandler()
         console.setLevel(logging.INFO)
-        console.addFilter(_memory_log_filter)
         formatter = logging.Formatter('%(levelname)-8s %(message)s')
         console.setFormatter(formatter)
         logger_root.addHandler(console)

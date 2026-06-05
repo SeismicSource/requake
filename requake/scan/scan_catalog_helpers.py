@@ -21,9 +21,6 @@ from tqdm import tqdm
 from ..config import config, rq_exit
 
 logger = logging.getLogger('scan_catalog')
-# Dedicated logger for memory diagnostics — always writes to the log
-# file but is filtered out of the console handler in rq_setup.py.
-mem_logger = logging.getLogger('requake.memory')
 
 _MEMORY_LOG_INTERVAL_S = 300.0  # log memory every 5 minutes
 
@@ -104,7 +101,7 @@ def log_memory_usage(prefix=''):
     if mem_mb < 0:
         return
     label = f'{prefix} ' if prefix else ''
-    logger.debug(f'[MEM] {label}{mem_mb:,.0f} MiB')
+    logger.info('[MEM] %s%.0f MiB', label, mem_mb)
 
 
 SLURM_CONTEXT_KEYS = (
