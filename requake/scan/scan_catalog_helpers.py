@@ -25,13 +25,25 @@ _MEMORY_LOG_INTERVAL_S = 300.0  # log memory every 5 minutes
 
 
 def _get_rss_mb():
-    """Return current process RSS in MiB, or -1 when unavailable.
+    """Return current process memory usage in MiB, or -1 when unavailable.
 
-    Tries ``psutil`` first, then ``/proc/self/status`` on Linux.
+    On Linux, prefers Pss from ``/proc/self/smaps_rollup``, which
+    divides shared pages proportionally — important when many worker
+    processes share fork-copied pages.  Falls back to ``psutil`` (all
+    platforms), then ``/proc/self/status`` VmRSS (Linux).
     """
+    # Linux-only: Pss is the most accurate metric for fork-heavy workloads.
+    with suppress(Exception):
+        with open('/proc/self/smaps_rollup', 'r', encoding='utf-8') as fh:
+            for line in fh:
+                if line.startswith('Pss:'):
+                    parts = line.split()
+                    return float(parts[1]) / 1024.0  # kB -> MiB
+    # Cross-platform: psutil works on Linux, macOS, and Windows.
     with suppress(Exception):
         import psutil
         return psutil.Process().memory_info().rss / (1024 * 1024)
+    # Linux fallback when psutil is not installed.
     with suppress(Exception):
         with open('/proc/self/status', 'r', encoding='utf-8') as fh:
             for line in fh:
@@ -42,12 +54,12 @@ def _get_rss_mb():
 
 
 def log_memory_usage(prefix=''):
-    """Log current process RSS when psutil or /proc is available."""
-    rss_mb = _get_rss_mb()
-    if rss_mb < 0:
+    """Log current process memory usage (Pss on Linux, RSS elsewhere)."""
+    mem_mb = _get_rss_mb()
+    if mem_mb < 0:
         return
     label = f'{prefix} ' if prefix else ''
-    logger.info(f'{label}memory: {rss_mb:,.0f} MiB RSS')
+    logger.info(f'[MEM] {label}{mem_mb:,.0f} MiB')
 
 
 SLURM_CONTEXT_KEYS = (
@@ -308,9 +320,9 @@ def _log_memory_if_due(state, label='', waveform_pair=None):
         )()
         if total_worker_rss > 0:
             logger.info(
-                f'{label} worker RSS total: {total_worker_rss:,.0f} MiB'
+                f'[MEM] {label}worker total: {total_worker_rss:,.0f} MiB'
                 if label
-                else f'worker RSS total: {total_worker_rss:,.0f} MiB'
+                else f'[MEM] worker total: {total_worker_rss:,.0f} MiB'
             )
 
 
