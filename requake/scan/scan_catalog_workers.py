@@ -51,7 +51,7 @@ from .scan_catalog_helpers import (
     log_pair_timing_split,
     progress_summary,
     update_noninteractive_progress,
-    _get_memory_mb,
+    get_memory_mb,
 )
 
 logger = logging.getLogger('scan_catalog')
@@ -94,7 +94,7 @@ class _WorkerLogCaptureHandler(logging.Handler):
             self.messages.append(message)
 
 
-class ParallelCacheStatsCollector:
+class _ParallelCacheStatsCollector:
     """Collect and aggregate cache stats snapshots from workers."""
 
     def __init__(self):
@@ -149,7 +149,7 @@ class ParallelCacheStatsCollector:
         return totals
 
 
-def effective_worker_cache_size(nprocs):
+def _effective_worker_cache_size(nprocs):
     """Return per-worker waveform cache size."""
     parallel_cache_size = int(
         getattr(config, 'catalog_waveform_cache_size_parallel', 0)
@@ -182,7 +182,7 @@ def _connect_worker_clients():
     config.dataselect_client = FDSNClient(config.fdsn_dataselect_url)
 
 
-def silence_worker_console_logging():
+def _silence_worker_console_logging():
     """Disable worker console logging to keep tqdm output stable."""
     root_logger = logging.getLogger()
     for handler in list(root_logger.handlers):
@@ -197,7 +197,7 @@ def _worker_initializer(cfg_dict, catalog, worker_cache_size):
     global _WORKER_CATALOG
     global _WORKER_DIAGNOSTICS
 
-    silence_worker_console_logging()
+    _silence_worker_console_logging()
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     restored_cfg = from_picklable_config_dict(cfg_dict)
     config.clear()
@@ -248,7 +248,7 @@ def _process_pair(pair, waveform_pair):
     ), waveform_fetch_dt, crosscorr_dt
 
 
-def worker_process_pair(idx_pair):
+def _worker_process_pair(idx_pair):
     """Process one pair index in a worker and return a compact payload."""
     root_logger = logging.getLogger()
     capture_handler = _WorkerLogCaptureHandler()
@@ -272,7 +272,7 @@ def worker_process_pair(idx_pair):
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
-            'rss_mb': _get_memory_mb(fast=True),
+            'rss_mb': get_memory_mb(fast=True),
             'trace_id': pair_out.trace_id,
             'lag_samples': pair_out.lag_samples,
             'cc_max': pair_out.cc_max,
@@ -288,7 +288,7 @@ def worker_process_pair(idx_pair):
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
-            'rss_mb': _get_memory_mb(fast=True),
+            'rss_mb': get_memory_mb(fast=True),
             'trace_id': pair[0].trace_id if pair is not None else None,
             'message': _safe_exception_message(err),
             'fetch_dt': 0.0,
@@ -302,7 +302,7 @@ def worker_process_pair(idx_pair):
             'idx1': idx1,
             'idx2': idx2,
             'worker_pid': os.getpid(),
-            'rss_mb': _get_memory_mb(fast=True),
+            'rss_mb': get_memory_mb(fast=True),
             'trace_id': pair[0].trace_id if pair is not None else None,
             'message': (
                 f'{type(err).__name__}: {_safe_exception_message(err)}'
@@ -317,12 +317,12 @@ def worker_process_pair(idx_pair):
         root_logger.removeHandler(capture_handler)
 
 
-def max_pending_futures(nprocs):
+def _max_pending_futures(nprocs):
     """Return bounded number of in-flight futures."""
     return max(MIN_PENDING_FUTURES, MAX_PENDING_MULTIPLIER * nprocs)
 
 
-def result_to_pair_record(catalog, result):
+def _result_to_pair_record(catalog, result):
     """Convert worker payload to PairRecord and timings."""
     idx1 = result['idx1']
     idx2 = result['idx2']
@@ -453,7 +453,7 @@ def _handle_future_result(
     total_analyzed[0] += 1
     if pbar is not None:
         pbar.update()
-    pair_record, fetch_dt, crosscorr_dt = result_to_pair_record(
+    pair_record, fetch_dt, crosscorr_dt = _result_to_pair_record(
         catalog, result,
     )
     state['waveform_fetch_time'] += fetch_dt
@@ -548,7 +548,7 @@ def _handle_done_futures(
             idx_pair = next(valid_pair_idx_iter)
         except StopIteration:
             continue
-        pending.add(executor.submit(worker_process_pair, idx_pair))
+        pending.add(executor.submit(_worker_process_pair, idx_pair))
     return False
 
 
@@ -560,7 +560,7 @@ def _fill_initial_pending(executor, valid_pair_idx_iter, max_pending):
             idx_pair = next(valid_pair_idx_iter)
         except StopIteration:
             break
-        pending.add(executor.submit(worker_process_pair, idx_pair))
+        pending.add(executor.submit(_worker_process_pair, idx_pair))
     return pending
 
 
@@ -599,7 +599,7 @@ def _process_pair_chunk(
             wait_for_sigint_pause()
             pending = _fill_initial_pending(
                 executor, valid_pair_idx_iter,
-                max_pending_futures(nprocs),
+                _max_pending_futures(nprocs),
             )
             while pending:
                 wait_for_sigint_pause()
@@ -675,7 +675,7 @@ def _emit_chunk_diagnostics(
     )
 
 
-def process_valid_pair_indices_parallel(
+def _process_valid_pair_indices_parallel(
     catalog,
     valid_pair_idx,
     npairs,
@@ -685,14 +685,14 @@ def process_valid_pair_indices_parallel(
 ):
     """Process valid pair indices, recycling workers after each chunk."""
     nprocs = state['nprocs']
-    worker_cache_size = effective_worker_cache_size(nprocs)
+    worker_cache_size = _effective_worker_cache_size(nprocs)
     logger.info(
         '[rq:scan] Using parallel pair processing: '
         'workers=%d, worker_cache_size=%d, '
         'recycle every %d pairs',
         nprocs, worker_cache_size, WORKER_RECYCLE_CHUNK_SIZE,
     )
-    cache_stats = ParallelCacheStatsCollector()
+    cache_stats = _ParallelCacheStatsCollector()
     batch_of_pairs = []
     total_analyzed = [0]
     cfg_dict = to_picklable_config_dict(config)
@@ -762,7 +762,7 @@ def process_valid_pair_indices(
     state['slurm_context'] = slurm_context or {}
     show_pbar, pbar = init_progress_bar(state)
     if nprocs > 1 and npairs > 0:
-        return process_valid_pair_indices_parallel(
+        return _process_valid_pair_indices_parallel(
             catalog,
             valid_pair_idx,
             npairs,

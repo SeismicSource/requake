@@ -30,7 +30,7 @@ logger = logging.getLogger('scan_catalog')
 _MEMORY_LOG_INTERVAL_S = 300.0  # log memory every 5 minutes
 
 
-def _get_memory_mb(fast=False):
+def get_memory_mb(fast=False):
     """Return current process memory usage in MiB, or -1 when unavailable.
 
     Memory metrics glossary
@@ -102,7 +102,7 @@ def _get_memory_mb(fast=False):
 
 def log_memory_usage(prefix=''):
     """Log current process memory usage (Pss on Linux, RSS elsewhere)."""
-    mem_mb = _get_memory_mb(fast=False)
+    mem_mb = get_memory_mb(fast=False)
     if mem_mb < 0:
         return
     label = f'{prefix} ' if prefix else ''

@@ -18,7 +18,7 @@ from ..config import config
 from ..database.pairs import read_event_key_rows, read_pair_key_ids
 
 logger = logging.getLogger('scan_catalog')
-EARTH_RADIUS_KM = 6371.0088
+_EARTH_RADIUS_KM = 6371.0088
 
 
 def _build_spatial_index(catalog):
@@ -39,7 +39,7 @@ def _build_spatial_index(catalog):
         )
     )
     tree = cKDTree(coords)
-    angular_dist = range_km / EARTH_RADIUS_KM
+    angular_dist = range_km / _EARTH_RADIUS_KM
     chord_dist = 2.0 * math.sin(angular_dist / 2.0)
     return coords, tree, chord_dist
 

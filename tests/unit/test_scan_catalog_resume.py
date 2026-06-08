@@ -31,12 +31,12 @@ from requake.scan.slurm_diagnostics import (
     slurm_progress_suffix,
 )
 from requake.scan.scan_catalog_workers import (
-    ParallelCacheStatsCollector,
-    effective_worker_cache_size,
-    max_pending_futures,
+    _ParallelCacheStatsCollector,
+    _effective_worker_cache_size,
+    _max_pending_futures,
     process_valid_pair_indices,
-    result_to_pair_record,
-    silence_worker_console_logging,
+    _result_to_pair_record,
+    _silence_worker_console_logging,
 )
 
 SCAN_CATALOG_MODULE = importlib.import_module('requake.scan.scan_catalog')
@@ -322,9 +322,9 @@ class TestScanCatalogResume(unittest.TestCase):
 
     def test_max_pending_futures_is_bounded(self):
         """Pending futures should have a deterministic lower bound."""
-        self.assertEqual(max_pending_futures(1), 32)
-        self.assertEqual(max_pending_futures(8), 32)
-        self.assertEqual(max_pending_futures(20), 40)
+        self.assertEqual(_max_pending_futures(1), 32)
+        self.assertEqual(_max_pending_futures(8), 32)
+        self.assertEqual(_max_pending_futures(20), 40)
 
     def test_effective_worker_cache_size_splits_global_cache(self):
         """Without override, parallel cache should split global budget."""
@@ -333,7 +333,7 @@ class TestScanCatalogResume(unittest.TestCase):
             catalog_waveform_cache_size_parallel=0,
         )
         with patch.object(WORKERS_MODULE, 'config', dummy_config):
-            size = effective_worker_cache_size(7)
+            size = _effective_worker_cache_size(7)
         self.assertEqual(size, 714)
 
     def test_effective_worker_cache_size_parallel_override(self):
@@ -343,7 +343,7 @@ class TestScanCatalogResume(unittest.TestCase):
             catalog_waveform_cache_size_parallel=1200,
         )
         with patch.object(WORKERS_MODULE, 'config', dummy_config):
-            size = effective_worker_cache_size(7)
+            size = _effective_worker_cache_size(7)
         self.assertEqual(size, 1200)
 
     def test_process_valid_pair_indices_uses_parallel_branch(self):
@@ -354,7 +354,7 @@ class TestScanCatalogResume(unittest.TestCase):
             return_value=(False, None),
         ), patch.object(
             WORKERS_MODULE,
-            'process_valid_pair_indices_parallel',
+            '_process_valid_pair_indices_parallel',
             return_value=11,
         ) as parallel_mock:
             result = process_valid_pair_indices(
@@ -459,7 +459,7 @@ class TestScanCatalogResume(unittest.TestCase):
             '_process_pair',
             return_value=(dummy_pair_record, 0.1, 0.2),
         ), patch.object(WORKERS_MODULE.os, 'getpid', return_value=321):
-            result = WORKERS_MODULE.worker_process_pair((0, 1))
+            result = WORKERS_MODULE._worker_process_pair((0, 1))
         self.assertEqual(result['idx1'], 0)
         self.assertEqual(result['idx2'], 1)
         self.assertEqual(result['worker_pid'], 321)
@@ -510,7 +510,7 @@ class TestScanCatalogResume(unittest.TestCase):
             return_value={},
         ), patch.object(
             WORKERS_MODULE,
-            'effective_worker_cache_size',
+            '_effective_worker_cache_size',
             return_value=100,
         ), patch.object(
             WORKERS_MODULE,
@@ -523,7 +523,7 @@ class TestScanCatalogResume(unittest.TestCase):
             '_flush_pair_batch_if_needed',
         ):
             analyzed = (
-                WORKERS_MODULE.process_valid_pair_indices_parallel(
+                WORKERS_MODULE._process_valid_pair_indices_parallel(
                     catalog,
                     valid_pair_idx,
                     len(valid_pair_idx),
@@ -535,7 +535,7 @@ class TestScanCatalogResume(unittest.TestCase):
         self.assertEqual(analyzed, len(valid_pair_idx))
         self.assertLessEqual(
             _RecordingExecutor.max_pending_seen,
-            WORKERS_MODULE.max_pending_futures(2),
+            WORKERS_MODULE._max_pending_futures(2),
         )
 
     def test_parallel_path_flushes_batches_at_threshold(self):
@@ -587,7 +587,7 @@ class TestScanCatalogResume(unittest.TestCase):
             return_value={},
         ), patch.object(
             WORKERS_MODULE,
-            'effective_worker_cache_size',
+            '_effective_worker_cache_size',
             return_value=100,
         ), patch.object(
             WORKERS_MODULE,
@@ -601,7 +601,7 @@ class TestScanCatalogResume(unittest.TestCase):
             '_finalize_pair_processing',
             side_effect=_record_finalize,
         ):
-            WORKERS_MODULE.process_valid_pair_indices_parallel(
+            WORKERS_MODULE._process_valid_pair_indices_parallel(
                 catalog,
                 valid_pair_idx,
                 len(valid_pair_idx),
@@ -620,7 +620,7 @@ class TestScanCatalogResume(unittest.TestCase):
         extra_handler = logging.StreamHandler(stream=sys.stderr)
         root_logger.addHandler(extra_handler)
         try:
-            silence_worker_console_logging()
+            _silence_worker_console_logging()
             self.assertEqual(root_logger.level, logging.INFO)
             self.assertEqual(len(root_logger.handlers), 1)
             self.assertIsInstance(root_logger.handlers[0], logging.NullHandler)
@@ -647,7 +647,7 @@ class TestScanCatalogResume(unittest.TestCase):
         }
         catalog = [_DummyEvent('A'), _DummyEvent('B')]
         with patch.object(WORKERS_MODULE.logger, 'warning') as warning:
-            pair_record, fetch_dt, cc_dt = result_to_pair_record(
+            pair_record, fetch_dt, cc_dt = _result_to_pair_record(
                 catalog,
                 result,
             )
@@ -691,7 +691,7 @@ class TestScanCatalogResume(unittest.TestCase):
 
     def test_parallel_cache_stats_collector_aggregates_workers(self):
         """Parallel cache collector should merge worker snapshots."""
-        collector = ParallelCacheStatsCollector()
+        collector = _ParallelCacheStatsCollector()
         collector.update_from_result(
             {
                 'worker_pid': 11,
