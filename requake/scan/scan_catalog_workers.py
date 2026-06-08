@@ -9,6 +9,7 @@ Worker and pair-processing helpers for catalog-based repeater scans.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
+import contextlib
 import logging
 import os
 import signal
@@ -33,6 +34,16 @@ from ..waveforms import (
     WaveformPair,
     cc_waveform_pair,
 )
+from .diagnostics import (
+    WorkerDiagnostics,
+    log_chunk_summary,
+    log_pool_recycle,
+    log_result_buffer,
+    log_sqlite_info,
+    running_under_slurm,
+    SlowTaskDetector,
+    SystemSnapshot,
+)
 from .scan_catalog_helpers import (
     init_pair_processing_state,
     init_progress_bar,
@@ -55,6 +66,7 @@ WORKER_RECYCLE_CHUNK_SIZE = 500_000
 
 _WORKER_WAVEFORM_PAIR = None
 _WORKER_CATALOG = None
+_WORKER_DIAGNOSTICS = None
 
 
 def _safe_exception_message(err):
@@ -184,6 +196,7 @@ def _worker_initializer(cfg_dict, catalog, worker_cache_size):
     """Initialize process-local worker state."""
     global _WORKER_WAVEFORM_PAIR
     global _WORKER_CATALOG
+    global _WORKER_DIAGNOSTICS
 
     silence_worker_console_logging()
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -194,6 +207,11 @@ def _worker_initializer(cfg_dict, catalog, worker_cache_size):
     config.catalog_waveform_cache_size = worker_cache_size
     _WORKER_WAVEFORM_PAIR = WaveformPair()
     _WORKER_CATALOG = catalog
+    if running_under_slurm():
+        _WORKER_DIAGNOSTICS = WorkerDiagnostics()
+        log_sqlite_info()
+    else:
+        _WORKER_DIAGNOSTICS = None
 
 
 def _fix_trace_id(stats):
@@ -248,6 +266,11 @@ def worker_process_pair(idx_pair):
             pair,
             _WORKER_WAVEFORM_PAIR,
         )
+        if _WORKER_DIAGNOSTICS is not None:
+            _WORKER_DIAGNOSTICS.pairs_processed += 1
+            _WORKER_DIAGNOSTICS.record_fetch(fetch_dt)
+            _WORKER_DIAGNOSTICS.record_correlation(crosscorr_dt)
+            _WORKER_DIAGNOSTICS.maybe_log()
         return {
             'status': 'ok',
             'idx1': idx1,
@@ -474,6 +497,75 @@ def _drain_pending_futures(
             )
 
 
+def _record_slow_task(result, task_duration, detector):
+    """Feed task duration into the slow-task detector if active."""
+    if detector is None or not running_under_slurm():
+        return
+    idx1 = result.get('idx1')
+    idx2 = result.get('idx2')
+    pair_id = (
+        f'{idx1},{idx2}'
+        if idx1 is not None and idx2 is not None
+        else None
+    )
+    detector.record(task_duration, pair_id)
+
+
+def _handle_done_futures(
+    done,
+    executor,
+    valid_pair_idx_iter,
+    pending,
+    catalog,
+    cache_stats,
+    total_analyzed,
+    state,
+    show_pbar,
+    pbar,
+    batch_of_pairs,
+    t_before_wait,
+    slow_task_detector,
+):
+    """Process completed futures and resubmit new work."""
+    for future in done:
+        wait_for_sigint_pause()
+        t_result = time.monotonic()
+        result = future.result()
+        _record_slow_task(
+            result, t_result - t_before_wait, slow_task_detector,
+        )
+        _handle_future_result(
+            result, catalog, cache_stats, total_analyzed,
+            state, show_pbar, pbar, batch_of_pairs,
+        )
+        if total_analyzed[0] - _handle_done_futures.chunk_start >= (
+            _handle_done_futures._chunk_size
+        ):
+            _drain_pending_futures(
+                pending, catalog, cache_stats, total_analyzed,
+                state, show_pbar, pbar, batch_of_pairs,
+            )
+            return True
+        try:
+            idx_pair = next(valid_pair_idx_iter)
+        except StopIteration:
+            continue
+        pending.add(executor.submit(worker_process_pair, idx_pair))
+    return False
+
+
+def _fill_initial_pending(executor, valid_pair_idx_iter, max_pending):
+    """Submit initial batch of futures up to max_pending."""
+    pending = set()
+    while len(pending) < max_pending:
+        try:
+            idx_pair = next(valid_pair_idx_iter)
+        except StopIteration:
+            break
+        pending.add(executor.submit(worker_process_pair, idx_pair))
+    return pending
+
+
 def _process_pair_chunk(
     valid_pair_idx_iter,
     chunk_size,
@@ -486,6 +578,8 @@ def _process_pair_chunk(
     show_pbar,
     pbar,
     total_analyzed,
+    chunk_id=0,
+    slow_task_detector=None,
 ):
     """Process one chunk of pairs with a fresh ProcessPoolExecutor.
 
@@ -493,62 +587,45 @@ def _process_pair_chunk(
     memory back to the OS.  *total_analyzed* is a single-element list
     used to carry the running pair count across chunks.
     """
+    _handle_done_futures.chunk_start = total_analyzed[0]
+    _handle_done_futures._chunk_size = chunk_size
     batch_of_pairs = []
-    chunk_start = total_analyzed[0]
-    max_pending = max_pending_futures(nprocs)
-    pending = set()
+    t_pool_create = time.monotonic()
     with ProcessPoolExecutor(
         max_workers=nprocs,
         initializer=_worker_initializer,
         initargs=(cfg_dict, tuple(catalog), worker_cache_size),
     ) as executor:
+        pool_startup = time.monotonic() - t_pool_create
         try:
             wait_for_sigint_pause()
-            while len(pending) < max_pending:
-                try:
-                    idx_pair = next(valid_pair_idx_iter)
-                except StopIteration:
-                    break
-                pending.add(
-                    executor.submit(worker_process_pair, idx_pair)
-                )
+            pending = _fill_initial_pending(
+                executor, valid_pair_idx_iter,
+                max_pending_futures(nprocs),
+            )
             while pending:
                 wait_for_sigint_pause()
+                t_before_wait = time.monotonic()
                 done, pending = wait(
-                    pending,
-                    return_when=FIRST_COMPLETED,
+                    pending, return_when=FIRST_COMPLETED,
                 )
-                for future in done:
-                    wait_for_sigint_pause()
-                    _handle_future_result(
-                        future.result(),
-                        catalog,
-                        cache_stats,
-                        total_analyzed,
-                        state,
-                        show_pbar,
-                        pbar,
+                chunk_done = _handle_done_futures(
+                    done, executor, valid_pair_idx_iter, pending,
+                    catalog, cache_stats, total_analyzed,
+                    state, show_pbar, pbar, batch_of_pairs,
+                    t_before_wait, slow_task_detector,
+                )
+                if chunk_done:
+                    pool_shutdown = time.monotonic() - t_pool_create
+                    _emit_chunk_diagnostics(
+                        chunk_id,
+                        _handle_done_futures.chunk_start,
+                        total_analyzed[0],
                         batch_of_pairs,
+                        pool_startup,
+                        pool_shutdown,
                     )
-                    if total_analyzed[0] - chunk_start >= chunk_size:
-                        _drain_pending_futures(
-                            pending,
-                            catalog,
-                            cache_stats,
-                            total_analyzed,
-                            state,
-                            show_pbar,
-                            pbar,
-                            batch_of_pairs,
-                        )
-                        return batch_of_pairs, False
-                    try:
-                        idx_pair = next(valid_pair_idx_iter)
-                    except StopIteration:
-                        continue
-                    pending.add(
-                        executor.submit(worker_process_pair, idx_pair)
-                    )
+                    return batch_of_pairs, False
         except KeyboardInterrupt:
             logger.info(
                 'Interrupted by user. Aborting parallel scan...'
@@ -561,7 +638,51 @@ def _process_pair_chunk(
             )
             logger.debug(f'Broken process pool details: {err}')
             rq_exit(1, abort=True)
+    pool_shutdown = time.monotonic() - t_pool_create
+    _emit_chunk_diagnostics(
+        chunk_id,
+        _handle_done_futures.chunk_start,
+        total_analyzed[0],
+        batch_of_pairs,
+        pool_startup,
+        pool_shutdown,
+    )
     return batch_of_pairs, True
+
+
+def _emit_chunk_diagnostics(
+    chunk_id,
+    chunk_start,
+    total_analyzed,
+    batch_of_pairs,
+    pool_startup,
+    pool_shutdown,
+):
+    """Emit chunk-level diagnostics when running under SLURM."""
+    if not running_under_slurm():
+        return
+    pairs_in_chunk = total_analyzed - chunk_start
+    elapsed = pool_shutdown
+    log_chunk_summary(
+        chunk_id,
+        pairs_in_chunk,
+        elapsed,
+        len(batch_of_pairs),
+    )
+    log_pool_recycle(chunk_id, pool_startup, pool_shutdown)
+    log_result_buffer(
+        chunk_id,
+        len(batch_of_pairs),
+        _rss_gb_diag(),
+    )
+
+
+def _rss_gb_diag():
+    """Return parent RSS in GiB for diagnostics, or -1.0."""
+    with contextlib.suppress(Exception):
+        import psutil
+        return psutil.Process().memory_info().rss / (1024 ** 3)
+    return -1.0
 
 
 def process_valid_pair_indices_parallel(
@@ -588,6 +709,13 @@ def process_valid_pair_indices_parallel(
     pair_iter = iter(valid_pair_idx)
     chunk = 0
     done = False
+
+    system_snapshot = None
+    slow_task_detector = None
+    if running_under_slurm():
+        system_snapshot = SystemSnapshot()
+        slow_task_detector = SlowTaskDetector()
+
     while not done:
         chunk += 1
         chunk_batch, done = _process_pair_chunk(
@@ -602,8 +730,15 @@ def process_valid_pair_indices_parallel(
             show_pbar,
             pbar,
             total_analyzed,
+            chunk_id=chunk,
+            slow_task_detector=slow_task_detector,
         )
         batch_of_pairs.extend(chunk_batch)
+        if system_snapshot is not None:
+            system_snapshot.maybe_log(
+                total_analyzed[0],
+                slurm_context=state.get('slurm_context'),
+            )
         if not done:
             logger.info(
                 f'Worker pool recycled after chunk {chunk} '

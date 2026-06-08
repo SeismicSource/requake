@@ -1,0 +1,333 @@
+# -*- coding: utf8 -*-
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""
+Low-overhead diagnostics for SLURM cluster runs.
+
+All instrumentation is guarded by :func:`running_under_slurm` so that
+local development runs are completely unaffected.
+
+:copyright:
+    2021-2026 Claudio Satriano <satriano@ipgp.fr>
+:license:
+    GNU General Public License v3.0 or later
+    (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
+"""
+import logging
+import os
+from collections import deque
+from contextlib import suppress
+from time import perf_counter as _perf_counter
+
+logger = logging.getLogger('scan_catalog.diag')
+
+# ---------------------------------------------------------------------------
+# SLURM detection
+# ---------------------------------------------------------------------------
+
+
+def running_under_slurm():
+    """Return ``True`` when the process is running inside a SLURM job."""
+    return 'SLURM_JOB_ID' in os.environ
+
+
+def _slurm_job_id():
+    """Return the SLURM job ID or ``None``."""
+    return os.environ.get('SLURM_JOB_ID')
+
+
+# ---------------------------------------------------------------------------
+# Startup log
+# ---------------------------------------------------------------------------
+
+
+def log_slurm_diagnostics_startup():
+    """Emit a single startup line showing whether diagnostics are active."""
+    enabled = running_under_slurm()
+    job_id = _slurm_job_id() if enabled else None
+    logger.info(
+        '[SLURM] DIAGNOSTICS enabled=%s job_id=%s',
+        str(enabled).lower(),
+        job_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# RSS helper (psutil, guarded)
+# ---------------------------------------------------------------------------
+
+
+def _rss_gb():
+    """Return current process RSS in GiB, or -1.0 on failure."""
+    if not running_under_slurm():
+        return -1.0
+    with suppress(Exception):
+        import psutil
+        return psutil.Process().memory_info().rss / (1024 ** 3)
+    return -1.0
+
+
+# ---------------------------------------------------------------------------
+# WorkerDiagnostics
+# ---------------------------------------------------------------------------
+
+
+class WorkerDiagnostics:
+    """Per-worker metrics collector.
+
+    Each worker process owns one instance.  Every 5 minutes it emits a
+    structured ``WORKER_STATS`` log line.
+    """
+
+    _LOG_INTERVAL = 300.0  # seconds
+
+    def __init__(self):
+        """Initialize per-worker counters and timers."""
+        self.pid = os.getpid()
+        self.pairs_processed = 0
+        self.worker_start_time = _perf_counter()
+        self.waveform_fetch_count = 0
+        self.waveform_fetch_time_total = 0.0
+        self.correlation_count = 0
+        self.correlation_time_total = 0.0
+        self._peak_rss_gb = 0.0
+        self._last_log_time = _perf_counter()
+
+    def _update_peak_rss(self, rss):
+        if rss > self._peak_rss_gb:
+            self._peak_rss_gb = rss
+
+    def record_fetch(self, elapsed):
+        """Accumulate one waveform-fetch timing sample."""
+        self.waveform_fetch_count += 1
+        self.waveform_fetch_time_total += elapsed
+
+    def record_correlation(self, elapsed):
+        """Accumulate one cross-correlation timing sample."""
+        self.correlation_count += 1
+        self.correlation_time_total += elapsed
+
+    def maybe_log(self):
+        """Emit ``WORKER_STATS`` if the log interval has elapsed."""
+        now = _perf_counter()
+        if now - self._last_log_time < self._LOG_INTERVAL:
+            return
+        self._last_log_time = now
+        rss = _rss_gb()
+        self._update_peak_rss(rss)
+        logger.info(
+            '[SLURM] WORKER_STATS pid=%d rss_gb=%.3f peak_gb=%.3f pairs=%d '
+            'db_fetches=%d db_time_s=%.3f corrs=%d corr_time_s=%.3f',
+            self.pid,
+            rss,
+            self._peak_rss_gb,
+            self.pairs_processed,
+            self.waveform_fetch_count,
+            self.waveform_fetch_time_total,
+            self.correlation_count,
+            self.correlation_time_total,
+        )
+
+
+# ---------------------------------------------------------------------------
+# SQLite diagnostics (per worker, one-shot at startup)
+# ---------------------------------------------------------------------------
+
+
+def _waveform_cache_db_path():
+    """Return the waveform-cache SQLite file path, or ``None``."""
+    with suppress(Exception):
+        from ..config import config
+        from pathlib import Path
+
+        if not bool(
+            getattr(config, 'catalog_waveform_disk_cache_enabled', True)
+        ):
+            return None
+        args = getattr(config, 'args', None)
+        outdir = getattr(args, 'outdir', None)
+        return (
+            None if outdir is None
+            else str(Path(outdir) / 'waveform_cache.sqlite')
+        )
+    return None
+
+
+def log_sqlite_info():
+    """Log SQLite database file size and page info once per worker."""
+    db_path = _waveform_cache_db_path()
+    if db_path is None or not os.path.exists(db_path):
+        return
+    db_size_gb = os.path.getsize(db_path) / (1024 ** 3)
+    page_count = '?'
+    page_size = '?'
+    with suppress(Exception):
+        import sqlite3
+        conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
+        try:
+            page_count = conn.execute('PRAGMA page_count').fetchone()[0]
+            page_size = conn.execute('PRAGMA page_size').fetchone()[0]
+        finally:
+            conn.close()
+    logger.info(
+        '[SLURM] SQLITE_INFO pid=%d db_size_gb=%.3f '
+        'page_count=%s page_size_bytes=%s',
+        os.getpid(),
+        db_size_gb,
+        page_count,
+        page_size,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Chunk summary (emitted by parent after each worker-recycle chunk)
+# ---------------------------------------------------------------------------
+
+
+def log_chunk_summary(
+    chunk_id,
+    pairs_processed,
+    elapsed,
+    results_in_chunk,
+):
+    """Emit ``CHUNK_SUMMARY`` after a worker-recycle chunk completes."""
+    throughput = pairs_processed / elapsed if elapsed > 0 else 0.0
+    logger.info(
+        '[SLURM] CHUNK_SUMMARY chunk=%d pairs_processed=%d elapsed_s=%.3f '
+        'throughput_pairs_per_s=%.1f results_in_chunk=%d',
+        chunk_id,
+        pairs_processed,
+        elapsed,
+        throughput,
+        results_in_chunk,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pool recycle timing (emitted by parent)
+# ---------------------------------------------------------------------------
+
+
+def log_pool_recycle(chunk_id, startup, shutdown):
+    """Emit ``POOL_RECYCLE`` with pool creation and shutdown timings."""
+    logger.info(
+        '[SLURM] POOL_RECYCLE chunk=%d startup_s=%.3f shutdown_s=%.3f',
+        chunk_id,
+        startup,
+        shutdown,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Result buffer (emitted by parent after each chunk)
+# ---------------------------------------------------------------------------
+
+
+def log_result_buffer(chunk_id, batch_len, rss_parent_gb):
+    """Emit ``RESULT_BUFFER`` to track batch growth."""
+    logger.info(
+        '[SLURM] RESULT_BUFFER chunk=%d len_batch_of_pairs=%d '
+        'rss_parent_gb=%.3f',
+        chunk_id,
+        batch_len,
+        rss_parent_gb,
+    )
+
+
+# ---------------------------------------------------------------------------
+# System snapshots (parent process, every 10 minutes)
+# ---------------------------------------------------------------------------
+
+
+class SystemSnapshot:
+    """Periodic system-level diagnostics for the parent process."""
+
+    _LOG_INTERVAL = 600.0  # 10 minutes
+
+    def __init__(self):
+        """Initialize system-snapshot state."""
+        self._last_log_time = _perf_counter()
+        self._prev_pairs = 0
+        self._prev_snap_time = _perf_counter()
+
+    def maybe_log(self, total_pairs_processed, slurm_context=None):
+        """Emit ``SYSTEM_STATS`` every 10 minutes."""
+        now = _perf_counter()
+        if now - self._last_log_time < self._LOG_INTERVAL:
+            return
+        self._last_log_time = now
+        interval = max(now - self._prev_snap_time, 1e-9)
+        pairs_delta = total_pairs_processed - self._prev_pairs
+        throughput = pairs_delta / interval
+        self._prev_pairs = total_pairs_processed
+        self._prev_snap_time = now
+        rss = _rss_gb()
+        loadavg = '?'
+        with suppress(Exception):
+            lavg = os.getloadavg()
+            loadavg = f'{lavg[0]:.2f},{lavg[1]:.2f},{lavg[2]:.2f}'
+        num_children = 0
+        if slurm_context:
+            with suppress(ValueError):
+                num_children = int(
+                    slurm_context.get('SLURM_NTASKS', 0)
+                )
+        logger.info(
+            '[SLURM] SYSTEM_STATS rss_parent_gb=%.3f num_children=%d '
+            'pairs_processed=%d throughput_pairs_per_s=%.1f '
+            'loadavg_1m_5m_15m=%s',
+            rss,
+            num_children,
+            total_pairs_processed,
+            throughput,
+            loadavg,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Slow-task detection
+# ---------------------------------------------------------------------------
+
+
+class SlowTaskDetector:
+    """Detect tasks whose duration far exceeds the rolling median.
+
+    Rate-limited to avoid log noise on multi-day runs.
+    """
+
+    # Emit at most one SLOW_TASK message per this many seconds.
+    _RATE_LIMIT_S = 30.0
+    # Task is "slow" when duration > _FACTOR × rolling median.
+    _FACTOR = 10.0
+    # Rolling window size.
+    _WINDOW = 256
+
+    def __init__(self):
+        """Initialize slow-task detector with empty rolling window."""
+        self._durations = deque(maxlen=self._WINDOW)
+        self._last_emit = 0.0
+
+    def record(self, duration, pair_id=None):
+        """Record a task duration and maybe emit ``SLOW_TASK``."""
+        self._durations.append(duration)
+        if len(self._durations) < 16:
+            # Not enough samples for a stable median yet.
+            return
+        sorted_d = sorted(self._durations)
+        mid = len(sorted_d) // 2
+        median = (
+            sorted_d[mid]
+            if len(sorted_d) % 2 == 1
+            else (sorted_d[mid - 1] + sorted_d[mid]) / 2.0
+        )
+        if median <= 0 or duration <= self._FACTOR * median:
+            return
+        now = _perf_counter()
+        if now - self._last_emit < self._RATE_LIMIT_S:
+            return
+        self._last_emit = now
+        logger.info(
+            '[SLURM] SLOW_TASK pid=%d duration_s=%.3f pair=%s',
+            os.getpid(),
+            duration,
+            pair_id if pair_id is not None else '?',
+        )

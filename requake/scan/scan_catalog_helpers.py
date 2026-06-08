@@ -136,6 +136,9 @@ def get_slurm_context():
 
 def log_slurm_runtime_context(slurm_context):
     """Log Slurm runtime details when available."""
+    from .diagnostics import log_slurm_diagnostics_startup
+
+    log_slurm_diagnostics_startup()
     if not slurm_context:
         return
     details = ', '.join(
