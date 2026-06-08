@@ -50,7 +50,10 @@ def build_valid_pair_indices(catalog):
     coords, tree, chord_dist = _build_spatial_index(catalog)
     if coords is None:
         return np.empty((0, 2), dtype=np.int32)
-    logger.info('Grouping valid pairs while building the spatial index...')
+    logger.info(
+        '[PAIRS] Grouping valid pairs while building '
+        'the spatial index...'
+    )
     counts = np.empty(nevents, dtype=np.int32)
     grouped_seconds = []
     npairs = 0
@@ -84,30 +87,31 @@ def log_pair_grouping_stats(valid_pair_idx):
     """Log whether pairs are grouped by first event."""
     npairs = len(valid_pair_idx)
     if npairs == 0:
-        logger.info('Pair grouping: no pairs to verify')
+        logger.info('[PAIRS] Pair grouping: no pairs to verify')
         return
     first = valid_pair_idx[:, 0]
     if npairs == 1:
-        logger.info('Pair grouping: single pair, grouping is trivial')
+        logger.info('[PAIRS] Pair grouping: single pair, grouping is trivial')
         return
     monotonic = bool(np.all(first[:-1] <= first[1:]))
     boundaries = np.flatnonzero(first[1:] != first[:-1]) + 1
     run_lengths = np.diff(np.concatenate(([0], boundaries, [npairs])))
     logger.info(
-        'Pair grouping: '
-        f'monotonic_first={monotonic}, '
-        f'first-event groups={len(run_lengths):n}, '
-        f'avg consecutive pairs per first event='
-        f'{run_lengths.mean():.1f}, '
-        f'median consecutive pairs per first event='
-        f'{np.median(run_lengths):.1f}, '
-        f'max consecutive pairs per first event='
-        f'{run_lengths.max():n}'
+        '[PAIRS] Pair grouping: '
+        'monotonic_first=%s, '
+        'first-event groups=%d, '
+        'avg consecutive pairs per first event=%.1f, '
+        'median consecutive pairs per first event=%.1f, '
+        'max consecutive pairs per first event=%d',
+        monotonic, len(run_lengths),
+        run_lengths.mean(),
+        np.median(run_lengths),
+        run_lengths.max(),
     )
     if not monotonic:
         logger.warning(
-            'Pairs are not grouped by first event; waveform reuse may be '
-            'degraded.'
+            '[PAIRS] Pairs are not grouped by first event; '
+            'waveform reuse may be degraded.'
         )
 
 
@@ -115,20 +119,20 @@ def load_existing_pair_ids(catalog):
     """Return packed pair IDs already present in the database."""
     t_read_keys_start = time.monotonic()
     logger.info(
-        'Loading existing pair key IDs from db file... '
+        '[PAIRS] Loading existing pair key IDs from db file...'
     )
     event_key_rows = read_event_key_rows()
     existing_pair_key_ids = read_pair_key_ids()
     read_keys_dt = time.monotonic() - t_read_keys_start
     logger.info(
-        f'{len(existing_pair_key_ids):n} unique pairs loaded '
-        f'in {read_keys_dt:.1f}s '
+        '[PAIRS] %d unique pairs loaded in %.1fs',
+        len(existing_pair_key_ids), read_keys_dt,
     )
     if not existing_pair_key_ids:
         return set()
     t_build_id_start = time.monotonic()
     logger.info(
-        'Building existing pair IDs for quick lookup... '
+        '[PAIRS] Building existing pair IDs for quick lookup...'
     )
     evid_to_idx = {
         ev.evid: idx for idx, ev in enumerate(catalog)
@@ -151,7 +155,7 @@ def load_existing_pair_ids(catalog):
         add_id(first * nevents + second)
     build_id_dt = time.monotonic() - t_build_id_start
     logger.info(
-        f'Existing pair IDs built in {build_id_dt:.1f}s'
+        '[PAIRS] Existing pair IDs built in %.1fs', build_id_dt,
     )
     return existing_ids
 
@@ -161,7 +165,7 @@ def mask_existing_pair_indices(valid_pair_idx, existing_pair_ids, nevents):
     if not existing_pair_ids or len(valid_pair_idx) == 0:
         return valid_pair_idx, 0
     t_mask_start = time.monotonic()
-    logger.info('Masking already processed pairs before processing...')
+    logger.info('[PAIRS] Masking already processed pairs before processing...')
     nevents_u64 = np.uint64(nevents)
     existing_ids = np.fromiter(
         existing_pair_ids,
@@ -177,6 +181,6 @@ def mask_existing_pair_indices(valid_pair_idx, existing_pair_ids, nevents):
     filtered = valid_pair_idx[keep]
     mask_dt = time.monotonic() - t_mask_start
     logger.info(
-        f'Existing-pair masking completed in {mask_dt:.1f}s'
+        '[PAIRS] Existing-pair masking completed in %.1fs', mask_dt,
     )
     return filtered, skipped

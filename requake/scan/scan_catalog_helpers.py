@@ -123,7 +123,7 @@ def resolve_scan_catalog_nprocs(npairs, slurm_context):
     config_nprocs = getattr(config, 'catalog_scan_nprocs', 0)
     requested = cli_nprocs if cli_nprocs is not None else config_nprocs
     if requested < 0:
-        logger.error('catalog_scan_nprocs must be >= 0')
+        logger.error('[NPROCS] catalog_scan_nprocs must be >= 0')
         rq_exit(1)
     if requested == 0:
         base_nprocs = None
@@ -133,8 +133,9 @@ def resolve_scan_catalog_nprocs(npairs, slurm_context):
             if parsed_cpus is None:
                 if slurm_cpus is not None:
                     logger.warning(
-                        f'Invalid {key} value {slurm_cpus!r}; '
-                        'trying fallback CPU count'
+                        '[NPROCS] Invalid %s value %r; '
+                        'trying fallback CPU count',
+                        key, slurm_cpus,
                     )
                 continue
             base_nprocs = parsed_cpus
@@ -148,8 +149,9 @@ def resolve_scan_catalog_nprocs(npairs, slurm_context):
     max_workers = max(1, npairs)
     effective_nprocs = min(max(1, base_nprocs), max_workers)
     logger.info(
-        'scan_catalog workers: '
-        f'requested={requested:n}, effective={effective_nprocs:n}'
+        '[NPROCS] scan_catalog workers: '
+        'requested=%d, effective=%d',
+        requested, effective_nprocs,
     )
     return effective_nprocs
 
@@ -186,12 +188,11 @@ def log_pair_timing_split(
     avg_crosscorr = crosscorr_time / pair_count
     avg_other = max(avg_elapsed - avg_fetch - avg_crosscorr, 0.0)
     logger.info(
-        'Timing split per pair: '
-        f'fetch={avg_fetch:.3f}s, '
-        f'cc={avg_crosscorr:.3f}s, '
-        f'other={avg_other:.3f}s '
-        f'(window={pair_count:n} pairs, '
-        f'{elapsed:.1f}s total)'
+        '[TIMING] Timing split per pair: '
+        'fetch=%.3fs, cc=%.3fs, other=%.3fs '
+        '(window=%d pairs, %.1fs total)',
+        avg_fetch, avg_crosscorr, avg_other,
+        pair_count, elapsed,
     )
 
 
@@ -204,17 +205,15 @@ def log_pair_processing_report(state, analyzed_pairs, elapsed):
     avg_cc = state['crosscorr_time'] / analyzed_pairs
     avg_other = max(elapsed / analyzed_pairs - avg_fetch - avg_cc, 0.0)
     logger.info(
-        'Pair processing report: '
-        f'mode={mode}, '
-        f'workers={state["nprocs"]:n}, '
-        f'analyzed_pairs={analyzed_pairs:n}, '
-        f'skipped_pairs={state["initial_processed"]:n}, '
-        f'total_pairs={state["total_pairs"]:n}, '
-        f'elapsed_s={elapsed:.3f}, '
-        f'pairs_per_s={rate:.1f}, '
-        f'avg_fetch_s={avg_fetch:.4f}, '
-        f'avg_cc_s={avg_cc:.4f}, '
-        f'avg_other_s={avg_other:.4f}'
+        '[REPORT] Pair processing report: '
+        'mode=%s, workers=%d, '
+        'analyzed_pairs=%d, skipped_pairs=%d, total_pairs=%d, '
+        'elapsed_s=%.3f, pairs_per_s=%.1f, '
+        'avg_fetch_s=%.4f, avg_cc_s=%.4f, avg_other_s=%.4f',
+        mode, state['nprocs'],
+        analyzed_pairs, state['initial_processed'], state['total_pairs'],
+        elapsed, rate,
+        avg_fetch, avg_cc, avg_other,
     )
 
 
@@ -222,25 +221,27 @@ def log_cache_stats(waveform_pair):
     """Log waveform cache hit-rate statistics."""
     stats = waveform_pair.get_cache_stats()
     logger.info(
-        'Cache stats: '
-        f'trace hits={stats["trace_cache_hits"]:n}, '
-        f'misses={stats["trace_cache_misses"]:n}, '
-        f'hit rate={stats["trace_cache_hit_rate"]:.1%}, '
-        f'sorted-trace-id hits={stats["sorted_trace_ids_cache_hits"]:n}, '
-        f'misses={stats["sorted_trace_ids_cache_misses"]:n}, '
-        f'hit rate={stats["sorted_trace_ids_cache_hit_rate"]:.1%}, '
-        f'skipped-pair hits={stats["skipped_trace_hits"]:n}, '
-        f'cache evictions={stats["trace_cache_evictions"]:n}, '
-        f'cache size={stats["trace_cache_size"]:n}/'
-        f'{stats["max_trace_cache_size"]:n}'
+        '[CACHE] Cache stats: '
+        'trace hits=%d, misses=%d, hit rate=%.1f%%, '
+        'sorted-trace-id hits=%d, misses=%d, hit rate=%.1f%%, '
+        'skipped-pair hits=%d, '
+        'cache evictions=%d, cache size=%d/%d',
+        stats['trace_cache_hits'], stats['trace_cache_misses'],
+        stats['trace_cache_hit_rate'] * 100,
+        stats['sorted_trace_ids_cache_hits'],
+        stats['sorted_trace_ids_cache_misses'],
+        stats['sorted_trace_ids_cache_hit_rate'] * 100,
+        stats['skipped_trace_hits'],
+        stats['trace_cache_evictions'],
+        stats['trace_cache_size'], stats['max_trace_cache_size'],
     )
     logger.info(
-        'Disk cache stats: '
-        f'hits={stats["disk_cache_hits"]:n}, '
-        f'misses={stats["disk_cache_misses"]:n}, '
-        f'writes={stats["disk_cache_writes"]:n}, '
-        f'read errors={stats["disk_cache_read_errors"]:n}, '
-        f'write errors={stats["disk_cache_write_errors"]:n}'
+        '[CACHE] Disk cache stats: '
+        'hits=%d, misses=%d, writes=%d, '
+        'read errors=%d, write errors=%d',
+        stats['disk_cache_hits'], stats['disk_cache_misses'],
+        stats['disk_cache_writes'],
+        stats['disk_cache_read_errors'], stats['disk_cache_write_errors'],
     )
 
 
@@ -270,8 +271,9 @@ def _log_noninteractive_progress(
         processed, npairs, window_start_time, rate=window_rate,
     )
     logger.info(
-        f'Processing pairs: {summary} '
-        f'[workers={nprocs:n}{slurm_suffix}]'
+        '[PROGRESS] Processing pairs: %s '
+        '[workers=%d%s]',
+        summary, nprocs, slurm_suffix,
     )
     log_pair_timing_split(
         window_pair_count,
