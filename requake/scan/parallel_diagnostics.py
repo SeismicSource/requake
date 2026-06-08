@@ -81,7 +81,7 @@ class ParallelWorkerDiagnostics:
         rss = parallel_rss_gb()
         self._update_peak_rss(rss)
         logger.info(
-            '[PARALLEL] WORKER_STATS pid=%d rss_gb=%.3f peak_gb=%.3f '
+            '[rq:parallel] WORKER_STATS pid=%d rss_gb=%.3f peak_gb=%.3f '
             'pairs=%d db_fetches=%d db_time_s=%.3f '
             'corrs=%d corr_time_s=%.3f',
             self.pid,
@@ -136,7 +136,7 @@ def parallel_log_sqlite_info():
         finally:
             conn.close()
     logger.info(
-        '[PARALLEL] SQLITE_INFO pid=%d db_size_gb=%.3f '
+        '[rq:parallel] SQLITE_INFO pid=%d db_size_gb=%.3f '
         'page_count=%s page_size_bytes=%s',
         os.getpid(),
         db_size_gb,
@@ -159,7 +159,7 @@ def parallel_log_chunk_summary(
     """Emit ``CHUNK_SUMMARY`` after a worker-recycle chunk completes."""
     throughput = pairs_processed / elapsed if elapsed > 0 else 0.0
     logger.info(
-        '[PARALLEL] CHUNK_SUMMARY chunk=%d pairs_processed=%d '
+        '[rq:parallel] CHUNK_SUMMARY chunk=%d pairs_processed=%d '
         'elapsed_s=%.3f throughput_pairs_per_s=%.1f '
         'results_in_chunk=%d',
         chunk_id,
@@ -173,7 +173,7 @@ def parallel_log_chunk_summary(
 def parallel_log_pool_recycle(chunk_id, startup, shutdown):
     """Emit ``POOL_RECYCLE`` with pool creation and shutdown timings."""
     logger.info(
-        '[PARALLEL] POOL_RECYCLE chunk=%d startup_s=%.3f shutdown_s=%.3f',
+        '[rq:parallel] POOL_RECYCLE chunk=%d startup_s=%.3f shutdown_s=%.3f',
         chunk_id,
         startup,
         shutdown,
@@ -183,7 +183,7 @@ def parallel_log_pool_recycle(chunk_id, startup, shutdown):
 def parallel_log_result_buffer(chunk_id, batch_len, rss_parent_gb):
     """Emit ``RESULT_BUFFER`` to track batch growth."""
     logger.info(
-        '[PARALLEL] RESULT_BUFFER chunk=%d len_batch_of_pairs=%d '
+        '[rq:parallel] RESULT_BUFFER chunk=%d len_batch_of_pairs=%d '
         'rss_parent_gb=%.3f',
         chunk_id,
         batch_len,
@@ -230,7 +230,7 @@ class ParallelSystemSnapshot:
                     slurm_context.get('SLURM_NTASKS', 0)
                 )
         logger.info(
-            '[PARALLEL] SYSTEM_STATS rss_parent_gb=%.3f num_children=%d '
+            '[rq:parallel] SYSTEM_STATS rss_parent_gb=%.3f num_children=%d '
             'pairs_processed=%d throughput_pairs_per_s=%.1f '
             'loadavg_1m_5m_15m=%s',
             rss,
@@ -284,7 +284,7 @@ class ParallelSlowTaskDetector:
             return
         self._last_emit = now
         logger.info(
-            '[PARALLEL] SLOW_TASK pid=%d duration_s=%.3f pair=%s',
+            '[rq:parallel] SLOW_TASK pid=%d duration_s=%.3f pair=%s',
             os.getpid(),
             duration,
             pair_id if pair_id is not None else '?',

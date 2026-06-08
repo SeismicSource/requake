@@ -55,22 +55,22 @@ def _ask_existing_pairs_action(npairs_in_db):
         return 'continue'
     if not sys.stdin.isatty():
         logger.error(
-            '[SCAN] Found %d event pairs in db file %s.',
+            '[rq:scan] Found %d event pairs in db file %s.',
             npairs_in_db,
             get_db_path(),
         )
         logger.error(
-            '[SCAN] Cannot prompt in non-interactive mode. '
+            '[rq:scan] Cannot prompt in non-interactive mode. '
             'Use --force to overwrite or --force-continue to resume.'
         )
         rq_exit(1)
     logger.warning(
-        '[SCAN] Found %d existing event pairs in db file %s.',
+        '[rq:scan] Found %d existing event pairs in db file %s.',
         npairs_in_db,
         get_db_path(),
     )
     logger.warning(
-        '[SCAN] You can overwrite them and restart, or continue '
+        '[rq:scan] You can overwrite them and restart, or continue '
         'from where the previous scan stopped.'
     )
     prompt = (
@@ -118,19 +118,19 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
     store_trace_metadata_from_inventory(trace_ids)
     nevents = len(catalog)
     initial_npairs = nevents * (nevents - 1) // 2
-    logger.info('[SCAN] Building valid event pairs...')
+    logger.info('[rq:scan] Building valid event pairs...')
     t_grouping_start = time.monotonic()
     valid_pair_idx = build_valid_pair_indices(catalog)
     grouping_dt = time.monotonic() - t_grouping_start
     logger.info(
-        '[SCAN] Valid-pair spatial grouping completed in %.1fs',
+        '[rq:scan] Valid-pair spatial grouping completed in %.1fs',
         grouping_dt,
     )
     skipped_npairs = 0
     candidate_npairs = len(valid_pair_idx)
     if continue_scan:
         logger.info(
-            '[SCAN] Continue-scan mode: loading existing pairs '
+            '[rq:scan] Continue-scan mode: loading existing pairs '
             'for pre-processing mask'
         )
         t_resume_filter_start = time.monotonic()
@@ -142,7 +142,7 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
         )
         resume_filter_dt = time.monotonic() - t_resume_filter_start
         logger.info(
-            '[SCAN] Loading existing pair IDs and applying mask '
+            '[rq:scan] Loading existing pair IDs and applying mask '
             'completed in %.1fs',
             resume_filter_dt,
         )
@@ -150,14 +150,14 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
     total_valid_pairs = skipped_npairs + npairs
     nprocs = resolve_scan_catalog_nprocs(npairs, slurm_context or {})
     ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
-    logger.info('[SCAN] Initial pairs: %d', initial_npairs)
-    logger.info('[SCAN] Candidate pairs: %d', candidate_npairs)
-    logger.info('[SCAN] Final pairs: %d', npairs)
-    logger.info('[SCAN] Pair ratio: %.6f (%.2f%%)', ratio, ratio * 100)
+    logger.info('[rq:scan] Initial pairs: %d', initial_npairs)
+    logger.info('[rq:scan] Candidate pairs: %d', candidate_npairs)
+    logger.info('[rq:scan] Final pairs: %d', npairs)
+    logger.info('[rq:scan] Pair ratio: %.6f (%.2f%%)', ratio, ratio * 100)
     log_pair_grouping_stats(valid_pair_idx)
     log_memory_usage(prefix='[parent before processing]')
     logger.info(
-        '[SCAN] Processing %d event pairs '
+        '[rq:scan] Processing %d event pairs '
         '(%d/%d already processed)',
         npairs, skipped_npairs, total_valid_pairs,
     )
@@ -172,7 +172,7 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
     )
     if continue_scan:
         logger.info(
-            '[SCAN] Skipped %d event pairs already present '
+            '[rq:scan] Skipped %d event pairs already present '
             'in the database',
             skipped_npairs,
         )
@@ -187,21 +187,21 @@ def scan_catalog():
     try:
         catalog = read_stored_catalog()
     except (ValueError, FileNotFoundError) as msg:
-        logger.error('[SCAN] %s', msg)
+        logger.error('[rq:scan] %s', msg)
         rq_exit(1)
     try:
         fix_non_locatable_events(catalog)
     except MetadataMismatchError as msg:
-        logger.error('[SCAN] %s', msg)
+        logger.error('[rq:scan] %s', msg)
         rq_exit(1)
     nevents = len(catalog)
     if nevents < 2:
         logger.error(
-            '[SCAN] Not enough events in catalog. '
+            '[rq:scan] Not enough events in catalog. '
             'You need at least 2 events to run the scan.')
         rq_exit(1)
     logger.info(
-        '[SCAN] %d events read from db file %s',
+        '[rq:scan] %d events read from db file %s',
         nevents, get_db_path(),
     )
     continue_scan = False
@@ -209,7 +209,7 @@ def scan_catalog():
     if existing_pairs > 0:
         action = _ask_existing_pairs_action(existing_pairs)
         if action == 'abort':
-            logger.info('[SCAN] Scan aborted by user')
+            logger.info('[rq:scan] Scan aborted by user')
             rq_exit(0)
         continue_scan = action == 'continue'
     try:
@@ -220,10 +220,10 @@ def scan_catalog():
         )
     except BrokenProcessPool as err:
         logger.error(
-            '[SCAN] Parallel scan stopped because a worker process '
+            '[rq:scan] Parallel scan stopped because a worker process '
             'terminated unexpectedly.'
         )
         logger.debug(f'Broken process pool details: {err}')
         rq_exit(1, abort=True)
-    logger.info('[SCAN] Processed %d event pairs', npairs)
-    logger.info('[SCAN] Done! Output written to %s', get_db_path())
+    logger.info('[rq:scan] Processed %d event pairs', npairs)
+    logger.info('[rq:scan] Done! Output written to %s', get_db_path())

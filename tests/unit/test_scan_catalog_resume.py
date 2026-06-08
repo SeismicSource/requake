@@ -680,7 +680,7 @@ class TestScanCatalogResume(unittest.TestCase):
             )
         self.assertEqual(info_log.call_count, 1)
         message = info_log.call_args.args[0]
-        self.assertIn('[REPORT] Pair processing report:', message)
+        self.assertIn('[rq:report] Pair processing report:', message)
         self.assertIn('mode=%s', message)
         self.assertIn('workers=%d', message)
         self.assertIn('analyzed_pairs=%d', message)

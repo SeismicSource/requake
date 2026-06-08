@@ -113,7 +113,7 @@ def slurm_log_startup():
     enabled = slurm_is_active()
     job_id = _slurm_job_id() if enabled else None
     logger.info(
-        '[SLURM] DIAGNOSTICS enabled=%s job_id=%s',
+        '[rq:slurm] DIAGNOSTICS enabled=%s job_id=%s',
         str(enabled).lower(),
         job_id,
     )
@@ -128,4 +128,4 @@ def slurm_log_runtime_context(slurm_context):
         f'{key}={value}'
         for key, value in sorted(slurm_context.items())
     )
-    logger.info('[SLURM] RUNTIME_CONTEXT %s', details)
+    logger.info('[rq:slurm] RUNTIME_CONTEXT %s', details)

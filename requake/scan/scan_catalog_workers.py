@@ -343,18 +343,18 @@ def result_to_pair_record(catalog, result):
         if message in seen_messages:
             continue
         seen_messages.add(message)
-        logger.warning('[WORKER] %s', message)
+        logger.warning('[rq:worker] %s', message)
     msg = result.get('message', '')
     if msg and msg not in seen_messages:
         if result.get('status') == 'error':
             logger.warning(
-                '[WORKER] Worker error while processing pair: %s', msg,
+                '[rq:worker] Worker error while processing pair: %s', msg,
             )
             worker_tb = result.get(
                 'traceback', ''
             ).strip().replace('\n', ' | ')
             if worker_tb:
-                logger.debug('[WORKER] Worker traceback: %s', worker_tb)
+                logger.debug('[rq:worker] Worker traceback: %s', worker_tb)
         else:
             logger.debug(msg)
     pair_record = PairRecord(
@@ -392,7 +392,7 @@ def _finalize_pair_processing(
             state['total_pairs'],
             state['start_time'],
         )
-        logger.info('[PROGRESS] Processing pairs: %s', summary)
+        logger.info('[rq:progress] Processing pairs: %s', summary)
     if npairs == 0:
         return
     total_elapsed = time.monotonic() - state['start_time']
@@ -428,7 +428,7 @@ def _process_candidate_pair(pair, waveform_pair, batch_of_pairs, state):
             state,
         )
     except (NoMetadataError, MetadataMismatchError) as msg:
-        logger.error('[WORKER] %s', msg)
+        logger.error('[rq:worker] %s', msg)
         rq_exit(1)
     except NoWaveformError as msg:
         log_once(logger, 'debug', msg)
@@ -626,16 +626,16 @@ def _process_pair_chunk(
                     return batch_of_pairs, False
         except KeyboardInterrupt:
             logger.info(
-                '[SCAN] Interrupted by user. Aborting parallel scan...'
+                '[rq:scan] Interrupted by user. Aborting parallel scan...'
             )
             rq_exit(1, abort=True)
         except BrokenProcessPool as err:
             logger.info(
-                '[SCAN] Process pool interrupted while '
+                '[rq:scan] Process pool interrupted while '
                 'spawning/running workers. Aborting scan.'
             )
             logger.debug(
-                '[SCAN] Broken process pool details: %s', err
+                '[rq:scan] Broken process pool details: %s', err
             )
             rq_exit(1, abort=True)
     pool_shutdown = time.monotonic() - t_pool_create
@@ -687,7 +687,7 @@ def process_valid_pair_indices_parallel(
     nprocs = state['nprocs']
     worker_cache_size = effective_worker_cache_size(nprocs)
     logger.info(
-        '[SCAN] Using parallel pair processing: '
+        '[rq:scan] Using parallel pair processing: '
         'workers=%d, worker_cache_size=%d, '
         'recycle every %d pairs',
         nprocs, worker_cache_size, WORKER_RECYCLE_CHUNK_SIZE,
@@ -728,7 +728,7 @@ def process_valid_pair_indices_parallel(
             )
         if not done:
             logger.info(
-                '[SCAN] Worker pool recycled after chunk %d '
+                '[rq:scan] Worker pool recycled after chunk %d '
                 '(%d pairs processed so far)',
                 chunk, total_analyzed[0],
             )
@@ -752,7 +752,7 @@ def process_valid_pair_indices(
     slurm_context=None,
 ):
     """Process valid pairs from index pairs."""
-    logger.info('[SCAN] Computing waveform cross-correlation...')
+    logger.info('[rq:scan] Computing waveform cross-correlation...')
     state = init_pair_processing_state(
         npairs,
         initial_processed,
