@@ -654,14 +654,9 @@ class TestScanCatalogResume(unittest.TestCase):
         self.assertEqual(pair_record.trace_id, 'WI.TDBA.00.HHZ')
         self.assertEqual(fetch_dt, 0.0)
         self.assertEqual(cc_dt, 0.0)
-        messages = [
-            call.args[1] if len(call.args) > 1 else call.args[0]
-            for call in warning.call_args_list
-        ]
-        self.assertEqual(
-            messages,
-            ['worker warning one', 'worker failure detail'],
-        )
+        messages = [call.args[0] for call in warning.call_args_list]
+        self.assertIn('worker warning one', messages[0])
+        self.assertIn('worker failure detail', messages[1])
 
     def test_pair_processing_report_contains_benchmark_fields(self):
         """End report should include stable metrics for comparisons."""
@@ -681,13 +676,13 @@ class TestScanCatalogResume(unittest.TestCase):
         self.assertEqual(info_log.call_count, 1)
         message = info_log.call_args.args[0]
         self.assertIn('[rq:report] Pair processing report:', message)
-        self.assertIn('mode=%s', message)
-        self.assertIn('workers=%d', message)
-        self.assertIn('analyzed_pairs=%d', message)
-        self.assertIn('skipped_pairs=%d', message)
-        self.assertIn('total_pairs=%d', message)
-        self.assertIn('elapsed_s=%.3f', message)
-        self.assertIn('pairs_per_s=%.1f', message)
+        self.assertIn('mode=parallel', message)
+        self.assertIn('workers=7', message)
+        self.assertIn('analyzed_pairs=100', message)
+        self.assertIn('skipped_pairs=10', message)
+        self.assertIn('total_pairs=110', message)
+        self.assertIn('elapsed_s=40.000', message)
+        self.assertIn('pairs_per_s=2.5', message)
 
     def test_parallel_cache_stats_collector_aggregates_workers(self):
         """Parallel cache collector should merge worker snapshots."""

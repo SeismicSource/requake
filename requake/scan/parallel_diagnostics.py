@@ -81,17 +81,13 @@ class ParallelWorkerDiagnostics:
         rss = parallel_rss_gb()
         self._update_peak_rss(rss)
         logger.info(
-            '[rq:parallel] WORKER_STATS pid=%d rss_gb=%.3f peak_gb=%.3f '
-            'pairs=%d db_fetches=%d db_time_s=%.3f '
-            'corrs=%d corr_time_s=%.3f',
-            self.pid,
-            rss,
-            self._peak_rss_gb,
-            self.pairs_processed,
-            self.waveform_fetch_count,
-            self.waveform_fetch_time_total,
-            self.correlation_count,
-            self.correlation_time_total,
+            f'[rq:parallel] WORKER_STATS pid={self.pid} '
+            f'rss_gb={rss:.3f} peak_gb={self._peak_rss_gb:.3f} '
+            f'pairs={self.pairs_processed:n} '
+            f'db_fetches={self.waveform_fetch_count:n} '
+            f'db_time_s={self.waveform_fetch_time_total:.3f} '
+            f'corrs={self.correlation_count:n} '
+            f'corr_time_s={self.correlation_time_total:.3f}'
         )
 
 
@@ -136,12 +132,9 @@ def parallel_log_sqlite_info():
         finally:
             conn.close()
     logger.info(
-        '[rq:parallel] SQLITE_INFO pid=%d db_size_gb=%.3f '
-        'page_count=%s page_size_bytes=%s',
-        os.getpid(),
-        db_size_gb,
-        page_count,
-        page_size,
+        f'[rq:parallel] SQLITE_INFO pid={os.getpid()} '
+        f'db_size_gb={db_size_gb:.3f} '
+        f'page_count={page_count} page_size_bytes={page_size}'
     )
 
 
@@ -159,35 +152,28 @@ def parallel_log_chunk_summary(
     """Emit ``CHUNK_SUMMARY`` after a worker-recycle chunk completes."""
     throughput = pairs_processed / elapsed if elapsed > 0 else 0.0
     logger.info(
-        '[rq:parallel] CHUNK_SUMMARY chunk=%d pairs_processed=%d '
-        'elapsed_s=%.3f throughput_pairs_per_s=%.1f '
-        'results_in_chunk=%d',
-        chunk_id,
-        pairs_processed,
-        elapsed,
-        throughput,
-        results_in_chunk,
+        f'[rq:parallel] CHUNK_SUMMARY chunk={chunk_id} '
+        f'pairs_processed={pairs_processed:n} '
+        f'elapsed_s={elapsed:.3f} '
+        f'throughput_pairs_per_s={throughput:.1f} '
+        f'results_in_chunk={results_in_chunk}'
     )
 
 
 def parallel_log_pool_recycle(chunk_id, startup, shutdown):
     """Emit ``POOL_RECYCLE`` with pool creation and shutdown timings."""
     logger.info(
-        '[rq:parallel] POOL_RECYCLE chunk=%d startup_s=%.3f shutdown_s=%.3f',
-        chunk_id,
-        startup,
-        shutdown,
+        f'[rq:parallel] POOL_RECYCLE chunk={chunk_id} '
+        f'startup_s={startup:.3f} shutdown_s={shutdown:.3f}'
     )
 
 
 def parallel_log_result_buffer(chunk_id, batch_len, rss_parent_gb):
     """Emit ``RESULT_BUFFER`` to track batch growth."""
     logger.info(
-        '[rq:parallel] RESULT_BUFFER chunk=%d len_batch_of_pairs=%d '
-        'rss_parent_gb=%.3f',
-        chunk_id,
-        batch_len,
-        rss_parent_gb,
+        f'[rq:parallel] RESULT_BUFFER chunk={chunk_id} '
+        f'len_batch_of_pairs={batch_len} '
+        f'rss_parent_gb={rss_parent_gb:.3f}'
     )
 
 
@@ -230,14 +216,11 @@ class ParallelSystemSnapshot:
                     slurm_context.get('SLURM_NTASKS', 0)
                 )
         logger.info(
-            '[rq:parallel] SYSTEM_STATS rss_parent_gb=%.3f num_children=%d '
-            'pairs_processed=%d throughput_pairs_per_s=%.1f '
-            'loadavg_1m_5m_15m=%s',
-            rss,
-            num_children,
-            total_pairs_processed,
-            throughput,
-            loadavg,
+            f'[rq:parallel] SYSTEM_STATS rss_parent_gb={rss:.3f} '
+            f'num_children={num_children} '
+            f'pairs_processed={total_pairs_processed:n} '
+            f'throughput_pairs_per_s={throughput:.1f} '
+            f'loadavg_1m_5m_15m={loadavg}'
         )
 
 
@@ -284,8 +267,7 @@ class ParallelSlowTaskDetector:
             return
         self._last_emit = now
         logger.info(
-            '[rq:parallel] SLOW_TASK pid=%d duration_s=%.3f pair=%s',
-            os.getpid(),
-            duration,
-            pair_id if pair_id is not None else '?',
+            f'[rq:parallel] SLOW_TASK pid={os.getpid()} '
+            f'duration_s={duration:.3f} '
+            f'pair={pair_id if pair_id is not None else "?"}'
         )

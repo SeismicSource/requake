@@ -343,7 +343,7 @@ def _result_to_pair_record(catalog, result):
         if message in seen_messages:
             continue
         seen_messages.add(message)
-        logger.warning('[rq:worker] %s', message)
+        logger.warning(f'[rq:worker] {message}')
     msg = result.get('message', '')
     if msg and msg not in seen_messages:
         if result.get('status') == 'error':
@@ -354,7 +354,7 @@ def _result_to_pair_record(catalog, result):
                 'traceback', ''
             ).strip().replace('\n', ' | ')
             if worker_tb:
-                logger.debug('[rq:worker] Worker traceback: %s', worker_tb)
+                logger.debug(f'[rq:worker] Worker traceback: {worker_tb}')
         else:
             logger.debug(msg)
     pair_record = PairRecord(
@@ -392,7 +392,7 @@ def _finalize_pair_processing(
             state['total_pairs'],
             state['start_time'],
         )
-        logger.info('[rq:progress] Processing pairs: %s', summary)
+        logger.info(f'[rq:progress] Processing pairs: {summary}')
     if npairs == 0:
         return
     total_elapsed = time.monotonic() - state['start_time']
@@ -428,7 +428,7 @@ def _process_candidate_pair(pair, waveform_pair, batch_of_pairs, state):
             state,
         )
     except (NoMetadataError, MetadataMismatchError) as msg:
-        logger.error('[rq:worker] %s', msg)
+        logger.error(f'[rq:worker] {msg}')
         rq_exit(1)
     except NoWaveformError as msg:
         log_once(logger, 'debug', msg)
@@ -687,10 +687,9 @@ def _process_valid_pair_indices_parallel(
     nprocs = state['nprocs']
     worker_cache_size = _effective_worker_cache_size(nprocs)
     logger.info(
-        '[rq:scan] Using parallel pair processing: '
-        'workers=%d, worker_cache_size=%d, '
-        'recycle every %d pairs',
-        nprocs, worker_cache_size, WORKER_RECYCLE_CHUNK_SIZE,
+        f'[rq:scan] Using parallel pair processing: '
+        f'workers={nprocs:n}, worker_cache_size={worker_cache_size:n}, '
+        f'recycle every {WORKER_RECYCLE_CHUNK_SIZE:n} pairs'
     )
     cache_stats = _ParallelCacheStatsCollector()
     batch_of_pairs = []
@@ -728,9 +727,8 @@ def _process_valid_pair_indices_parallel(
             )
         if not done:
             logger.info(
-                '[rq:scan] Worker pool recycled after chunk %d '
-                '(%d pairs processed so far)',
-                chunk, total_analyzed[0],
+                f'[rq:scan] Worker pool recycled after chunk {chunk} '
+                f'({total_analyzed[0]:n} pairs processed so far)'
             )
     _finalize_pair_processing(
         batch_of_pairs,

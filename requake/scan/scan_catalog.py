@@ -55,9 +55,8 @@ def _ask_existing_pairs_action(npairs_in_db):
         return 'continue'
     if not sys.stdin.isatty():
         logger.error(
-            '[rq:scan] Found %d event pairs in db file %s.',
-            npairs_in_db,
-            get_db_path(),
+            f'[rq:scan] Found {npairs_in_db:n} event pairs '
+            f'in db file {get_db_path()}.'
         )
         logger.error(
             '[rq:scan] Cannot prompt in non-interactive mode. '
@@ -150,16 +149,15 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
     total_valid_pairs = skipped_npairs + npairs
     nprocs = resolve_scan_catalog_nprocs(npairs, slurm_context or {})
     ratio = npairs / initial_npairs if initial_npairs > 0 else 0.0
-    logger.info('[rq:scan] Initial pairs: %d', initial_npairs)
-    logger.info('[rq:scan] Candidate pairs: %d', candidate_npairs)
-    logger.info('[rq:scan] Final pairs: %d', npairs)
-    logger.info('[rq:scan] Pair ratio: %.6f (%.2f%%)', ratio, ratio * 100)
+    logger.info(f'[rq:scan] Initial pairs: {initial_npairs:n}')
+    logger.info(f'[rq:scan] Candidate pairs: {candidate_npairs:n}')
+    logger.info(f'[rq:scan] Final pairs: {npairs:n}')
+    logger.info(f'[rq:scan] Pair ratio: {ratio:.6f} ({ratio:.2%})')
     log_pair_grouping_stats(valid_pair_idx)
     log_memory_usage(prefix='[parent before processing]')
     logger.info(
-        '[rq:scan] Processing %d event pairs '
-        '(%d/%d already processed)',
-        npairs, skipped_npairs, total_valid_pairs,
+        f'[rq:scan] Processing {npairs:n} event pairs '
+        f'({skipped_npairs:n}/{total_valid_pairs:n} already processed)'
     )
     analyzed_npairs = process_valid_pair_indices(
         catalog,
@@ -172,9 +170,8 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
     )
     if continue_scan:
         logger.info(
-            '[rq:scan] Skipped %d event pairs already present '
-            'in the database',
-            skipped_npairs,
+            f'[rq:scan] Skipped {skipped_npairs:n} event pairs '
+            f'already present in the database'
         )
     log_memory_usage(prefix='[parent after processing]')
     return analyzed_npairs
@@ -187,12 +184,12 @@ def scan_catalog():
     try:
         catalog = read_stored_catalog()
     except (ValueError, FileNotFoundError) as msg:
-        logger.error('[rq:scan] %s', msg)
+        logger.error(f'[rq:scan] {msg}')
         rq_exit(1)
     try:
         fix_non_locatable_events(catalog)
     except MetadataMismatchError as msg:
-        logger.error('[rq:scan] %s', msg)
+        logger.error(f'[rq:scan] {msg}')
         rq_exit(1)
     nevents = len(catalog)
     if nevents < 2:
@@ -201,8 +198,8 @@ def scan_catalog():
             'You need at least 2 events to run the scan.')
         rq_exit(1)
     logger.info(
-        '[rq:scan] %d events read from db file %s',
-        nevents, get_db_path(),
+        f'[rq:scan] {nevents:n} events read from db file '
+        f'{get_db_path()}'
     )
     continue_scan = False
     existing_pairs = count_pairs()
@@ -225,5 +222,5 @@ def scan_catalog():
         )
         logger.debug(f'Broken process pool details: {err}')
         rq_exit(1, abort=True)
-    logger.info('[rq:scan] Processed %d event pairs', npairs)
-    logger.info('[rq:scan] Done! Output written to %s', get_db_path())
+    logger.info(f'[rq:scan] Processed {npairs:n} event pairs')
+    logger.info(f'[rq:scan] Done! Output written to {get_db_path()}')
