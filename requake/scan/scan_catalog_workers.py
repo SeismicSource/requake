@@ -9,7 +9,6 @@ Worker and pair-processing helpers for catalog-based repeater scans.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
-import contextlib
 import logging
 import os
 import signal
@@ -34,15 +33,15 @@ from ..waveforms import (
     WaveformPair,
     cc_waveform_pair,
 )
-from .diagnostics import (
-    WorkerDiagnostics,
-    log_chunk_summary,
-    log_pool_recycle,
-    log_result_buffer,
-    log_sqlite_info,
-    running_under_slurm,
-    SlowTaskDetector,
-    SystemSnapshot,
+from .parallel_diagnostics import (
+    ParallelWorkerDiagnostics,
+    ParallelSystemSnapshot,
+    ParallelSlowTaskDetector,
+    parallel_log_chunk_summary,
+    parallel_log_pool_recycle,
+    parallel_log_result_buffer,
+    parallel_log_sqlite_info,
+    parallel_rss_gb,
 )
 from .scan_catalog_helpers import (
     init_pair_processing_state,
@@ -207,11 +206,8 @@ def _worker_initializer(cfg_dict, catalog, worker_cache_size):
     config.catalog_waveform_cache_size = worker_cache_size
     _WORKER_WAVEFORM_PAIR = WaveformPair()
     _WORKER_CATALOG = catalog
-    if running_under_slurm():
-        _WORKER_DIAGNOSTICS = WorkerDiagnostics()
-        log_sqlite_info()
-    else:
-        _WORKER_DIAGNOSTICS = None
+    _WORKER_DIAGNOSTICS = ParallelWorkerDiagnostics()
+    parallel_log_sqlite_info()
 
 
 def _fix_trace_id(stats):
@@ -499,7 +495,7 @@ def _drain_pending_futures(
 
 def _record_slow_task(result, task_duration, detector):
     """Feed task duration into the slow-task detector if active."""
-    if detector is None or not running_under_slurm():
+    if detector is None:
         return
     idx1 = result.get('idx1')
     idx2 = result.get('idx2')
@@ -658,31 +654,21 @@ def _emit_chunk_diagnostics(
     pool_startup,
     pool_shutdown,
 ):
-    """Emit chunk-level diagnostics when running under SLURM."""
-    if not running_under_slurm():
-        return
+    """Emit chunk-level diagnostics."""
     pairs_in_chunk = total_analyzed - chunk_start
     elapsed = pool_shutdown
-    log_chunk_summary(
+    parallel_log_chunk_summary(
         chunk_id,
         pairs_in_chunk,
         elapsed,
         len(batch_of_pairs),
     )
-    log_pool_recycle(chunk_id, pool_startup, pool_shutdown)
-    log_result_buffer(
+    parallel_log_pool_recycle(chunk_id, pool_startup, pool_shutdown)
+    parallel_log_result_buffer(
         chunk_id,
         len(batch_of_pairs),
-        _rss_gb_diag(),
+        parallel_rss_gb(),
     )
-
-
-def _rss_gb_diag():
-    """Return parent RSS in GiB for diagnostics, or -1.0."""
-    with contextlib.suppress(Exception):
-        import psutil
-        return psutil.Process().memory_info().rss / (1024 ** 3)
-    return -1.0
 
 
 def process_valid_pair_indices_parallel(
@@ -710,11 +696,8 @@ def process_valid_pair_indices_parallel(
     chunk = 0
     done = False
 
-    system_snapshot = None
-    slow_task_detector = None
-    if running_under_slurm():
-        system_snapshot = SystemSnapshot()
-        slow_task_detector = SlowTaskDetector()
+    system_snapshot = ParallelSystemSnapshot()
+    slow_task_detector = ParallelSlowTaskDetector()
 
     while not done:
         chunk += 1

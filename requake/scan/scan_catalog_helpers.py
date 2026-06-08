@@ -19,6 +19,11 @@ from contextlib import suppress
 from tqdm import tqdm
 
 from ..config import config, rq_exit
+from .slurm_diagnostics import (
+    SLURM_CPU_SOURCES,
+    slurm_parse_cpu_count,
+    slurm_progress_suffix,
+)
 
 logger = logging.getLogger('scan_catalog')
 
@@ -104,81 +109,12 @@ def log_memory_usage(prefix=''):
     logger.info('[MEM] %s%.0f MiB', label, mem_mb)
 
 
-SLURM_CONTEXT_KEYS = (
-    'SLURM_JOB_ID',
-    'SLURM_JOB_NAME',
-    'SLURM_CLUSTER_NAME',
-    'SLURM_CPUS_PER_TASK',
-    'SLURM_CPUS_ON_NODE',
-    'SLURM_JOB_CPUS_PER_NODE',
-    'SLURM_NTASKS',
-    'SLURM_PROCID',
-    'SLURM_NODELIST',
-    'SLURM_MEM_PER_CPU',
-    'SLURM_MEM_PER_NODE',
-)
-SLURM_PROGRESS_KEYS = (
-    'SLURM_JOB_ID',
-    'SLURM_PROCID',
-    'SLURM_NODELIST',
-)
-
-
-def get_slurm_context():
-    """Return current Slurm environment variables that are set."""
-    context = {}
-    for key in SLURM_CONTEXT_KEYS:
-        value = os.environ.get(key)
-        if value:
-            context[key] = value
-    return context
-
-
-def log_slurm_runtime_context(slurm_context):
-    """Log Slurm runtime details when available."""
-    from .diagnostics import log_slurm_diagnostics_startup
-
-    log_slurm_diagnostics_startup()
-    if not slurm_context:
-        return
-    details = ', '.join(
-        f'{key}={slurm_context[key]}'
-        for key in SLURM_CONTEXT_KEYS
-        if key in slurm_context
-    )
-    logger.info(f'Slurm runtime context: {details}')
-
-
-def slurm_progress_suffix(slurm_context):
-    """Build compact Slurm suffix for periodic progress logs."""
-    if not slurm_context:
-        return ''
-    details = ', '.join(
-        f'{key}={slurm_context[key]}'
-        for key in SLURM_PROGRESS_KEYS
-        if key in slurm_context
-    )
-    return f', {details}' if details else ''
-
-
 def _available_cpu_count():
     """Return available CPU count, preferring affinity when supported."""
     if hasattr(os, 'sched_getaffinity'):
         with suppress(OSError):
             return len(os.sched_getaffinity(0))
     return os.cpu_count() or 1
-
-
-def _parse_slurm_cpu_count(value):
-    """Parse a Slurm CPU count value into an integer."""
-    if value is None:
-        return None
-    with suppress(ValueError):
-        return int(value)
-    head = value.split('(', 1)[0].split(',', 1)[0].strip()
-    with suppress(ValueError):
-        return int(head)
-    return None
 
 
 def resolve_scan_catalog_nprocs(npairs, slurm_context):
@@ -190,15 +126,10 @@ def resolve_scan_catalog_nprocs(npairs, slurm_context):
         logger.error('catalog_scan_nprocs must be >= 0')
         rq_exit(1)
     if requested == 0:
-        slurm_cpu_sources = (
-            'SLURM_CPUS_PER_TASK',
-            'SLURM_CPUS_ON_NODE',
-            'SLURM_JOB_CPUS_PER_NODE',
-        )
         base_nprocs = None
-        for key in slurm_cpu_sources:
+        for key in SLURM_CPU_SOURCES:
             slurm_cpus = slurm_context.get(key)
-            parsed_cpus = _parse_slurm_cpu_count(slurm_cpus)
+            parsed_cpus = slurm_parse_cpu_count(slurm_cpus)
             if parsed_cpus is None:
                 if slurm_cpus is not None:
                     logger.warning(

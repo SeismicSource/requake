@@ -35,11 +35,10 @@ from .scan_catalog_pairs import (
     mask_existing_pair_indices,
 )
 from .scan_catalog_helpers import (
-    get_slurm_context,
     log_memory_usage,
-    log_slurm_runtime_context,
     resolve_scan_catalog_nprocs,
 )
+from .slurm_diagnostics import slurm_get_context, slurm_log_runtime_context
 from .scan_catalog_workers import (
     process_valid_pair_indices,
 )
@@ -177,8 +176,8 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
 
 def scan_catalog():
     """Perform cross-correlation on catalog events."""
-    slurm_context = get_slurm_context()
-    log_slurm_runtime_context(slurm_context)
+    slurm_context = slurm_get_context()
+    slurm_log_runtime_context(slurm_context)
     try:
         catalog = read_stored_catalog()
     except (ValueError, FileNotFoundError) as msg:

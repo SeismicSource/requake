@@ -22,10 +22,12 @@ from requake.config.parse_arguments import parse_arguments
 from requake.scan.scan_catalog import _process_pairs
 from requake.scan.scan_catalog_pairs import load_existing_pair_ids
 from requake.scan.scan_catalog_helpers import (
-    get_slurm_context,
     init_progress_bar,
     log_pair_processing_report,
     resolve_scan_catalog_nprocs,
+)
+from requake.scan.slurm_diagnostics import (
+    slurm_get_context,
     slurm_progress_suffix,
 )
 from requake.scan.scan_catalog_workers import (
@@ -298,7 +300,7 @@ class TestScanCatalogResume(unittest.TestCase):
             'SLURM_NODELIST': 'node001',
         }
         with patch.dict(RUNTIME_MODULE.os.environ, env, clear=True):
-            context = get_slurm_context()
+            context = slurm_get_context()
         self.assertEqual(context['SLURM_JOB_ID'], '1234')
         self.assertEqual(context['SLURM_CPUS_PER_TASK'], '12')
         self.assertEqual(context['SLURM_NODELIST'], 'node001')

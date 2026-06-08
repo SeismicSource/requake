@@ -1,10 +1,9 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Low-overhead diagnostics for SLURM cluster runs.
+Low-overhead diagnostics for parallel ProcessPoolExecutor workloads.
 
-All instrumentation is guarded by :func:`running_under_slurm` so that
-local development runs are completely unaffected.
+Active whenever parallel processing is used, regardless of SLURM.
 
 :copyright:
     2021-2026 Claudio Satriano <satriano@ipgp.fr>
@@ -18,48 +17,15 @@ from collections import deque
 from contextlib import suppress
 from time import perf_counter as _perf_counter
 
-logger = logging.getLogger('scan_catalog.diag')
+logger = logging.getLogger('scan_catalog.parallel_diag')
 
 # ---------------------------------------------------------------------------
-# SLURM detection
-# ---------------------------------------------------------------------------
-
-
-def running_under_slurm():
-    """Return ``True`` when the process is running inside a SLURM job."""
-    return 'SLURM_JOB_ID' in os.environ
-
-
-def _slurm_job_id():
-    """Return the SLURM job ID or ``None``."""
-    return os.environ.get('SLURM_JOB_ID')
-
-
-# ---------------------------------------------------------------------------
-# Startup log
+# RSS helper
 # ---------------------------------------------------------------------------
 
 
-def log_slurm_diagnostics_startup():
-    """Emit a single startup line showing whether diagnostics are active."""
-    enabled = running_under_slurm()
-    job_id = _slurm_job_id() if enabled else None
-    logger.info(
-        '[SLURM] DIAGNOSTICS enabled=%s job_id=%s',
-        str(enabled).lower(),
-        job_id,
-    )
-
-
-# ---------------------------------------------------------------------------
-# RSS helper (psutil, guarded)
-# ---------------------------------------------------------------------------
-
-
-def _rss_gb():
+def parallel_rss_gb():
     """Return current process RSS in GiB, or -1.0 on failure."""
-    if not running_under_slurm():
-        return -1.0
     with suppress(Exception):
         import psutil
         return psutil.Process().memory_info().rss / (1024 ** 3)
@@ -67,11 +33,11 @@ def _rss_gb():
 
 
 # ---------------------------------------------------------------------------
-# WorkerDiagnostics
+# Worker metrics (per-process, emitted every 5 minutes)
 # ---------------------------------------------------------------------------
 
 
-class WorkerDiagnostics:
+class ParallelWorkerDiagnostics:
     """Per-worker metrics collector.
 
     Each worker process owns one instance.  Every 5 minutes it emits a
@@ -112,11 +78,12 @@ class WorkerDiagnostics:
         if now - self._last_log_time < self._LOG_INTERVAL:
             return
         self._last_log_time = now
-        rss = _rss_gb()
+        rss = parallel_rss_gb()
         self._update_peak_rss(rss)
         logger.info(
-            '[SLURM] WORKER_STATS pid=%d rss_gb=%.3f peak_gb=%.3f pairs=%d '
-            'db_fetches=%d db_time_s=%.3f corrs=%d corr_time_s=%.3f',
+            '[PARALLEL] WORKER_STATS pid=%d rss_gb=%.3f peak_gb=%.3f '
+            'pairs=%d db_fetches=%d db_time_s=%.3f '
+            'corrs=%d corr_time_s=%.3f',
             self.pid,
             rss,
             self._peak_rss_gb,
@@ -152,7 +119,7 @@ def _waveform_cache_db_path():
     return None
 
 
-def log_sqlite_info():
+def parallel_log_sqlite_info():
     """Log SQLite database file size and page info once per worker."""
     db_path = _waveform_cache_db_path()
     if db_path is None or not os.path.exists(db_path):
@@ -169,7 +136,7 @@ def log_sqlite_info():
         finally:
             conn.close()
     logger.info(
-        '[SLURM] SQLITE_INFO pid=%d db_size_gb=%.3f '
+        '[PARALLEL] SQLITE_INFO pid=%d db_size_gb=%.3f '
         'page_count=%s page_size_bytes=%s',
         os.getpid(),
         db_size_gb,
@@ -179,11 +146,11 @@ def log_sqlite_info():
 
 
 # ---------------------------------------------------------------------------
-# Chunk summary (emitted by parent after each worker-recycle chunk)
+# Chunk-level diagnostics (emitted by parent after each recycle chunk)
 # ---------------------------------------------------------------------------
 
 
-def log_chunk_summary(
+def parallel_log_chunk_summary(
     chunk_id,
     pairs_processed,
     elapsed,
@@ -192,8 +159,9 @@ def log_chunk_summary(
     """Emit ``CHUNK_SUMMARY`` after a worker-recycle chunk completes."""
     throughput = pairs_processed / elapsed if elapsed > 0 else 0.0
     logger.info(
-        '[SLURM] CHUNK_SUMMARY chunk=%d pairs_processed=%d elapsed_s=%.3f '
-        'throughput_pairs_per_s=%.1f results_in_chunk=%d',
+        '[PARALLEL] CHUNK_SUMMARY chunk=%d pairs_processed=%d '
+        'elapsed_s=%.3f throughput_pairs_per_s=%.1f '
+        'results_in_chunk=%d',
         chunk_id,
         pairs_processed,
         elapsed,
@@ -202,30 +170,20 @@ def log_chunk_summary(
     )
 
 
-# ---------------------------------------------------------------------------
-# Pool recycle timing (emitted by parent)
-# ---------------------------------------------------------------------------
-
-
-def log_pool_recycle(chunk_id, startup, shutdown):
+def parallel_log_pool_recycle(chunk_id, startup, shutdown):
     """Emit ``POOL_RECYCLE`` with pool creation and shutdown timings."""
     logger.info(
-        '[SLURM] POOL_RECYCLE chunk=%d startup_s=%.3f shutdown_s=%.3f',
+        '[PARALLEL] POOL_RECYCLE chunk=%d startup_s=%.3f shutdown_s=%.3f',
         chunk_id,
         startup,
         shutdown,
     )
 
 
-# ---------------------------------------------------------------------------
-# Result buffer (emitted by parent after each chunk)
-# ---------------------------------------------------------------------------
-
-
-def log_result_buffer(chunk_id, batch_len, rss_parent_gb):
+def parallel_log_result_buffer(chunk_id, batch_len, rss_parent_gb):
     """Emit ``RESULT_BUFFER`` to track batch growth."""
     logger.info(
-        '[SLURM] RESULT_BUFFER chunk=%d len_batch_of_pairs=%d '
+        '[PARALLEL] RESULT_BUFFER chunk=%d len_batch_of_pairs=%d '
         'rss_parent_gb=%.3f',
         chunk_id,
         batch_len,
@@ -238,7 +196,7 @@ def log_result_buffer(chunk_id, batch_len, rss_parent_gb):
 # ---------------------------------------------------------------------------
 
 
-class SystemSnapshot:
+class ParallelSystemSnapshot:
     """Periodic system-level diagnostics for the parent process."""
 
     _LOG_INTERVAL = 600.0  # 10 minutes
@@ -260,7 +218,7 @@ class SystemSnapshot:
         throughput = pairs_delta / interval
         self._prev_pairs = total_pairs_processed
         self._prev_snap_time = now
-        rss = _rss_gb()
+        rss = parallel_rss_gb()
         loadavg = '?'
         with suppress(Exception):
             lavg = os.getloadavg()
@@ -272,7 +230,7 @@ class SystemSnapshot:
                     slurm_context.get('SLURM_NTASKS', 0)
                 )
         logger.info(
-            '[SLURM] SYSTEM_STATS rss_parent_gb=%.3f num_children=%d '
+            '[PARALLEL] SYSTEM_STATS rss_parent_gb=%.3f num_children=%d '
             'pairs_processed=%d throughput_pairs_per_s=%.1f '
             'loadavg_1m_5m_15m=%s',
             rss,
@@ -288,7 +246,7 @@ class SystemSnapshot:
 # ---------------------------------------------------------------------------
 
 
-class SlowTaskDetector:
+class ParallelSlowTaskDetector:
     """Detect tasks whose duration far exceeds the rolling median.
 
     Rate-limited to avoid log noise on multi-day runs.
@@ -326,7 +284,7 @@ class SlowTaskDetector:
             return
         self._last_emit = now
         logger.info(
-            '[SLURM] SLOW_TASK pid=%d duration_s=%.3f pair=%s',
+            '[PARALLEL] SLOW_TASK pid=%d duration_s=%.3f pair=%s',
             os.getpid(),
             duration,
             pair_id if pair_id is not None else '?',
