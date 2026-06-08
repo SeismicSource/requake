@@ -7,6 +7,10 @@
 - Prefer f-strings over other formatting methods.
 - Use triple double quotes for docstrings.
 - In multi-line docstrings, place the opening """ on its own line.
+- Make sure that:
+  - Private functions (name starting with `_`) are only used internally within
+    a module
+  - Only functions that are used across different modules are public
 
 ## Before Finalizing
 
@@ -27,6 +31,7 @@ flake8 <modified_python_files> && sourcery review <modified_files>
 
 - Keep commit messages short.
 - Follow the style of recent commits in the repository.
+- Use command line `git`.
 
 ## Local Setup
 
