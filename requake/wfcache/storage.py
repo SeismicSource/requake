@@ -100,7 +100,6 @@ def _ns_to_utc(value):
 
 def _cleanup_slurm_local_cache():
     """Remove the SLURM local waveform-cache copy if it exists."""
-    global _SLURM_LOCAL_CACHE_DIR  # pylint: disable=global-statement
     global _SLURM_LOCAL_CACHE_CLEANED  # pylint: disable=global-statement
 
     if _SLURM_LOCAL_CACHE_CLEANED or _SLURM_LOCAL_CACHE_DIR is None:
@@ -122,6 +121,18 @@ def _slurm_local_cache_signal_handler(signum, _frame):
     # Re-raise the signal with the default handler.
     signal.signal(signum, signal.SIG_DFL)
     os.kill(os.getpid(), signum)
+
+
+def _checkpoint_original_cache(original_path):
+    """Apply pending WAL entries and truncate the WAL file.
+
+    After this call the main database file is self-contained and
+    safe to copy without ``-wal`` / ``-shm`` sidecars.
+    """
+    with suppress(Exception):
+        conn = sqlite3.connect(str(original_path))
+        conn.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+        conn.close()
 
 
 def _setup_slurm_local_cache(original_path):
@@ -149,25 +160,22 @@ def _setup_slurm_local_cache(original_path):
         return _register_slurm_cleanup(cache_dir, original_path)
 
     try:
+        _checkpoint_original_cache(original_path)
         cache_dir.mkdir(parents=True, exist_ok=True)
         dest = cache_dir / original_path.name
         logger.info(
-            f'[rq:wfcache] Copying waveform cache to local storage '
-            f'on node {node}: {dest}'
+            '[rq:wfcache] Copying waveform cache to local storage '
+            'on node %s: %s',
+            node, dest,
         )
         shutil.copy2(str(original_path), str(dest))
-        # Also copy the WAL and SHM files if they exist, so SQLite can
-        # recover any uncheckpointed writes from the prefetch phase.
-        for suffix in ('-wal', '-shm'):
-            sidecar = Path(str(original_path) + suffix)
-            if sidecar.exists():
-                shutil.copy2(str(sidecar), str(dest) + suffix)
         _SLURM_LOCAL_CACHE_DIR = cache_dir
         return _register_slurm_cleanup(cache_dir, dest)
     except OSError as err:
         logger.warning(
-            f'[rq:wfcache] Could not copy waveform cache to '
-            f'local storage ({err}). Falling back to original path.'
+            '[rq:wfcache] Could not copy waveform cache to '
+            'local storage (%s). Falling back to original path.',
+            err,
         )
         return original_path
 
@@ -203,6 +211,15 @@ def get_waveform_cache_db_path():
     outdir_path.mkdir(parents=True, exist_ok=True)
     original = outdir_path / 'waveform_cache.sqlite'
     return _setup_slurm_local_cache(original)
+
+
+def ensure_slurm_local_cache():
+    """Trigger SLURM local-cache copy early, before pair processing.
+
+    Call this once at startup so the (potentially large) file copy
+    overlaps with catalog loading and pair-index building.
+    """
+    get_waveform_cache_db_path()
 
 
 def _connect_cache_db(cache_path):
