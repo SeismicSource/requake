@@ -100,16 +100,15 @@ def log_pair_grouping_stats(valid_pair_idx):
     boundaries = np.flatnonzero(first[1:] != first[:-1]) + 1
     run_lengths = np.diff(np.concatenate(([0], boundaries, [npairs])))
     logger.info(
-        '[rq:pairs] Pair grouping: '
-        'monotonic_first=%s, '
-        'first-event groups=%d, '
-        'avg consecutive pairs per first event=%.1f, '
-        'median consecutive pairs per first event=%.1f, '
-        'max consecutive pairs per first event=%d',
-        monotonic, len(run_lengths),
-        run_lengths.mean(),
-        np.median(run_lengths),
-        run_lengths.max(),
+        f'[rq:pairs] Pair grouping: '
+        f'monotonic_first={monotonic}, '
+        f'first-event groups={len(run_lengths):n}, '
+        f'avg consecutive pairs per first event='
+        f'{run_lengths.mean():.1f}, '
+        f'median consecutive pairs per first event='
+        f'{np.median(run_lengths):.1f}, '
+        f'max consecutive pairs per first event='
+        f'{run_lengths.max():n}'
     )
     if not monotonic:
         logger.warning(
@@ -128,8 +127,8 @@ def load_existing_pair_ids(catalog):
     existing_pair_key_ids = read_pair_key_ids()
     read_keys_dt = time.monotonic() - t_read_keys_start
     logger.info(
-        '[rq:pairs] %d unique pairs loaded in %.1fs',
-        len(existing_pair_key_ids), read_keys_dt,
+        f'[rq:pairs] {len(existing_pair_key_ids):n} unique pairs '
+        f'loaded in {read_keys_dt:.1f}s'
     )
     if not existing_pair_key_ids:
         return set()
@@ -158,7 +157,7 @@ def load_existing_pair_ids(catalog):
         add_id(first * nevents + second)
     build_id_dt = time.monotonic() - t_build_id_start
     logger.info(
-        '[rq:pairs] Existing pair IDs built in %.1fs', build_id_dt,
+        f'[rq:pairs] Existing pair IDs built in {build_id_dt:.1f}s'
     )
     return existing_ids
 
@@ -187,6 +186,6 @@ def mask_existing_pair_indices(valid_pair_idx, existing_pair_ids, nevents):
     filtered = valid_pair_idx[keep]
     mask_dt = time.monotonic() - t_mask_start
     logger.info(
-        '[rq:pairs] Existing-pair masking completed in %.1fs', mask_dt,
+        f'[rq:pairs] Existing-pair masking completed in {mask_dt:.1f}s'
     )
     return filtered, skipped

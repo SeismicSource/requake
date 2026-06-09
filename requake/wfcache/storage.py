@@ -111,8 +111,8 @@ def _cleanup_slurm_local_cache():
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
             logger.info(
-                '[rq:wfcache] Removed local waveform cache copy: %s',
-                cache_dir,
+                f'[rq:wfcache] Removed local waveform cache copy: '
+                f'{cache_dir}'
             )
 
 
@@ -152,9 +152,8 @@ def _setup_slurm_local_cache(original_path):
         cache_dir.mkdir(parents=True, exist_ok=True)
         dest = cache_dir / original_path.name
         logger.info(
-            '[rq:wfcache] Copying waveform cache to local storage '
-            'on node %s: %s',
-            node, dest,
+            f'[rq:wfcache] Copying waveform cache to local storage '
+            f'on node {node}: {dest}'
         )
         shutil.copy2(str(original_path), str(dest))
         # Also copy the WAL and SHM files if they exist, so SQLite can
@@ -167,9 +166,8 @@ def _setup_slurm_local_cache(original_path):
         return _register_slurm_cleanup(cache_dir, dest)
     except OSError as err:
         logger.warning(
-            '[rq:wfcache] Could not copy waveform cache to '
-            'local storage (%s). Falling back to original path.',
-            err,
+            f'[rq:wfcache] Could not copy waveform cache to '
+            f'local storage ({err}). Falling back to original path.'
         )
         return original_path
 

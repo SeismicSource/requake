@@ -133,9 +133,8 @@ def resolve_scan_catalog_nprocs(npairs, slurm_context):
             if parsed_cpus is None:
                 if slurm_cpus is not None:
                     logger.warning(
-                        '[rq:nprocs] Invalid %s value %r; '
-                        'trying fallback CPU count',
-                        key, slurm_cpus,
+                        f'[rq:nprocs] Invalid {key} value {slurm_cpus!r}; '
+                        f'trying fallback CPU count'
                     )
                 continue
             base_nprocs = parsed_cpus

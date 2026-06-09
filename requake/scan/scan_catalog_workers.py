@@ -348,7 +348,7 @@ def _result_to_pair_record(catalog, result):
     if msg and msg not in seen_messages:
         if result.get('status') == 'error':
             logger.warning(
-                '[rq:worker] Worker error while processing pair: %s', msg,
+                f'[rq:worker] Worker error while processing pair: {msg}',
             )
             worker_tb = result.get(
                 'traceback', ''
@@ -635,7 +635,7 @@ def _process_pair_chunk(
                 'spawning/running workers. Aborting scan.'
             )
             logger.debug(
-                '[rq:scan] Broken process pool details: %s', err
+                f'[rq:scan] Broken process pool details: {err}'
             )
             rq_exit(1, abort=True)
     pool_shutdown = time.monotonic() - t_pool_create

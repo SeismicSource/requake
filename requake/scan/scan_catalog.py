@@ -64,9 +64,8 @@ def _ask_existing_pairs_action(npairs_in_db):
         )
         rq_exit(1)
     logger.warning(
-        '[rq:scan] Found %d existing event pairs in db file %s.',
-        npairs_in_db,
-        get_db_path(),
+        f'[rq:scan] Found {npairs_in_db:n} existing event pairs '
+        f'in db file {get_db_path()}.'
     )
     logger.warning(
         '[rq:scan] You can overwrite them and restart, or continue '
