@@ -10,7 +10,10 @@ SQLite-backed waveform cache storage.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import io
+import logging
 import os
+import shutil
+import signal
 import atexit
 import sqlite3
 from contextlib import suppress
@@ -20,6 +23,8 @@ import numpy as np
 from obspy import Stream, UTCDateTime, read
 
 from ..config import config
+
+logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 SCHEMA_VERSION = 1
 DEFAULT_FAILURE_MAX_RETRIES = 3
@@ -78,6 +83,9 @@ _CACHE_SCHEMA_VERIFIED = set()
 _CACHE_BATCH_ACTIVE = False
 # Cached return value of _failure_limits() for this process.
 _FAILURE_LIMITS = None
+# Paths for SLURM local-copy management.
+_SLURM_LOCAL_CACHE_DIR = None
+_SLURM_LOCAL_CACHE_CLEANED = False
 
 
 def _utc_to_ns(value):
@@ -90,6 +98,101 @@ def _ns_to_utc(value):
     return UTCDateTime(float(value) / 1e9)
 
 
+def _cleanup_slurm_local_cache():
+    """Remove the SLURM local waveform-cache copy if it exists."""
+    global _SLURM_LOCAL_CACHE_DIR  # pylint: disable=global-statement
+    global _SLURM_LOCAL_CACHE_CLEANED  # pylint: disable=global-statement
+
+    if _SLURM_LOCAL_CACHE_CLEANED or _SLURM_LOCAL_CACHE_DIR is None:
+        return
+    _SLURM_LOCAL_CACHE_CLEANED = True
+    cache_dir = str(_SLURM_LOCAL_CACHE_DIR)
+    with suppress(OSError):
+        if os.path.exists(cache_dir):
+            shutil.rmtree(cache_dir)
+            logger.info(
+                '[rq:wfcache] Removed local waveform cache copy: %s',
+                cache_dir,
+            )
+
+
+def _slurm_local_cache_signal_handler(signum, _frame):
+    """Clean up local cache copy on signal, then re-raise."""
+    _cleanup_slurm_local_cache()
+    # Re-raise the signal with the default handler.
+    signal.signal(signum, signal.SIG_DFL)
+    os.kill(os.getpid(), signum)
+
+
+def _setup_slurm_local_cache(original_path):
+    """Copy the waveform cache to local storage when running under SLURM.
+
+    Returns the local Path if the copy succeeded, otherwise *original_path*.
+    Registration of cleanup handlers is idempotent.
+    """
+    global _SLURM_LOCAL_CACHE_DIR  # pylint: disable=global-statement
+
+    if _SLURM_LOCAL_CACHE_DIR is not None:
+        return _SLURM_LOCAL_CACHE_DIR / original_path.name
+    if 'SLURM_JOB_ID' not in os.environ:
+        return original_path
+    if not os.path.exists(str(original_path)):
+        return original_path
+
+    tmp_base = os.environ.get('TMPDIR', '/tmp')
+    job_id = os.environ['SLURM_JOB_ID']
+    node = os.environ.get('SLURMD_NODENAME', os.uname().nodename)
+    cache_dir = Path(tmp_base) / f'requake_wfcache_{job_id}'
+
+    if cache_dir.exists():
+        _SLURM_LOCAL_CACHE_DIR = cache_dir
+        return _register_slurm_cleanup(cache_dir, original_path)
+
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        dest = cache_dir / original_path.name
+        logger.info(
+            '[rq:wfcache] Copying waveform cache to local storage '
+            'on node %s: %s',
+            node, dest,
+        )
+        shutil.copy2(str(original_path), str(dest))
+        # Also copy the WAL and SHM files if they exist, so SQLite can
+        # recover any uncheckpointed writes from the prefetch phase.
+        for suffix in ('-wal', '-shm'):
+            sidecar = Path(str(original_path) + suffix)
+            if sidecar.exists():
+                shutil.copy2(str(sidecar), str(dest) + suffix)
+        _SLURM_LOCAL_CACHE_DIR = cache_dir
+        return _register_slurm_cleanup(cache_dir, dest)
+    except OSError as err:
+        logger.warning(
+            '[rq:wfcache] Could not copy waveform cache to '
+            'local storage (%s). Falling back to original path.',
+            err,
+        )
+        return original_path
+
+
+def _register_slurm_cleanup(cache_dir, dest_path):
+    """Register atexit and signal handlers for local-cache cleanup.
+
+    Only SIGTERM is intercepted directly — SLURM uses it for job
+    cancellation.  SIGINT is left to the application-level handler,
+    which calls ``sys.exit`` and therefore triggers the ``atexit``
+    callback registered here.
+    """
+    global _SLURM_LOCAL_CACHE_CLEANED  # pylint: disable=global-statement
+
+    if _SLURM_LOCAL_CACHE_CLEANED:
+        return dest_path
+    _SLURM_LOCAL_CACHE_CLEANED = False
+    atexit.register(_cleanup_slurm_local_cache)
+    with suppress(OSError):
+        signal.signal(signal.SIGTERM, _slurm_local_cache_signal_handler)
+    return dest_path
+
+
 def get_waveform_cache_db_path():
     """Return path to the SQLite waveform cache database file."""
     if not bool(getattr(config, 'catalog_waveform_disk_cache_enabled', True)):
@@ -100,7 +203,8 @@ def get_waveform_cache_db_path():
         return None
     outdir_path = Path(outdir)
     outdir_path.mkdir(parents=True, exist_ok=True)
-    return outdir_path / 'waveform_cache.sqlite'
+    original = outdir_path / 'waveform_cache.sqlite'
+    return _setup_slurm_local_cache(original)
 
 
 def _connect_cache_db(cache_path):
