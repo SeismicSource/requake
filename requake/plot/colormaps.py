@@ -15,22 +15,22 @@ from ..config import config, rq_exit
 _SPATIAL_CMAP = 'plasma'
 
 cmaps = {
-    'family_number': mpl.cm.get_cmap('tab10'),
-    'time': mpl.cm.get_cmap('GnBu'),
-    'duration': mpl.cm.get_cmap('viridis'),
-    'latitude': mpl.cm.get_cmap(_SPATIAL_CMAP),
-    'longitude': mpl.cm.get_cmap(_SPATIAL_CMAP),
-    'depth': mpl.cm.get_cmap(_SPATIAL_CMAP),
-    'distance_from': mpl.cm.get_cmap(_SPATIAL_CMAP),
-    'number_of_events': mpl.cm.get_cmap('Greens'),
-    'cumul_moment': mpl.cm.get_cmap('plasma'),
-    'cumul_slip': mpl.cm.get_cmap('cividis'),
-    'slip_rate': mpl.cm.get_cmap('inferno'),
+    'family_number': mpl.colormaps['tab10'],
+    'time': mpl.colormaps['GnBu'],
+    'duration': mpl.colormaps['viridis'],
+    'latitude': mpl.colormaps[_SPATIAL_CMAP],
+    'longitude': mpl.colormaps[_SPATIAL_CMAP],
+    'depth': mpl.colormaps[_SPATIAL_CMAP],
+    'distance_from': mpl.colormaps[_SPATIAL_CMAP],
+    'number_of_events': mpl.colormaps['Greens'],
+    'cumul_moment': mpl.colormaps['plasma'],
+    'cumul_slip': mpl.colormaps['cividis'],
+    'slip_rate': mpl.colormaps['inferno'],
 }
 if getattr(config.args, 'colormap', None) is not None:
     try:
-        user_cmap = mpl.cm.get_cmap(config.args.colormap)
-    except ValueError:
+        user_cmap = mpl.colormaps[config.args.colormap]
+    except KeyError:
         rq_exit(f'Colormap "{config.args.colormap}" not found.')
     for cmap in cmaps:
         cmaps[cmap] = user_cmap.copy()
