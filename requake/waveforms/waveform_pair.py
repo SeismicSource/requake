@@ -11,6 +11,7 @@ Classes to handle waveform pairs for Requake.
 """
 import contextlib
 import logging
+import time
 from collections import defaultdict, OrderedDict
 from obspy import Stream
 from obspy.geodetics import gps2dist_azimuth
@@ -247,7 +248,15 @@ class WaveformPair:
                 continue
             self.trace_cache_misses += 1
             try:
+                t_ev_start = time.monotonic()
                 tr = get_event_waveform(ev)
+                ev_dt = time.monotonic() - t_ev_start
+                if ev_dt > 5.0:
+                    logger.warning(
+                        '[rq:perf] Slow event waveform fetch: '
+                        'evid=%s trace_id=%s dt=%.1fs',
+                        ev.evid, ev.trace_id, ev_dt,
+                    )
                 self._cache_put(cache_key, tr)
                 st.append(tr)
             except NoWaveformError as err:

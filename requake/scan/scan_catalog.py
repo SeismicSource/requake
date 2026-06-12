@@ -42,7 +42,6 @@ from .slurm_diagnostics import slurm_get_context, slurm_log_runtime_context
 from .scan_catalog_workers import (
     process_valid_pair_indices,
 )
-from ..wfcache.storage import ensure_slurm_local_cache
 
 logger = logging.getLogger('scan_catalog')
 
@@ -117,7 +116,6 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
     store_trace_metadata_from_inventory(trace_ids)
     nevents = len(catalog)
     initial_npairs = nevents * (nevents - 1) // 2
-    ensure_slurm_local_cache()
     logger.info('[rq:scan] Building valid event pairs...')
     t_grouping_start = time.monotonic()
     valid_pair_idx = build_valid_pair_indices(catalog)

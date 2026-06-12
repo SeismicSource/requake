@@ -71,6 +71,8 @@ def get_waveform_cache_stats():
 
 def _read_waveform_from_disk_cache(evid, traceid, starttime, endtime):
     """Read a waveform window from persistent cache when available."""
+    import time as _time
+    t_start = _time.monotonic()
     try:
         tr = read_waveform_from_cache(evid, traceid, starttime, endtime)
     except Exception as err:  # pylint: disable=broad-except
@@ -80,6 +82,13 @@ def _read_waveform_from_disk_cache(evid, traceid, starttime, endtime):
             f'for {evid}/{traceid}: {err}'
         )
         return None
+    dt = _time.monotonic() - t_start
+    if dt > 5.0:
+        logger.warning(
+            '[rq:perf] Slow disk cache read: evid=%s traceid=%s '
+            'dt=%.1fs hit=%s',
+            evid, traceid, dt, tr is not None,
+        )
     if tr is None:
         _increment_waveform_cache_stat('disk_cache_misses')
         return None
@@ -261,6 +270,11 @@ def _get_event_waveform_from_client(
     )
     if require_prefetch:
         raise NoWaveformError()
+    logger.warning(
+        '[rq:perf] Live FDSN fetch: evid=%s traceid=%s '
+        't0=%s t1=%s',
+        evid, traceid, t0, t1,
+    )
     try:
         tr = get_waveform_from_client(traceid, t0, t1)
     except NoWaveformError as err:

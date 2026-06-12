@@ -12,8 +12,7 @@ SQLite-backed waveform cache storage.
 import io
 import logging
 import os
-import shutil
-import signal
+import time
 import atexit
 import sqlite3
 from contextlib import suppress
@@ -83,9 +82,6 @@ _CACHE_SCHEMA_VERIFIED = set()
 _CACHE_BATCH_ACTIVE = False
 # Cached return value of _failure_limits() for this process.
 _FAILURE_LIMITS = None
-# Paths for SLURM local-copy management.
-_SLURM_LOCAL_CACHE_DIR = None
-_SLURM_LOCAL_CACHE_CLEANED = False
 
 
 def _utc_to_ns(value):
@@ -98,107 +94,6 @@ def _ns_to_utc(value):
     return UTCDateTime(float(value) / 1e9)
 
 
-def _cleanup_slurm_local_cache():
-    """Remove the SLURM local waveform-cache copy if it exists."""
-    global _SLURM_LOCAL_CACHE_CLEANED  # pylint: disable=global-statement
-
-    if _SLURM_LOCAL_CACHE_CLEANED or _SLURM_LOCAL_CACHE_DIR is None:
-        return
-    _SLURM_LOCAL_CACHE_CLEANED = True
-    cache_dir = str(_SLURM_LOCAL_CACHE_DIR)
-    with suppress(OSError):
-        if os.path.exists(cache_dir):
-            shutil.rmtree(cache_dir)
-            logger.info(
-                f'[rq:wfcache] Removed local waveform cache copy: '
-                f'{cache_dir}'
-            )
-
-
-def _slurm_local_cache_signal_handler(signum, _frame):
-    """Clean up local cache copy on signal, then re-raise."""
-    _cleanup_slurm_local_cache()
-    # Re-raise the signal with the default handler.
-    signal.signal(signum, signal.SIG_DFL)
-    os.kill(os.getpid(), signum)
-
-
-def _checkpoint_original_cache(original_path):
-    """Apply pending WAL entries and truncate the WAL file.
-
-    After this call the main database file is self-contained and
-    safe to copy without ``-wal`` / ``-shm`` sidecars.
-    """
-    with suppress(Exception):
-        conn = sqlite3.connect(str(original_path))
-        conn.execute('PRAGMA wal_checkpoint(TRUNCATE)')
-        conn.close()
-
-
-def _setup_slurm_local_cache(original_path):
-    """Copy the waveform cache to local storage when running under SLURM.
-
-    Returns the local Path if the copy succeeded, otherwise *original_path*.
-    Registration of cleanup handlers is idempotent.
-    """
-    global _SLURM_LOCAL_CACHE_DIR  # pylint: disable=global-statement
-
-    if _SLURM_LOCAL_CACHE_DIR is not None:
-        return _SLURM_LOCAL_CACHE_DIR / original_path.name
-    if 'SLURM_JOB_ID' not in os.environ:
-        return original_path
-    if not os.path.exists(str(original_path)):
-        return original_path
-
-    tmp_base = os.environ.get('TMPDIR', '/tmp')
-    job_id = os.environ['SLURM_JOB_ID']
-    node = os.environ.get('SLURMD_NODENAME', os.uname().nodename)
-    cache_dir = Path(tmp_base) / f'requake_wfcache_{job_id}'
-
-    if cache_dir.exists():
-        _SLURM_LOCAL_CACHE_DIR = cache_dir
-        return _register_slurm_cleanup(cache_dir, original_path)
-
-    try:
-        _checkpoint_original_cache(original_path)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        dest = cache_dir / original_path.name
-        logger.info(
-            '[rq:wfcache] Copying waveform cache to local storage '
-            'on node %s: %s',
-            node, dest,
-        )
-        shutil.copy2(str(original_path), str(dest))
-        _SLURM_LOCAL_CACHE_DIR = cache_dir
-        return _register_slurm_cleanup(cache_dir, dest)
-    except OSError as err:
-        logger.warning(
-            '[rq:wfcache] Could not copy waveform cache to '
-            'local storage (%s). Falling back to original path.',
-            err,
-        )
-        return original_path
-
-
-def _register_slurm_cleanup(cache_dir, dest_path):
-    """Register atexit and signal handlers for local-cache cleanup.
-
-    Only SIGTERM is intercepted directly — SLURM uses it for job
-    cancellation.  SIGINT is left to the application-level handler,
-    which calls ``sys.exit`` and therefore triggers the ``atexit``
-    callback registered here.
-    """
-    global _SLURM_LOCAL_CACHE_CLEANED  # pylint: disable=global-statement
-
-    if _SLURM_LOCAL_CACHE_CLEANED:
-        return dest_path
-    _SLURM_LOCAL_CACHE_CLEANED = False
-    atexit.register(_cleanup_slurm_local_cache)
-    with suppress(OSError):
-        signal.signal(signal.SIGTERM, _slurm_local_cache_signal_handler)
-    return dest_path
-
-
 def get_waveform_cache_db_path():
     """Return path to the SQLite waveform cache database file."""
     if not bool(getattr(config, 'catalog_waveform_disk_cache_enabled', True)):
@@ -209,17 +104,7 @@ def get_waveform_cache_db_path():
         return None
     outdir_path = Path(outdir)
     outdir_path.mkdir(parents=True, exist_ok=True)
-    original = outdir_path / 'waveform_cache.sqlite'
-    return _setup_slurm_local_cache(original)
-
-
-def ensure_slurm_local_cache():
-    """Trigger SLURM local-cache copy early, before pair processing.
-
-    Call this once at startup so the (potentially large) file copy
-    overlaps with catalog loading and pair-index building.
-    """
-    get_waveform_cache_db_path()
+    return outdir_path / 'waveform_cache.sqlite'
 
 
 def _connect_cache_db(cache_path):
@@ -363,7 +248,9 @@ def read_waveform_from_cache(evid, trace_id, starttime, endtime):
         ).fetchone()
     if row is None:
         return None
+    t_deser_start = time.monotonic()
     st = read(io.BytesIO(row['data_blob']), format='MSEED')
+    deser_dt = time.monotonic() - t_deser_start
     if not st:
         return None
     tr = st[0]
@@ -371,10 +258,21 @@ def read_waveform_from_cache(evid, trace_id, starttime, endtime):
         int(row['start_time_ns']) != req_start_ns
         or int(row['end_time_ns']) != req_end_ns
     ):
+        t_trim_start = time.monotonic()
         tr = tr.copy()
         tr.trim(starttime=starttime, endtime=endtime)
+        trim_dt = time.monotonic() - t_trim_start
         if tr.stats.npts <= 0:
             return None
+    else:
+        trim_dt = 0.0
+    total_dt = deser_dt + trim_dt
+    if total_dt > 1.0:
+        logger.warning(
+            '[rq:perf] Slow cache read: evid=%s trace_id=%s '
+            'deser=%.2fs trim=%.2fs npts=%d',
+            evid, trace_id, deser_dt, trim_dt, tr.stats.npts,
+        )
     return tr
 
 

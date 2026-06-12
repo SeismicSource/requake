@@ -238,6 +238,17 @@ def _process_pair(pair, waveform_pair):
     crosscorr_dt = time.monotonic() - t_cc_start
     _fix_trace_id(tr1.stats)
     _fix_trace_id(tr2.stats)
+    if waveform_fetch_dt > 5.0:
+        logger.warning(
+            '[rq:perf] Slow pair fetch: ev1=%s ev2=%s '
+            'fetch=%.1fs cc=%.3fs tr1_npts=%d tr2_npts=%d',
+            pair[0].evid,
+            pair[1].evid,
+            waveform_fetch_dt,
+            crosscorr_dt,
+            tr1.stats.npts,
+            tr2.stats.npts,
+        )
     return PairRecord(
         pair[0],
         pair[1],
