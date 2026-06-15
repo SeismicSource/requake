@@ -169,23 +169,19 @@ class TestScanCatalogResume(unittest.TestCase):
         """Existing-pair IDs should be canonicalized by catalog index."""
         catalog = [_DummyEvent('A'), _DummyEvent('B'), _DummyEvent('C')]
         event_keys = [(10, 'A'), (11, 'B'), (12, 'C')]
-        existing = {(11, 10), (12, 11)}
+        nevents = len(catalog)
+        packed = {0 * nevents + 1, 1 * nevents + 2}
         with patch.object(
             PAIRS_MODULE,
             'read_event_key_rows',
             return_value=event_keys,
         ), patch.object(
             PAIRS_MODULE,
-            'read_pair_key_ids',
-            return_value=existing,
+            'read_packed_pair_ids',
+            return_value=packed,
         ):
             existing_ids = load_existing_pair_ids(catalog)
-        nevents = len(catalog)
-        expected = {
-            0 * nevents + 1,
-            1 * nevents + 2,
-        }
-        self.assertEqual(existing_ids, expected)
+        self.assertEqual(existing_ids, packed)
 
     def test_noninteractive_progress_uses_total_pair_count(self):
         """Resume progress log should use total pairs, not remaining."""

@@ -15,7 +15,7 @@ import logging
 import numpy as np
 from scipy.spatial import cKDTree
 from ..config import config
-from ..database.pairs import read_event_key_rows, read_pair_key_ids
+from ..database.pairs import read_event_key_rows, read_packed_pair_ids
 
 logger = logging.getLogger('scan_catalog')
 _EARTH_RADIUS_KM = 6371.0088
@@ -124,18 +124,6 @@ def load_existing_pair_ids(catalog):
         '[rq:pairs] Loading existing pair key IDs from db file...'
     )
     event_key_rows = read_event_key_rows()
-    existing_pair_key_ids = read_pair_key_ids()
-    read_keys_dt = time.monotonic() - t_read_keys_start
-    logger.info(
-        f'[rq:pairs] {len(existing_pair_key_ids):n} unique pairs '
-        f'loaded in {read_keys_dt:.1f}s'
-    )
-    if not existing_pair_key_ids:
-        return set()
-    t_build_id_start = time.monotonic()
-    logger.info(
-        '[rq:pairs] Building existing pair IDs for quick lookup...'
-    )
     evid_to_idx = {
         ev.evid: idx for idx, ev in enumerate(catalog)
     }
@@ -144,20 +132,12 @@ def load_existing_pair_ids(catalog):
         for event_id, evid in event_key_rows
         if evid in evid_to_idx
     }
-    get_idx = event_id_to_idx.get
     nevents = len(catalog)
-    existing_ids = set()
-    add_id = existing_ids.add
-    for event1_id, event2_id in existing_pair_key_ids:
-        idx1 = get_idx(event1_id)
-        idx2 = get_idx(event2_id)
-        if idx1 is None or idx2 is None:
-            continue
-        first, second = (idx1, idx2) if idx1 < idx2 else (idx2, idx1)
-        add_id(first * nevents + second)
-    build_id_dt = time.monotonic() - t_build_id_start
+    existing_ids = read_packed_pair_ids(event_id_to_idx, nevents)
+    read_keys_dt = time.monotonic() - t_read_keys_start
     logger.info(
-        f'[rq:pairs] Existing pair IDs built in {build_id_dt:.1f}s'
+        f'[rq:pairs] {len(existing_ids):n} unique pairs '
+        f'loaded and packed in {read_keys_dt:.1f}s'
     )
     return existing_ids
 

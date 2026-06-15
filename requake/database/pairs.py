@@ -364,8 +364,18 @@ def read_event_key_rows():
     return [(int(row['event_id']), row['evid']) for row in rows]
 
 
-def read_pair_key_ids():
-    """Read stored event-pair foreign keys as integer ID tuples."""
+def read_packed_pair_ids(event_id_to_idx, nevents):
+    """Stream pair keys from DB and return packed ``uint64`` IDs.
+
+    Reads ``(event1_id, event2_id)`` rows from the database and
+    packs them into a set of canonical ``uint64`` values in a
+    single pass, avoiding the intermediate tuple set.
+
+    :param event_id_to_idx: mapping from ``event_id`` to catalog index
+    :param nevents: number of events in the catalog
+    :return: set of packed IDs, each computed as
+        ``min(idx1, idx2) * nevents + max(idx1, idx2)``
+    """
     conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
@@ -382,10 +392,19 @@ def read_pair_key_ids():
                     f'Requake version in db file {get_db_path()}'
                 ) from err
             raise
-        return {
-            (int(row['event1_id']), int(row['event2_id']))
-            for row in rows
-        }
+        get_idx = event_id_to_idx.get
+        result = set()
+        add_id = result.add
+        for event1_id, event2_id in rows:
+            idx1 = get_idx(int(event1_id))
+            idx2 = get_idx(int(event2_id))
+            if idx1 is None or idx2 is None:
+                continue
+            if idx1 < idx2:
+                add_id(idx1 * nevents + idx2)
+            else:
+                add_id(idx2 * nevents + idx1)
+        return result
     finally:
         conn.close()
 
