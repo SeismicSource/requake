@@ -179,23 +179,13 @@ def _connect_station_dataselect():
     Connect to station and dataselect services.
 
     Those can be either FDSN web services or local files.
+    Both FDSN clients are created lazily on first use to avoid
+    unnecessary network I/O when data comes from local sources.
     """
-    from obspy.clients.fdsn import Client as FDSNClient
-    if config.station_metadata_path is None:
-        config.station_client = FDSNClient(config.fdsn_station_url)
-        logger.info(
-            f'Connected to FDSN station server: {config.fdsn_station_url}'
-        )
+    config.station_client = None
     config.dataselect_client = None
     if config.sds_data_path is not None:
         _connect_sds()
-    if config.event_data_path is not None:
-        return
-    config.dataselect_client = FDSNClient(config.fdsn_dataselect_url)
-    logger.info(
-        'Connected to FDSN dataselect server: '
-        f'{config.fdsn_dataselect_url}'
-    )
 
 
 def _connect_sds():

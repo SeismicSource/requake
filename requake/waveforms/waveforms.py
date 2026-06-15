@@ -118,6 +118,9 @@ def get_waveform_from_client(traceid, starttime, endtime):
     """
     Get a waveform from a FDSN or SDS client.
 
+    The FDSN dataselect client is created lazily on first use to avoid
+    unnecessary network I/O when waveforms come from the disk cache.
+
     :param traceid: trace id
     :type traceid: str
     :param starttime: start time
@@ -129,6 +132,15 @@ def get_waveform_from_client(traceid, starttime, endtime):
     :rtype: obspy.Trace
     """
     client = config.dataselect_client
+    if client is None and config.event_data_path is None:
+        # Lazy-init FDSN dataselect client
+        from obspy.clients.fdsn import Client as FDSNClient
+        client = FDSNClient(config.fdsn_dataselect_url)
+        config.dataselect_client = client
+        logger.info(
+            'Connected to FDSN dataselect server: '
+            f'{config.fdsn_dataselect_url}'
+        )
     if client is None:
         raise NoWaveformError(
             'No dataselect_client defined in the config file')

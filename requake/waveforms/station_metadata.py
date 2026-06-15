@@ -122,11 +122,18 @@ def _download_metadata():
     Download metadata for the trace_ids specified in config file.
 
     The metadata is stored in the config object.
+    The FDSN station client is created lazily on first call.
 
     :raises MetadataMismatchError: if the metadata does not match
         the expected format
     """
     logger.info('Downloading station metadata...')
+    if config.station_client is None:
+        from obspy.clients.fdsn import Client as FDSNClient
+        config.station_client = FDSNClient(config.fdsn_station_url)
+        logger.info(
+            f'Connected to FDSN station server: {config.fdsn_station_url}'
+        )
     inv = Inventory()
     cl = config.station_client
     start_time = min(config.catalog_start_times)
