@@ -381,7 +381,14 @@ def _result_to_pair_record(catalog, result):
 def _flush_pair_batch_if_needed(batch_of_pairs):
     """Flush pair batch when it reaches the configured chunk size."""
     if len(batch_of_pairs) >= 100:
+        t_start = time.monotonic()
         write_pair_records(batch_of_pairs, append=True)
+        dt = time.monotonic() - t_start
+        if dt > 1.0:
+            logger.warning(
+                '[rq:perf] Slow pair DB write: dt=%.1fs n_pairs=%d',
+                dt, len(batch_of_pairs),
+            )
         batch_of_pairs.clear()
 
 

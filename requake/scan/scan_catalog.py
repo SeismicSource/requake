@@ -138,6 +138,10 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
             existing_pair_ids,
             nevents,
         )
+        # Free the pair-ID set immediately after masking.
+        # It can be large and would otherwise stay in scope
+        # for the entire pair-processing phase.
+        del existing_pair_ids
         resume_filter_dt = time.monotonic() - t_resume_filter_start
         logger.info(
             '[rq:scan] Loading existing pair IDs and applying mask '
