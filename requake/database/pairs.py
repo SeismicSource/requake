@@ -371,11 +371,8 @@ def read_pair_key_ids():
         cursor = conn.cursor()
         try:
             rows = cursor.execute(
-                f'''
-                SELECT DISTINCT event1_id, event2_id
-                FROM {EVENT_PAIRS_TABLE}
-                '''
-            ).fetchall()
+                f'SELECT event1_id, event2_id FROM {EVENT_PAIRS_TABLE}'
+            )
         except sqlite3.OperationalError as err:
             if _is_missing_pairs_table_error(err):
                 return set()
@@ -385,12 +382,12 @@ def read_pair_key_ids():
                     f'Requake version in db file {get_db_path()}'
                 ) from err
             raise
+        return {
+            (int(row['event1_id']), int(row['event2_id']))
+            for row in rows
+        }
     finally:
         conn.close()
-    return {
-        (int(row['event1_id']), int(row['event2_id']))
-        for row in rows
-    }
 
 
 def read_pairs(cc_min=None, cc_max=None):
