@@ -119,6 +119,16 @@ class _DummyConfig:
 class TestScanCatalogResume(unittest.TestCase):
     """Test scan_catalog resume and overwrite selection features."""
 
+    @staticmethod
+    def _resolve_nprocs(nprocs, npairs, slurm_context=None):
+        """Resolve nprocs with a config stub patched in."""
+        dummy_config = SimpleNamespace(
+            args=SimpleNamespace(nprocs=nprocs),
+            catalog_scan_nprocs=0,
+        )
+        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
+            return resolve_scan_catalog_nprocs(npairs, slurm_context or {})
+
     def test_scan_catalog_force_flag(self):
         """--force should be accepted for scan_catalog."""
         with patch.object(sys, 'argv', ['requake', 'scan_catalog', '--force']):
@@ -237,55 +247,36 @@ class TestScanCatalogResume(unittest.TestCase):
 
     def test_resolve_nprocs_prefers_cli(self):
         """CLI nprocs should override config value."""
-        dummy_config = SimpleNamespace(
-            args=SimpleNamespace(nprocs=3),
-            catalog_scan_nprocs=9,
-        )
-        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
-            resolved = resolve_scan_catalog_nprocs(100, {})
+        resolved = self._resolve_nprocs(nprocs=3, npairs=100)
         self.assertEqual(resolved, 3)
 
     def test_resolve_nprocs_auto_slurm(self):
         """Auto nprocs should use Slurm cpus per task."""
-        dummy_config = SimpleNamespace(
-            args=SimpleNamespace(nprocs=None),
-            catalog_scan_nprocs=0,
+        resolved = self._resolve_nprocs(
+            nprocs=None, npairs=100,
+            slurm_context={'SLURM_CPUS_PER_TASK': '8'},
         )
-        slurm_context = {'SLURM_CPUS_PER_TASK': '8'}
-        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
-            resolved = resolve_scan_catalog_nprocs(100, slurm_context)
         self.assertEqual(resolved, 8)
 
     def test_resolve_nprocs_clamps_to_pair_count(self):
         """Resolved workers should be clamped to pair count."""
-        dummy_config = SimpleNamespace(
-            args=SimpleNamespace(nprocs=32),
-            catalog_scan_nprocs=0,
-        )
-        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
-            resolved = resolve_scan_catalog_nprocs(5, {})
+        resolved = self._resolve_nprocs(nprocs=32, npairs=5)
         self.assertEqual(resolved, 5)
 
     def test_resolve_nprocs_uses_slurm_cpus_on_node(self):
         """Automatic nprocs should use SLURM_CPUS_ON_NODE."""
-        dummy_config = SimpleNamespace(
-            args=SimpleNamespace(nprocs=None),
-            catalog_scan_nprocs=0,
+        resolved = self._resolve_nprocs(
+            nprocs=None, npairs=100,
+            slurm_context={'SLURM_CPUS_ON_NODE': '12'},
         )
-        slurm_context = {'SLURM_CPUS_ON_NODE': '12'}
-        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
-            resolved = resolve_scan_catalog_nprocs(100, slurm_context)
         self.assertEqual(resolved, 12)
 
     def test_resolve_nprocs_parses_job_cpus_per_node(self):
         """Automatic nprocs should parse SLURM_JOB_CPUS_PER_NODE."""
-        dummy_config = SimpleNamespace(
-            args=SimpleNamespace(nprocs=None),
-            catalog_scan_nprocs=0,
+        resolved = self._resolve_nprocs(
+            nprocs=None, npairs=100,
+            slurm_context={'SLURM_JOB_CPUS_PER_NODE': '8(x2),4'},
         )
-        slurm_context = {'SLURM_JOB_CPUS_PER_NODE': '8(x2),4'}
-        with patch.object(RUNTIME_MODULE, 'config', dummy_config):
-            resolved = resolve_scan_catalog_nprocs(100, slurm_context)
         self.assertEqual(resolved, 8)
 
     def test_get_slurm_context_returns_only_set_values(self):
