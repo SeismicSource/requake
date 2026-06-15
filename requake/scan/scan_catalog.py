@@ -121,8 +121,8 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
     valid_pair_idx = build_valid_pair_indices(catalog)
     grouping_dt = time.monotonic() - t_grouping_start
     logger.info(
-        '[rq:scan] Valid-pair spatial grouping completed in %.1fs',
-        grouping_dt,
+        f'[rq:scan] Valid-pair spatial grouping '
+        f'completed in {grouping_dt:.1f}s'
     )
     skipped_npairs = 0
     candidate_npairs = len(valid_pair_idx)
@@ -144,9 +144,8 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
         del existing_pair_ids
         resume_filter_dt = time.monotonic() - t_resume_filter_start
         logger.info(
-            '[rq:scan] Loading existing pair IDs and applying mask '
-            'completed in %.1fs',
-            resume_filter_dt,
+            f'[rq:scan] Loading existing pair IDs and applying mask '
+            f'completed in {resume_filter_dt:.1f}s'
         )
     npairs = len(valid_pair_idx)
     total_valid_pairs = skipped_npairs + npairs
