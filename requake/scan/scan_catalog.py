@@ -190,7 +190,13 @@ def scan_catalog():
         logger.error(f'[rq:scan] {msg}')
         rq_exit(1)
     try:
+        t_fix_start = time.monotonic()
         fix_non_locatable_events(catalog)
+        fix_dt = time.monotonic() - t_fix_start
+        if fix_dt > 1.0:
+            logger.info(
+                f'[rq:scan] Fixed non-locatable events in {fix_dt:.1f}s'
+            )
     except MetadataMismatchError as msg:
         logger.error(f'[rq:scan] {msg}')
         rq_exit(1)
@@ -205,7 +211,13 @@ def scan_catalog():
         f'{get_db_path()}'
     )
     continue_scan = False
+    t_count_start = time.monotonic()
     existing_pairs = count_pairs()
+    count_dt = time.monotonic() - t_count_start
+    logger.info(
+        f'[rq:scan] Pair count queried in {count_dt:.1f}s '
+        f'({existing_pairs:n} existing pairs)'
+    )
     if existing_pairs > 0:
         action = _ask_existing_pairs_action(existing_pairs)
         if action == 'abort':
