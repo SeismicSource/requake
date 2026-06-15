@@ -211,13 +211,7 @@ def scan_catalog():
         f'{get_db_path()}'
     )
     continue_scan = False
-    t_count_start = time.monotonic()
-    has_existing_pairs = count_pairs() > 0
-    count_dt = time.monotonic() - t_count_start
-    logger.info(
-        f'[rq:scan] Pair existence check completed in {count_dt:.1f}s'
-    )
-    if has_existing_pairs:
+    if count_pairs() > 0:
         action = _ask_existing_pairs_action()
         if action == 'abort':
             logger.info('[rq:scan] Scan aborted by user')
