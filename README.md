@@ -142,6 +142,8 @@ Different commands are available:
                         families
     scan_templates      scan a continuous waveform stream using one or more
                         templates
+    wfcache             manage persistent waveform cache (prefetch, print,
+                        inspect, extract, reset_failures)
 
 Certain commands (e.g., `plot_pair`) require further arguments (use, e.g.,
 `requake plot_pair -h` to get help).
@@ -177,6 +179,14 @@ Now, build the catalog of event pairs with:
 
     requake scan_catalog
 
+When relying on FDSN web services for waveform data, it is strongly
+recommended to prefetch all waveform windows before running the scan.
+This downloads every required waveform once and stores it in a local
+SQLite cache, avoiding repeated downloads and dramatically reducing
+overall runtime for large catalogs:
+
+    requake wfcache prefetch
+
 Once done ([it will take time!](#performances)), you are ready to build
 repeating earthquake families:
 
@@ -192,6 +202,12 @@ repeating earthquake families:
   seconds (~68,000 pairs per minute). These results indicate that overall
   performance is typically dominated by waveform download latency rather than
   computation.
+
+- For large FDSN-based runs, use `requake wfcache prefetch` before
+  `requake scan_catalog` to download all waveforms upfront into a local
+  SQLite cache.  This eliminates repeated downloads, lets the scan read
+  exclusively from disk, and is the single most effective way to speed up
+  catalog scanning.
 
 - `requake build_families` is fast™.
 

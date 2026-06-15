@@ -10,4 +10,10 @@ Performances
   performance is typically dominated by waveform download latency rather than
   computation.
 
+* For large FDSN-based runs, use ``requake wfcache prefetch`` before
+  ``requake scan_catalog`` to download all waveforms upfront into a local
+  SQLite cache.  This eliminates repeated downloads, lets the scan read
+  exclusively from disk, and is the single most effective way to speed up
+  catalog scanning.
+
 * ``requake build_families`` is fast™.

@@ -37,6 +37,8 @@ Different commands are available:
                        families
    scan_templates      scan a continuous waveform stream using one or more
                        templates
+   wfcache             manage persistent waveform cache (prefetch, print,
+                       inspect, extract, reset_failures)
 
 
 Certain commands (e.g., ``plot_pair``\ ) require further arguments
@@ -84,6 +86,17 @@ or
 .. code-block::
 
    requake read_catalog CATALOG_FILE
+
+
+When relying on FDSN web services for waveform data, it is strongly
+recommended to prefetch all waveform windows before running the scan.
+This downloads every required waveform once and stores it in a local
+SQLite cache, avoiding repeated downloads and dramatically reducing
+overall runtime for large catalogs:
+
+.. code-block::
+
+   requake wfcache prefetch
 
 
 Now, build the catalog of event pairs with:
