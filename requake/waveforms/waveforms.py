@@ -234,12 +234,15 @@ def _get_event_waveform_from_client(
         tp_max_s = read_cache_meta(f'tp_max_{traceid}')
     else:
         tp_min_s = tp_max_s = None
+    pre_p = config.cc_pre_P
+    trace_length = config.cc_trace_length
     if tp_min_s is not None and tp_max_s is not None:
-        t0 = orig_time + float(tp_min_s)
-        t1 = orig_time + float(tp_max_s)
+        # Standardized offsets (from wfcache_prefetch) are raw P-arrival
+        # travel times.  Apply the same padding used by _build_prefetch_request
+        # so that cache keys match the windows stored during prefetch.
+        t0 = orig_time + float(tp_min_s) - pre_p
+        t1 = orig_time + float(tp_max_s) + trace_length
     else:
-        pre_p = config.cc_pre_P
-        trace_length = config.cc_trace_length
         t0 = p_arrival_time - pre_p
         t1 = t0 + trace_length
     # Three-tier decision for each waveform request:

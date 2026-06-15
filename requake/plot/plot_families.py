@@ -235,7 +235,10 @@ def plot_families():
             'how to select specific families.')
         families = families[:20]
     for family in families:
-        fig, figure_name = _plot_family(family)
+        result = _plot_family(family)
+        if result is None:
+            continue
+        fig, figure_name = result
         save_or_show_plot(fig, figure_name, show=False)
     if config.args.output == 'NO_OUTPUT':
         print('''

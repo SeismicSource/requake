@@ -413,29 +413,34 @@ def _failure_limits():
 
 def has_exhausted_failure(evid, trace_id):
     """
-    Return True if (evid, trace_id) has exhausted its allowed retries.
+    Return True if (evid, trace_id) exhausted its retries and is in backoff.
 
     Compares retry_count against the minimum of the stored max_retries
     and the current config max_retries, so that a tighter current
     policy (e.g. max_retries=0) correctly supersedes a more permissive
     value that was stored by an earlier run.
+
+    Once all exhausted entries have passed their backoff deadline,
+    returns False so that callers may retry.
     """
     cache_path = get_waveform_cache_db_path()
     if cache_path is None or not cache_path.exists():
         return False
     conn = _get_cache_connection(cache_path)
-    # Use MIN(stored, current) so that a stricter current policy
-    # (e.g. max_retries=0 set after a prefetch run that used
-    # max_retries=3) correctly marks older rows as exhausted.
     current_max_retries, _ = _failure_limits()
+    now_ns = _utc_to_ns(UTCDateTime())
     row = conn.execute(
         '''
         SELECT 1 FROM waveform_failures
         WHERE evid = ? AND trace_id = ?
             AND retry_count >= MIN(max_retries, ?)
+            AND (
+                next_retry_after_ns IS NULL
+                OR next_retry_after_ns > ?
+            )
         LIMIT 1
         ''',
-        (str(evid), str(trace_id), current_max_retries),
+        (str(evid), str(trace_id), current_max_retries, now_ns),
     ).fetchone()
     return row is not None
 
@@ -481,17 +486,16 @@ def should_skip_waveform_download(evid, trace_id, starttime, endtime):
         ).fetchone()
     if row is None:
         return False, ''
-    retry_count = int(row['retry_count'])
-    max_retries = int(row['max_retries'])
     next_retry_after_ns = row['next_retry_after_ns']
-    if retry_count >= max_retries:
-        return True, f'retry limit reached ({retry_count}/{max_retries})'
     if next_retry_after_ns is not None and now_ns < int(next_retry_after_ns):
         last_error = row['last_error'] or ''
         retry_after = _ns_to_utc(next_retry_after_ns)
+        retry_count = int(row['retry_count'])
+        max_retries = int(row['max_retries'])
+        prefix = 'retry limit reached; ' if retry_count >= max_retries else ''
         return (
             True,
-            f'next retry after {retry_after} '
+            f'{prefix}next retry after {retry_after} '
             f'(last error: {last_error})',
         )
     return False, ''
