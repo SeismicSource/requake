@@ -124,16 +124,19 @@ def load_existing_pair_ids(catalog):
         '[rq:pairs] Loading existing pair key IDs from db file...'
     )
     event_key_rows = read_event_key_rows()
-    evid_to_idx = {
+    # Map event string IDs to their position in the catalog.
+    _evid_to_idx = {
         ev.evid: idx for idx, ev in enumerate(catalog)
     }
-    event_id_to_idx = {
-        event_id: evid_to_idx[evid]
+    # Map DB integer event IDs to catalog indices.
+    # Only events present in the current catalog are included.
+    _db_id_to_idx = {
+        event_id: _evid_to_idx[evid]
         for event_id, evid in event_key_rows
-        if evid in evid_to_idx
+        if evid in _evid_to_idx
     }
     nevents = len(catalog)
-    existing_ids = read_packed_pair_ids(event_id_to_idx, nevents)
+    existing_ids = read_packed_pair_ids(_db_id_to_idx, nevents)
     read_keys_dt = time.monotonic() - t_read_keys_start
     logger.info(
         f'[rq:pairs] {len(existing_ids):n} unique pairs '
