@@ -27,6 +27,79 @@ class MetadataMismatchError(Exception):
     """Exception raised for mismatched metadata."""
 
 
+def _read_station_metadata_from_db():
+    """
+    Build an ObsPy Inventory from the trace_metadata SQLite table.
+
+    This avoids an FDSN metadata download when trace metadata was
+    already persisted during a previous catalog scan.
+
+    :returns: inventory or None if the table is missing or empty
+    :rtype: obspy.Inventory or None
+    """
+    from ..database.db import get_db_connection
+    from ..database.trace_metadata import (
+        TRACE_METADATA_TABLE,
+        _is_missing_trace_metadata_table_error,
+    )
+    conn = get_db_connection(initdb=False)
+    try:
+        cursor = conn.cursor()
+        try:
+            rows = cursor.execute(
+                f'SELECT * FROM {TRACE_METADATA_TABLE}'
+            ).fetchall()
+        except Exception as err:
+            if _is_missing_trace_metadata_table_error(err):
+                return None
+            raise
+    finally:
+        conn.close()
+    if not rows:
+        return None
+    inv = Inventory()
+    networks = {}
+    for row in rows:
+        trace_id = row['trace_id']
+        try:
+            net, sta, loc, chan = trace_id.split('.')
+        except ValueError:
+            continue
+        net = net or '@@'
+        if net not in networks:
+            network = Network(code=net)
+            inv.networks.append(network)
+            networks[net] = network
+        else:
+            network = networks[net]
+        # Check if station already exists in this network
+        station = next(
+            (s for s in network.stations if s.code == sta), None
+        )
+        if station is None:
+            station = Station(
+                code=sta,
+                latitude=row['trace_lat'] or 0,
+                longitude=row['trace_lon'] or 0,
+                elevation=row['elevation'] or 0,
+            )
+            network.stations.append(station)
+        channel = Channel(
+            code=chan,
+            location_code=loc,
+            latitude=row['trace_lat'] or 0,
+            longitude=row['trace_lon'] or 0,
+            elevation=row['elevation'] or 0,
+            depth=row['local_depth'] or 0,
+        )
+        station.channels.append(channel)
+    logger.info(
+        'Built station metadata from database '
+        f'({len(rows)} trace metadata rows)'
+    )
+    return inv
+
+
 def _read_station_metadata_from_csv(csv_file):
     """
     Read station metadata from a CSV file.
@@ -179,10 +252,14 @@ def load_inventory():
     """
     Load the inventory object if not already loaded.
 
+    Tries, in order: local file, database, FDSN download.
     The inventory is stored in the config object.
     """
+    if config.inventory is not None:
+        return
+    _read_station_metadata()
     if config.inventory is None:
-        _read_station_metadata()
+        config.inventory = _read_station_metadata_from_db()
     if config.inventory is None:
         _download_metadata()
 
