@@ -16,6 +16,9 @@ remembers failed downloads across runs, eliminating redundant HTTP requests.
 - New config: `catalog_waveform_cache_failure_max_retries`,
   `catalog_waveform_cache_failure_backoff_s`,
   `catalog_waveform_require_prefetch`.
+- Several optimization for parallel runs in `scan_catalog` (especially on
+  Slurm clusters) and for startup time of `scan_catalog -c` (continue an
+  interrupted scan).
 - Extended documentation for `scan_catalog` and tips on using `wfcache`.
 
 ## [0.8.2] - 2026-06-03
