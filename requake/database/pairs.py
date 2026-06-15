@@ -349,7 +349,7 @@ def read_event_key_rows():
                 SELECT event_id, evid
                 FROM {EVENT_KEYS_TABLE}
                 '''
-            ).fetchall()
+            )
         except sqlite3.OperationalError as err:
             if _is_missing_pairs_table_error(err):
                 return []
