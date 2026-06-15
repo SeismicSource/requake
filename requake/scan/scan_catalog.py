@@ -46,7 +46,7 @@ from .scan_catalog_workers import (
 logger = logging.getLogger('scan_catalog')
 
 
-def _ask_existing_pairs_action(npairs_in_db):
+def _ask_existing_pairs_action():
     """Ask the user whether to overwrite or continue an existing scan."""
     args = config.args
     if args.force:
@@ -55,7 +55,7 @@ def _ask_existing_pairs_action(npairs_in_db):
         return 'continue'
     if not sys.stdin.isatty():
         logger.error(
-            f'[rq:scan] Found {npairs_in_db:n} event pairs '
+            f'[rq:scan] Found existing event pairs '
             f'in db file {get_db_path()}.'
         )
         logger.error(
@@ -64,7 +64,7 @@ def _ask_existing_pairs_action(npairs_in_db):
         )
         rq_exit(1)
     logger.warning(
-        f'[rq:scan] Found {npairs_in_db:n} existing event pairs '
+        f'[rq:scan] Found existing event pairs '
         f'in db file {get_db_path()}.'
     )
     logger.warning(
@@ -212,14 +212,13 @@ def scan_catalog():
     )
     continue_scan = False
     t_count_start = time.monotonic()
-    existing_pairs = count_pairs()
+    has_existing_pairs = count_pairs() > 0
     count_dt = time.monotonic() - t_count_start
     logger.info(
-        f'[rq:scan] Pair count queried in {count_dt:.1f}s '
-        f'({existing_pairs:n} existing pairs)'
+        f'[rq:scan] Pair existence check completed in {count_dt:.1f}s'
     )
-    if existing_pairs > 0:
-        action = _ask_existing_pairs_action(existing_pairs)
+    if has_existing_pairs:
+        action = _ask_existing_pairs_action()
         if action == 'abort':
             logger.info('[rq:scan] Scan aborted by user')
             rq_exit(0)
