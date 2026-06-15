@@ -95,8 +95,14 @@ def write_families(families):
         conn.close()
 
 
-def read_families():
-    """Read catalog-scan families from SQLite."""
+def read_families(family_numbers=None):
+    """Read catalog-scan families from SQLite.
+
+    :param family_numbers: If given, only read families with these numbers.
+    :type family_numbers: iterable of int or None
+    :return: List of families.
+    :rtype: list of Family
+    """
     from ..catalog import RequakeEvent
     from ..families.families import Family
 
@@ -104,12 +110,24 @@ def read_families():
     try:
         cursor = conn.cursor()
         try:
-            rows = cursor.execute(
-                f'''
-                SELECT * FROM {FAMILIES_TABLE}
-                ORDER BY family_number, orig_time, evid, trace_id
-                '''
-            ).fetchall()
+            if family_numbers is not None:
+                family_numbers = sorted(set(family_numbers))
+                placeholders = ','.join('?' * len(family_numbers))
+                rows = cursor.execute(
+                    f'''
+                    SELECT * FROM {FAMILIES_TABLE}
+                    WHERE family_number IN ({placeholders})
+                    ORDER BY family_number, orig_time, evid, trace_id
+                    ''',
+                    family_numbers,
+                ).fetchall()
+            else:
+                rows = cursor.execute(
+                    f'''
+                    SELECT * FROM {FAMILIES_TABLE}
+                    ORDER BY family_number, orig_time, evid, trace_id
+                    '''
+                ).fetchall()
         except sqlite3.OperationalError as err:
             if MISSING_FAMILIES_TABLE in str(err):
                 raise FileNotFoundError(

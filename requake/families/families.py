@@ -151,15 +151,17 @@ class Family(list):
         return distance / 1e3
 
 
-def _read_families_from_catalog_scan():
+def _read_families_from_catalog_scan(family_numbers=None):
     """
     Read a list of families from the catalog scan output.
 
+    :param family_numbers: If given, only read families with these numbers.
+    :type family_numbers: iterable of int or None
     :return: List of families.
     :rtype: list of Family
     """
     from ..database.families import read_families as read_families_from_db
-    return read_families_from_db()
+    return read_families_from_db(family_numbers=family_numbers)
 
 
 def _read_families_from_template_scan():
@@ -175,16 +177,18 @@ def _read_families_from_template_scan():
     return read_template_families_from_db()
 
 
-def read_families():
+def read_families(family_numbers=None):
     """
     Read families from the catalog scan output or template scan output.
 
+    :param family_numbers: If given, only read families with these numbers.
+    :type family_numbers: iterable of int or None
     :return: List of families.
     :rtype: list of Family
     """
     if getattr(config.args, 'template', False):
         return _read_families_from_template_scan()
-    return _read_families_from_catalog_scan()
+    return _read_families_from_catalog_scan(family_numbers=family_numbers)
 
 
 def read_selected_families():
@@ -197,7 +201,7 @@ def read_selected_families():
     :raises FamilyNotFoundError: if no family is found
     """
     family_numbers = _build_family_number_list()
-    families = read_families()
+    families = read_families(family_numbers=family_numbers)
     families_selected = []
     for family in families:
         if family.number not in family_numbers:
