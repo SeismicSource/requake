@@ -139,11 +139,11 @@ def load_existing_pair_ids(catalog):
     evid_to_idx = {
         ev.evid: idx for idx, ev in enumerate(catalog)
     }
-    event_id_to_idx = {}
-    for event_id, evid in event_key_rows:
-        idx = evid_to_idx.get(evid)
-        if idx is not None:
-            event_id_to_idx[event_id] = idx
+    event_id_to_idx = {
+        event_id: evid_to_idx[evid]
+        for event_id, evid in event_key_rows
+        if evid in evid_to_idx
+    }
     get_idx = event_id_to_idx.get
     nevents = len(catalog)
     existing_ids = set()
