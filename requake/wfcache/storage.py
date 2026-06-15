@@ -486,16 +486,17 @@ def should_skip_waveform_download(evid, trace_id, starttime, endtime):
         ).fetchone()
     if row is None:
         return False, ''
+    retry_count = int(row['retry_count'])
+    max_retries = int(row['max_retries'])
+    if retry_count >= max_retries:
+        return True, f'retry limit reached ({retry_count}/{max_retries})'
     next_retry_after_ns = row['next_retry_after_ns']
     if next_retry_after_ns is not None and now_ns < int(next_retry_after_ns):
         last_error = row['last_error'] or ''
         retry_after = _ns_to_utc(next_retry_after_ns)
-        retry_count = int(row['retry_count'])
-        max_retries = int(row['max_retries'])
-        prefix = 'retry limit reached; ' if retry_count >= max_retries else ''
         return (
             True,
-            f'{prefix}next retry after {retry_after} '
+            f'next retry after {retry_after} '
             f'(last error: {last_error})',
         )
     return False, ''
