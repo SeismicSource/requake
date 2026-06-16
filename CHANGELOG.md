@@ -19,7 +19,8 @@ remembers failed downloads across runs, eliminating redundant HTTP requests.
 - Several optimization for parallel runs in `scan_catalog` (especially on
   Slurm clusters) and for startup time of `scan_catalog -c` (continue an
   interrupted scan).
-- Extended documentation for `scan_catalog` and tips on using `wfcache`.
+- Extended documentation for `scan_catalog`.
+- Extended documentation for `wfcache`.
 
 ## [0.8.2] - 2026-06-03
 

@@ -76,8 +76,9 @@ Waveforms can come from three sources, in order of priority:
 
 1. **On-disk SQLite cache** (``OUTDIR/waveform_cache.sqlite``) —
    if ``catalog_waveform_disk_cache_enabled`` is ``true``, previously
-   fetched waveforms are reused.  Use ``requake wfcache prefetch`` to
-   populate this cache before the scan.
+   fetched waveforms are reused.  Use
+   :doc:`requake wfcache prefetch <wfcache>` to populate this cache
+   before the scan.
 
 2. **In-memory cache** (sized by ``catalog_waveform_cache_size``) —
    waveforms for recently processed events are kept in RAM to avoid
@@ -197,9 +198,10 @@ Performance tips
 ----------------
 
 * **Prefetch waveforms.**  For large catalogs relying on FDSN sources,
-  run ``requake wfcache prefetch`` before the scan.  This downloads all
-  required waveform windows once and stores them in the local SQLite
-  cache, letting the scan read from disk instead of the network.
+  run :doc:`requake wfcache prefetch <wfcache>` before the scan.  This
+  downloads all required waveform windows once and stores them in the
+  local SQLite cache, letting the scan read from disk instead of the
+  network.
 
 * **Tune the search radius.**  A larger ``catalog_search_range`` finds
   more candidate pairs but increases runtime.  Choose a value that
