@@ -12,7 +12,7 @@ If you used Requake for a scientific paper, please cite it as:
 Please replace ``X.Y`` with the Requake version number you used.
 
 You can also cite the following abstract presented at the
-2016 AGU Fall Meeting:
+2021 AGU Fall Meeting:
 
 ..
 
