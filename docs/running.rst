@@ -106,7 +106,7 @@ Now, build the catalog of event pairs with:
    requake scan_catalog
 
 
-Once done (\ `it will take time! <performances.html#performances>`_\ ),
+Once done (:doc:`it will take time! <performances>`),
 you are ready to build repeating earthquake families:
 
 .. code-block::
