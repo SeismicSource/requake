@@ -9,6 +9,10 @@ catalog-based repeater search.  It compares every event in an earthquake
 catalog against its neighbours and identifies pairs with highly similar
 waveforms — the building blocks of repeating-earthquake families.
 
+The scan is *single-station*: each event pair is compared using one
+seismic trace at a time (``catalog_trace_id``).  If multiple trace IDs
+are configured, the station closest to the event pair is selected.
+
 The scan is parallelized across multiple CPU cores to handle large
 catalogs efficiently.
 
@@ -85,8 +89,7 @@ Waveforms can come from three sources, in order of priority:
    data folder.
 
 If multiple trace IDs are configured (comma-separated), Requake selects
-the station closest to the event pair for each comparison, minimising
-attenuation differences.
+the station closest to the event pair for each comparison.
 
 
 Cross-correlation and pair selection
