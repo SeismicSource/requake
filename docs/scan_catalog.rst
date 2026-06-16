@@ -6,8 +6,9 @@ Catalog Scan
 
 The command ``requake scan_catalog`` is the core of Requake's
 catalog-based repeater search.  It compares every event in an earthquake
-catalog against its neighbours and identifies pairs with highly similar
-waveforms — the building blocks of repeating-earthquake families.
+:doc:`catalog <read_catalog>` against its neighbours and identifies
+pairs with highly similar waveforms — the building blocks of
+repeating-earthquake families.
 
 The scan is *single-station*: each event pair is compared using one
 seismic trace at a time (``catalog_trace_id``).  If multiple trace IDs
@@ -23,7 +24,8 @@ control it, and how to get the best performance out of it.
 Overview
 --------
 
-Given a catalog of :math:`N` events, the scan proceeds in three stages:
+Given a :doc:`catalog <read_catalog>` of :math:`N` events, the scan
+proceeds in three stages:
 
 1. **Spatial grouping** — events are compared only if their epicentres
    lie within a configurable search radius (``catalog_search_range``).
