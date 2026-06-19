@@ -4,6 +4,11 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- New interactive curses pager for all ``print_`` commands
+  (``print_catalog``, ``print_pairs``, ``print_families``).
+  Automatically activated when output is a terminal; use ``--no-pager``
+  to fall back to plain-text output.
+
 ## [0.8.3] - 2026-06-19
 
 Note: you should run `requake update_config` to update your config file

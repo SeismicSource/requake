@@ -113,3 +113,59 @@ you are ready to build repeating earthquake families:
 
    requake build_families
 
+
+Interactive pager
+^^^^^^^^^^^^^^^^^
+
+All ``print_`` commands (``print_catalog``, ``print_pairs``,
+``print_families``) open an interactive `curses <https://en.wikipedia.org/wiki/Curses_(programming_library)>`_ pager when the output is
+a terminal.  Use ``--no-pager`` to fall back to plain-text output
+(e.g., for piping to ``wc`` or ``grep``).
+
+Navigation
+""""""""""
+
+============= ===========================================
+Key           Action
+============= ===========================================
+``↓`` ``↑``   Move selection down / up one row
+``j`` ``k``   Same as ``↓`` / ``↑`` (vim-style)
+``Space``     Page down
+``f``         Page down
+``b``         Page up
+``g``         Jump to first row (home)
+``G``         Jump to last row (end)
+``Enter``     Show row details in a popup
+``←`` ``→``   Scroll horizontally
+``⇧←``        Jump to beginning of line
+``⇧→``        Jump to end of line
+``⇧↑``        Page up
+``⇧↓``        Page down
+============= ===========================================
+
+Sorting
+"""""""
+
+============= ===========================================
+Key           Action
+============= ===========================================
+``1``-``9``   Sort by column (1 = first, 9 = ninth)
+``0``         Restore default sort order
+``s``         Open interactive sort column selector
+============= ===========================================
+
+Clipboard
+"""""""""
+
+Pressing ``c`` copies the selected row's identifier(s) to the
+system clipboard.  For the pairs table both event IDs are copied
+(space-separated).
+
+Pairs large-dataset warning
+"""""""""""""""""""""""""""
+
+When more than 10,000 pairs match the current filter, ``print_pairs``
+shows a confirmation prompt before opening the pager.  Use
+``--cc-min`` / ``--cc-max`` to narrow the selection, or ``--force``
+to skip the warning.
+
