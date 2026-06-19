@@ -178,6 +178,90 @@ def _cc_filter_clause(cc_min, cc_max):
     return where, params
 
 
+def count_pairs_upper_bound(cc_min, cc_max, limit):
+    """Return a fast upper-bound count, capped at *limit* + 1.
+
+    Queries only the ``event_pairs`` table (no JOINs), so the result
+    may be higher than the true count returned by :func:`read_pairs`
+    (e.g. when orphan rows exist).  Use for quick threshold checks
+    where a conservative over-estimate is acceptable.
+    """
+    where, params = _cc_filter_clause(cc_min, cc_max)
+    conn = get_db_connection(initdb=False)
+    try:
+        cursor = conn.cursor()
+        rows = cursor.execute(
+            f'SELECT 1 FROM {EVENT_PAIRS_TABLE} AS p '
+            f'{where} LIMIT ?',
+            list(params) + [limit + 1],
+        ).fetchall()
+        return len(rows)
+    finally:
+        conn.close()
+
+
+def count_pairs_up_to(cc_min, cc_max, limit):
+    """Return the number of matching pairs, capped at *limit* + 1.
+
+    Uses the same FROM / JOIN / WHERE clauses as :func:`read_pairs`
+    but only selects ``1`` — no object construction — so the count
+    is accurate (orphan rows are excluded).  The ``LIMIT`` stops
+    scanning early.
+    """
+    where, params = _cc_filter_clause(cc_min, cc_max)
+    conn = get_db_connection(initdb=False)
+    try:
+        cursor = conn.cursor()
+        try:
+            rows = cursor.execute(
+                f'''
+                SELECT 1
+                FROM {EVENT_PAIRS_TABLE} AS p
+                JOIN {EVENT_KEYS_TABLE} AS e1
+                  ON e1.event_id = p.event1_id
+                JOIN {EVENT_KEYS_TABLE} AS e2
+                  ON e2.event_id = p.event2_id
+                JOIN {TRACE_KEYS_TABLE} AS tk
+                  ON tk.trace_key_id = p.trace_key_id
+                JOIN catalog AS c1 ON c1.evid = e1.evid
+                JOIN catalog AS c2 ON c2.evid = e2.evid
+                LEFT JOIN {TRACE_METADATA_TABLE} AS tm
+                  ON tm.trace_id = tk.trace_id
+                 AND tm.valid_from_utc <= c1.orig_time
+                 AND (
+                   tm.valid_to_utc IS NULL
+                   OR c1.orig_time < tm.valid_to_utc
+                 )
+                {where}
+                LIMIT ?
+                ''',
+                list(params) + [limit + 1],
+            ).fetchall()
+            return len(rows)
+        except sqlite3.OperationalError as err:
+            if _is_missing_pairs_table_error(err):
+                raise PairsTableNotFoundError(
+                    'Event pairs table not found in db file '
+                    f'{get_db_path()}'
+                ) from err
+            if _is_incompatible_pairs_schema_error(err):
+                raise PairsSchemaError(
+                    'Stored event pairs schema is incompatible '
+                    f'with this Requake version in db file '
+                    f'{get_db_path()}'
+                ) from err
+            raise
+        except sqlite3.DatabaseError as err:
+            if 'database disk image is malformed' in str(err).lower():
+                raise DatabaseCorruptError(
+                    'The event pairs database is corrupted: '
+                    f'{get_db_path()}'
+                ) from err
+            raise
+    finally:
+        conn.close()
+
+
 def _lookup_id(
     cursor,
     table,
@@ -409,7 +493,8 @@ def read_packed_pair_ids(event_id_to_idx, nevents):
         conn.close()
 
 
-def read_pairs(cc_min=None, cc_max=None):
+def read_pairs(cc_min=None, cc_max=None, offset=None, limit=None,
+               count_only=False, order_by=None):
     """
     Read event pairs from SQLite, optionally filtering by cc_max.
 
@@ -417,16 +502,67 @@ def read_pairs(cc_min=None, cc_max=None):
     :type cc_min: float or None
     :param cc_max: If given, only return pairs with cc_max <= cc_max.
     :type cc_max: float or None
-    :return: list of RequakeEventPair objects
-    :rtype: list
+    :param offset: Zero-based row offset for pagination.
+    :type offset: int or None
+    :param limit: Maximum number of rows to return.
+    :type limit: int or None
+    :param count_only: If True, return the total row count instead of
+        rows.
+    :type count_only: bool
+    :param order_by: Optional (column_expr, asc) tuple for ORDER BY.
+        When None, the default ordering is used.
+    :type order_by: tuple or None
+    :return: list of RequakeEventPair objects or, when count_only is
+        True, an integer row count.
+    :rtype: list or int
 
     :raise PairsTableNotFoundError: if the stored pairs table is missing
     """
     where, params = _cc_filter_clause(cc_min, cc_max)
+    if order_by is None:
+        order_clause = (
+            'ORDER BY c1.orig_time, c2.orig_time, '
+            'e1.evid, e2.evid, tk.trace_id'
+        )
+    else:
+        col_expr, asc = order_by
+        direction = 'ASC' if asc else 'DESC'
+        nulls_clause = 'NULLS LAST'
+        order_clause = f'ORDER BY {col_expr} {direction} {nulls_clause}'
+    limit_clause = ''
+    if not count_only and limit is not None:
+        limit_clause = 'LIMIT ?'
+        params = list(params) + [limit]
+        if offset is not None:
+            limit_clause += ' OFFSET ?'
+            params.append(offset)
     conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
         try:
+            if count_only:
+                count_sql = f'''
+                    SELECT COUNT(*)
+                    FROM {EVENT_PAIRS_TABLE} AS p
+                    JOIN {EVENT_KEYS_TABLE} AS e1
+                      ON e1.event_id = p.event1_id
+                    JOIN {EVENT_KEYS_TABLE} AS e2
+                      ON e2.event_id = p.event2_id
+                    JOIN {TRACE_KEYS_TABLE} AS tk
+                      ON tk.trace_key_id = p.trace_key_id
+                    JOIN catalog AS c1 ON c1.evid = e1.evid
+                    JOIN catalog AS c2 ON c2.evid = e2.evid
+                    LEFT JOIN {TRACE_METADATA_TABLE} AS tm
+                      ON tm.trace_id = tk.trace_id
+                     AND tm.valid_from_utc <= c1.orig_time
+                     AND (
+                       tm.valid_to_utc IS NULL
+                       OR c1.orig_time < tm.valid_to_utc
+                     )
+                    {where}
+                '''
+                row = cursor.execute(count_sql, params).fetchone()
+                return row[0]
             rows = cursor.execute(
                 f'''
                 SELECT
@@ -466,8 +602,8 @@ def read_pairs(cc_min=None, cc_max=None):
                    tm.valid_to_utc IS NULL OR c1.orig_time < tm.valid_to_utc
                  )
                 {where}
-                ORDER BY c1.orig_time, c2.orig_time,
-                         e1.evid, e2.evid, tk.trace_id
+                {order_clause}
+                {limit_clause}
                 ''',
                 params,
             ).fetchall()
