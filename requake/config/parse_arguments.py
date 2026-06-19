@@ -166,6 +166,10 @@ def parse_arguments(progname='requake'):
         choices=['simple', 'markdown', 'csv'],
         help='format for the output table (default: %(default)s)'
     )
+    print_format.add_argument(
+        '--no-pager', action='store_true',
+        help='disable the interactive curses pager'
+    )
     # ---
     # --- print_catalog
     subparser.add_parser(
@@ -215,6 +219,10 @@ def parse_arguments(progname='requake'):
         '-C', '--cc_max',
         type=float, default=None,
         help='maximum cross-correlation coefficient (default: %(default)s)'
+    )
+    print_pairs.add_argument(
+        '--force', action='store_true',
+        help='skip the large-dataset warning'
     )
     # ---
     # --- traceid
