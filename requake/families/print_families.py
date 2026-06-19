@@ -12,7 +12,8 @@ Print families to screen.
 import logging
 import numpy as np
 from obspy.geodetics import gps2dist_azimuth
-from ..config import config, generic_printer, rq_exit
+from ..config import config, rq_exit
+from ..config.generic_printer import _display_table
 from .families import FamilyNotFoundError, read_selected_families
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -141,7 +142,12 @@ def _print_family_list(families, duration_units, duration_multiplier):
             family.magmax
         ]
         rows.append(row)
-    generic_printer(rows, headers_fmt)
+    _display_table(
+        headers_fmt, rows,
+        row_label='Families',
+        copy_label='family',
+        detail_title='Family Details',
+    )
 
 
 def _print_family_stats(families):
