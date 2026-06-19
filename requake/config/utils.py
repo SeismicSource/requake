@@ -14,6 +14,7 @@ import sys
 import locale
 import shutil
 import hashlib
+import threading
 from datetime import datetime
 from .configobj import ConfigObj, ParseError
 from .configobj.validate import Validator
@@ -275,3 +276,62 @@ def manage_uncaught_exception(exception):
         'Thank you for your help!\n\n'
     )
     sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+#  Terminal progress utilities
+# ---------------------------------------------------------------------------
+
+_SPINNER_FRAMES = ('⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏')
+
+
+def status(msg):
+    """Print a progress message to stderr."""
+    print(msg, file=sys.stderr)
+    sys.stderr.flush()
+
+
+def run_with_spinner(message, func):
+    r"""Run *func* in a thread, showing a braille spinner on stderr.
+
+    The spinner animates on a single line via ``\r``.  When the
+    operation completes the line is cleared.  ``Ctrl+C`` is handled
+    so the terminal is left in a clean state.
+    """
+    done = threading.Event()
+    error = [None]
+    result = [None]
+
+    def _target():
+        try:
+            result[0] = func()
+        except Exception as exc:  # pylint: disable=broad-except
+            error[0] = exc
+        finally:
+            done.set()
+
+    thread = threading.Thread(target=_target, daemon=True)
+    thread.start()
+
+    i = 0
+    try:
+        while not done.wait(0.1):
+            print(
+                f'\r{_SPINNER_FRAMES[i % len(_SPINNER_FRAMES)]}'
+                f' {message}',
+                file=sys.stderr, end='',
+            )
+            sys.stderr.flush()
+            i += 1
+        # Clear the spinner line.
+        print('\r' + ' ' * 79, file=sys.stderr, end='\r')
+        sys.stderr.flush()
+    except KeyboardInterrupt:
+        # Leave a clean line after the spinner.
+        print(file=sys.stderr)
+        sys.stderr.flush()
+        raise
+
+    if error[0] is not None:
+        raise error[0]
+    return result[0]
