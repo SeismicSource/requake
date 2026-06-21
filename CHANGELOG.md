@@ -4,6 +4,11 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- Optional parallel processing for `scan_templates`: time chunks are
+  dispatched to worker processes, spreading the cross-correlation across
+  cores and overlapping waveform downloads. On by default with automatic
+  worker-count detection; configurable with the `template_scan_nprocs`
+  config option or the `--nprocs` command-line option (`1` disables it).
 - New interactive curses pager for all ``print_`` commands
   (``print_catalog``, ``print_pairs``, ``print_families``).
   Automatically activated when output is a terminal; use ``--no-pager``
