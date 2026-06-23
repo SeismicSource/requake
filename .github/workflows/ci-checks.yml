@@ -10,7 +10,7 @@ jobs:
       source_changed: ${{ steps.filter.outputs.source }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Detect Source Changes
         id: filter
@@ -35,7 +35,7 @@ jobs:
         python-version: ['3.10', '3.11', '3.12']
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set Up Python
         uses: actions/setup-python@v6
@@ -66,7 +66,7 @@ jobs:
         python-version: ['3.10', '3.11', '3.12']
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set Up Python
         uses: actions/setup-python@v6
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Build Wheel and Source Distribution
         run: pipx run build
