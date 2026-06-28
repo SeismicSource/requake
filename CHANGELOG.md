@@ -4,6 +4,18 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- `scan_templates` now finds every cross-correlation peak above
+  `template_cc_min` in each time chunk (sliding normalized cross-correlation),
+  so more than one event can be detected per chunk; peaks closer than `t_min`
+  are merged. This replaces the single best peak selected by the
+  cross-correlation/MAD ratio, which is removed (`min_cc_mad_ratio`).
+  Optionally, when `template_use_swave_cc` is enabled, a second
+  cross-correlation centred on the S arrival (NCCs) enables a combined
+  criterion (`template_cc_min_combined`, `template_ccs_min_combined`); the
+  NCCs is stored in a new `ccs` column of the template detections table. The
+  S-wave part is off by default.
+- New `decim_factor` option decimates the template and the continuous data
+  before cross-correlation to speed up `scan_templates` (1 disables it).
 - New interactive curses pager for all ``print_`` commands
   (``print_catalog``, ``print_pairs``, ``print_families``).
   Automatically activated when output is a terminal; use ``--no-pager``
