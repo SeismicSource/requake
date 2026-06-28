@@ -4,6 +4,10 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- New `dataselect_location_fallback` option: a waveform request that returns
+  no data for the exact location code is retried with a wildcard location
+  code, which helps with networks whose location code changed over time (for
+  example an empty location code before 2002). Disabled by default.
 - New interactive curses pager for all ``print_`` commands
   (``print_catalog``, ``print_pairs``, ``print_families``).
   Automatically activated when output is a terminal; use ``--no-pager``
