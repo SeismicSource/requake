@@ -4,6 +4,11 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- Cross-correlation now handles continuous data whose sampling rate differs
+  from the template (for example the 20 Hz FDF recordings from 1998 to
+  2002): the finer trace is resampled to the common coarser rate instead of
+  aborting the scan, and the high-corner frequency is clamped just below the
+  Nyquist frequency so the bandpass stays valid at low sampling rates.
 - New interactive curses pager for all ``print_`` commands
   (``print_catalog``, ``print_pairs``, ``print_families``).
   Automatically activated when output is a terminal; use ``--no-pager``
