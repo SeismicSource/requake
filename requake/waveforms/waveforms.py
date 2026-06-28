@@ -114,14 +114,20 @@ def _write_waveform_to_disk_cache(evid, traceid, starttime, endtime, tr):
     return written
 
 
-def get_waveform_from_client(traceid, starttime, endtime):
+def _fetch_waveform(client, net, sta, loc, chan, traceid, starttime, endtime):
     """
-    Get a waveform from a FDSN or SDS client.
+    Fetch and clean a single waveform window, raising on missing data.
 
-    The FDSN dataselect client is created lazily on first use to avoid
-    unnecessary network I/O when waveforms come from the disk cache.
-
-    :param traceid: trace id
+    :param client: an ObsPy FDSN or SDS client
+    :param net: network code
+    :type net: str
+    :param sta: station code
+    :type sta: str
+    :param loc: location code
+    :type loc: str
+    :param chan: channel code
+    :type chan: str
+    :param traceid: trace id, used only for error messages
     :type traceid: str
     :param starttime: start time
     :type starttime: obspy.UTCDateTime
@@ -130,21 +136,9 @@ def get_waveform_from_client(traceid, starttime, endtime):
 
     :return: waveform trace
     :rtype: obspy.Trace
+
+    :raises NoWaveformError: if no waveform data is available
     """
-    client = config.dataselect_client
-    if client is None and config.event_data_path is None:
-        # Lazy-init FDSN dataselect client
-        from obspy.clients.fdsn import Client as FDSNClient
-        client = FDSNClient(config.fdsn_dataselect_url)
-        config.dataselect_client = client
-        logger.info(
-            'Connected to FDSN dataselect server: '
-            f'{config.fdsn_dataselect_url}'
-        )
-    if client is None:
-        raise NoWaveformError(
-            'No dataselect_client defined in the config file')
-    net, sta, loc, chan = traceid.split('.')
     try:
         st = client.get_waveforms(
             network=net, station=sta, location=loc, channel=chan,
@@ -183,6 +177,56 @@ def get_waveform_from_client(traceid, starttime, endtime):
             f'between {starttime} and {endtime}'
         )
     return st[0]
+
+
+def get_waveform_from_client(traceid, starttime, endtime):
+    """
+    Get a waveform from a FDSN or SDS client.
+
+    The FDSN dataselect client is created lazily on first use to avoid
+    unnecessary network I/O when waveforms come from the disk cache.
+
+    When ``dataselect_location_fallback`` is set and the exact location code
+    returns no data, the request is retried with a wildcard location code.
+    This helps with networks whose location code changed over time (for
+    example an empty location code before 2002).
+
+    :param traceid: trace id
+    :type traceid: str
+    :param starttime: start time
+    :type starttime: obspy.UTCDateTime
+    :param endtime: end time
+    :type endtime: obspy.UTCDateTime
+
+    :return: waveform trace
+    :rtype: obspy.Trace
+    """
+    client = config.dataselect_client
+    if client is None and config.event_data_path is None:
+        # Lazy-init FDSN dataselect client
+        from obspy.clients.fdsn import Client as FDSNClient
+        client = FDSNClient(config.fdsn_dataselect_url)
+        config.dataselect_client = client
+        logger.info(
+            'Connected to FDSN dataselect server: '
+            f'{config.fdsn_dataselect_url}'
+        )
+    if client is None:
+        raise NoWaveformError(
+            'No dataselect_client defined in the config file')
+    net, sta, loc, chan = traceid.split('.')
+    try:
+        return _fetch_waveform(
+            client, net, sta, loc, chan, traceid, starttime, endtime)
+    except NoWaveformError:
+        fallback = getattr(config, 'dataselect_location_fallback', False)
+        if not fallback or loc in ('', '*'):
+            raise
+        logger.warning(
+            'No data for %s with location "%s"; retrying with a wildcard '
+            'location code', traceid, loc)
+        return _fetch_waveform(
+            client, net, sta, '*', chan, traceid, starttime, endtime)
 
 
 def _get_arrivals_and_distance(
