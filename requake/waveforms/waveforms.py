@@ -18,7 +18,7 @@ from obspy.geodetics import gps2dist_azimuth, locations2degrees
 from obspy.signal.cross_correlation import correlate, xcorr_max
 from obspy.clients.fdsn.header import FDSNException, FDSNNoDataException
 from scipy.stats import median_abs_deviation
-from ..config import config, rq_exit
+from ..config import config
 from ..wfcache import (
     clear_waveform_failure,
     read_cache_meta,
@@ -494,6 +494,22 @@ def process_waveforms(tr_or_st):
         config.args.freq_band[1] if getattr(config.args, 'freq_band', None)
         else config.cc_freq_max
     )
+    # Clamp the high corner just below the Nyquist frequency so the bandpass
+    # stays valid for low sampling-rate data (for example 20 Hz continuous
+    # recordings, where the default 10 Hz corner equals the Nyquist).
+    if isinstance(tr_or_st, Stream):
+        sampling_rate = min(tr.stats.sampling_rate for tr in tr_or_st)
+    else:
+        sampling_rate = tr_or_st.stats.sampling_rate
+    nyquist = 0.5 * sampling_rate
+    if freq_max >= nyquist:
+        clamped_freq_max = 0.99 * nyquist
+        logger.warning(
+            'High corner frequency %g Hz is at or above the Nyquist '
+            'frequency %g Hz; clamping to %g Hz.',
+            freq_max, nyquist, clamped_freq_max
+        )
+        freq_max = clamped_freq_max
     tr_or_st.filter(
         type='bandpass',
         freqmin=freq_min,
@@ -510,28 +526,32 @@ def process_waveforms(tr_or_st):
 
 def cc_waveform_pair(tr1, tr2, mode='events'):
     """Perform cross-correlation."""
-    dt1 = tr1.stats.delta
-    dt2 = tr2.stats.delta
-    if dt1 != dt2:
-        if mode == 'events':
-            evid1 = tr1.stats.evid
-            evid2 = tr2.stats.evid
-            logger.warning(
-                f'{evid1} {evid2} - '
-                'The two traces have a different sampling interval. '
-                'Skipping pair.'
-            )
-        elif mode == 'scan':
-            logger.error(
-                'The two traces have a different sampling interval.')
-            rq_exit(1)
     tr1 = process_waveforms(tr1)
     tr2 = process_waveforms(tr2)
-    shift = int(config.cc_max_shift / dt1)
+    # Reconcile different sampling rates (for example a 100 Hz template
+    # against 20 Hz continuous data) by resampling the finer trace down to
+    # the common coarser rate. Both traces are already band-limited by
+    # process_waveforms, so resampling introduces no aliasing.
+    sampling_rate1 = tr1.stats.sampling_rate
+    sampling_rate2 = tr2.stats.sampling_rate
+    if sampling_rate1 != sampling_rate2:
+        target_rate = min(sampling_rate1, sampling_rate2)
+        if mode == 'events':
+            logger.warning(
+                f'{tr1.stats.evid} {tr2.stats.evid} - '
+                'the two traces have a different sampling interval; '
+                f'resampling to {target_rate:g} Hz.'
+            )
+        if sampling_rate1 > target_rate:
+            tr1.resample(target_rate)
+        if sampling_rate2 > target_rate:
+            tr2.resample(target_rate)
+    dt = tr1.stats.delta
+    shift = int(config.cc_max_shift / dt)
     cc = correlate(tr1, tr2, shift)
     abs_max = bool(config.cc_allow_negative)
     lag, cc_max = xcorr_max(cc, abs_max)
-    lag_sec = lag * dt1
+    lag_sec = lag * dt
     if mode != 'scan':
         return lag, lag_sec, cc_max
     # compute median absolute deviation for the non-zero portion of cc
