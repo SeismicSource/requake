@@ -4,6 +4,11 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- `build_templates` can build the template as a weighted average of the
+  family traces (`weighted_template_average`), using manual plausibility
+  weights from `template_weights_file` (one `evid weight` pair per line).
+  Weights are never derived from the cross-correlation, which would bias the
+  template towards itself. Disabled by default (arithmetic mean unchanged).
 - New interactive curses pager for all ``print_`` commands
   (``print_catalog``, ``print_pairs``, ``print_families``).
   Automatically activated when output is a terminal; use ``--no-pager``

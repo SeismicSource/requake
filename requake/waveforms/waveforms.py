@@ -595,6 +595,8 @@ def _stack_traces(st):
     tr_stack.data *= 0.
     p_arrival = 0.
     s_arrival = 0.
+    weighted = config.weighted_template_average
+    total_weight = 0.
     for tr in st:
         tr.detrend('demean')
         data = tr.data.astype(np.float64, copy=False)
@@ -605,12 +607,19 @@ def _stack_traces(st):
             data = np.pad(data, (0, len(tr_stack.data) - len(data)))
         elif len(data) > len(tr_stack.data):
             data = data[:len(tr_stack.data)]
-        tr_stack.data += data
-        p_arrival += tr.stats.P_arrival_time - tr.stats.starttime
-        s_arrival += tr.stats.S_arrival_time - tr.stats.starttime
-    tr_stack.data /= len(st)
-    p_arrival /= len(st)
-    s_arrival /= len(st)
+        # Weights express manual plausibility and default to 1 (arithmetic
+        # mean). They are never derived from the cross-correlation, which
+        # would bias the template towards itself.
+        weight = float(tr.stats.get('weight', 1.)) if weighted else 1.
+        tr_stack.data += weight * data
+        p_arrival += weight * (tr.stats.P_arrival_time - tr.stats.starttime)
+        s_arrival += weight * (tr.stats.S_arrival_time - tr.stats.starttime)
+        total_weight += weight
+    if total_weight == 0.:
+        total_weight = float(len(st))
+    tr_stack.data /= total_weight
+    p_arrival /= total_weight
+    s_arrival /= total_weight
     tr_stack.stats.starttime = UTCDateTime('1900/01/01T00:00:00')
     tr_stack.stats.P_arrival_time = tr_stack.stats.starttime + p_arrival
     tr_stack.stats.S_arrival_time = tr_stack.stats.starttime + s_arrival
@@ -619,12 +628,54 @@ def _stack_traces(st):
     return tr_stack
 
 
+def _load_template_weights():
+    """
+    Load manual template weights from ``config.template_weights_file``.
+
+    The file has one ``evid weight`` pair per line; blank lines and lines
+    starting with ``#`` are ignored. Returns an empty mapping when no file is
+    configured.
+
+    :return: mapping of event id to weight
+    :rtype: dict
+    """
+    path = config.template_weights_file
+    if not path:
+        return {}
+    weights = {}
+    with open(path, encoding='utf-8') as fp:
+        for line in fp:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            evid, weight = line.split()[:2]
+            weights[evid] = float(weight)
+    return weights
+
+
+def _apply_template_weights(st):
+    """
+    Assign manual plausibility weights to family traces before stacking.
+
+    Each trace receives ``stats.weight`` from the weights file, keyed by event
+    id; traces with no entry keep a weight of 1.
+
+    :param st: stream of family traces
+    :type st: :class:`obspy.Stream`
+    """
+    weights = _load_template_weights()
+    for tr in st:
+        tr.stats.weight = weights.get(tr.stats.evid, 1.)
+
+
 def build_template(st, family):
     """
     Build a template by averaging traces.
 
     Assumes that the stream is realigned.
     """
+    if config.weighted_template_average:
+        _apply_template_weights(st)
     tr_template = _stack_traces(st)
     tr_template.stats.evid = f'average{family.number:02d}'
     tr_template.stats.ev_lat = family.lat
