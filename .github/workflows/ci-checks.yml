@@ -14,7 +14,7 @@ jobs:
 
       - name: Detect Source Changes
         id: filter
-        uses: dorny/paths-filter@v4.0.1
+        uses: dorny/paths-filter@v4.0.2
         with:
           filters: |
             source:
