@@ -30,6 +30,7 @@ TEMPLATES_SCHEMA_STATEMENTS = [
       lat             REAL,
       depth_km        REAL,
       cc_max          REAL,
+      ccs             REAL,
       UNIQUE (family_number, trace_id, evid)
     )
     ''',
@@ -48,11 +49,27 @@ def _ensure_template_detections_table(cursor):
     """Create the template detection table and indexes when needed."""
     for statement in TEMPLATES_SCHEMA_STATEMENTS:
         cursor.execute(statement)
+    # Add the ccs column to databases created before it existed.
+    existing_columns = [
+        row[1] for row in cursor.execute(
+            f'PRAGMA table_info({TEMPLATE_DETECTIONS_TABLE})'
+        )
+    ]
+    if 'ccs' not in existing_columns:
+        cursor.execute(
+            f'ALTER TABLE {TEMPLATE_DETECTIONS_TABLE} ADD COLUMN ccs REAL'
+        )
 
 
 def _detection_row(detection):
-    """Convert a detection tuple into a database row tuple."""
-    family_number, trace_id, event, cc_max = detection
+    """Convert a detection tuple into a database row tuple.
+
+    The detection tuple is ``(family_number, trace_id, event, cc_max)`` or
+    ``(family_number, trace_id, event, cc_max, ccs)``; ``ccs`` (the S-wave
+    cross-correlation) is ``None`` when it was not computed.
+    """
+    family_number, trace_id, event, cc_max = detection[:4]
+    ccs = detection[4] if len(detection) > 4 else None
     return (
         family_number,
         trace_id,
@@ -62,6 +79,7 @@ def _detection_row(detection):
         event.lat,
         event.depth,
         cc_max,
+        ccs,
     )
 
 
@@ -84,8 +102,8 @@ def write_template_detections(detections, append=True):
                     f'''
                     INSERT OR REPLACE INTO {TEMPLATE_DETECTIONS_TABLE} (
                       family_number, trace_id, evid, orig_time, lon, lat,
-                      depth_km, cc_max
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                      depth_km, cc_max, ccs
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''',
                     (_detection_row(detection) for detection in detections),
                 ),

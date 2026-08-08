@@ -17,3 +17,16 @@ Performances
   catalog scanning.
 
 * ``requake build_families`` is fast™.
+* ``requake scan_templates`` cross-correlates each template against the
+  continuous data in chunks of ``time_chunk`` seconds. Computation time as a
+  function of ``time_chunk`` follows a U-shaped curve: very small chunks issue
+  many short data requests, while very large chunks make each
+  cross-correlation slow and memory-hungry. On the test datasets a chunk of
+  one day to two weeks was a good compromise; values of about one month or
+  more were markedly slower.
+
+* The ``decim_factor`` option decimates the template and the continuous data
+  before cross-correlation, trading a little resolution for speed. A factor of
+  2 left detection cross-correlations essentially unchanged on 100 Hz data.
+  Keep the resulting Nyquist frequency (``sampling_rate / (2 * decim_factor)``)
+  above ``cc_freq_max``.
