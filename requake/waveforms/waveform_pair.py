@@ -15,7 +15,6 @@ import time
 from collections import defaultdict, OrderedDict
 from obspy import Stream
 from obspy.geodetics import gps2dist_azimuth
-from obspy.taup import TauPyModel
 from ..config import config
 from ..wfcache import has_exhausted_failure, register_waveform_failure
 from .waveforms import (
@@ -54,7 +53,6 @@ class WaveformPair:
 
     def __init__(self):
         """Initialize the waveform-pair helper and its caches."""
-        self.model = TauPyModel(model='ak135')
         self.evid1 = None
         self.max_trace_cache_size = max(
             int(getattr(config, 'catalog_waveform_cache_size', 5000)),

@@ -11,9 +11,20 @@ Functions for computing P and S arrivals.
 """
 import logging
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
-from obspy.taup import TauPyModel
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
-model = TauPyModel(model='ak135')
+_model = None
+
+
+def _get_model():
+    """Return the shared TauPy model, creating it on first use."""
+    global _model
+    if _model is None:
+        # Lazy import: obspy.taup pulls in matplotlib, and building the
+        # velocity model is expensive; do it only when arrivals are needed.
+        # pylint: disable=import-outside-toplevel
+        from obspy.taup import TauPyModel
+        _model = TauPyModel(model='ak135')
+    return _model
 
 
 def get_arrivals(trace_lat, trace_lon, ev_lat, ev_lon, ev_depth):
@@ -32,6 +43,7 @@ def get_arrivals(trace_lat, trace_lon, ev_lat, ev_lon, ev_depth):
     distance, _, _ = gps2dist_azimuth(
         trace_lat, trace_lon, ev_lat, ev_lon)
     distance /= 1e3
+    model = _get_model()
     p_arrivals = model.get_travel_times(
         source_depth_in_km=ev_depth,
         distance_in_degree=dist_deg,

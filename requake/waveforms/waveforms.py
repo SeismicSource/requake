@@ -15,7 +15,6 @@ import numpy as np
 from obspy import read
 from obspy import Stream, UTCDateTime
 from obspy.geodetics import gps2dist_azimuth, locations2degrees
-from obspy.signal.cross_correlation import correlate, xcorr_max
 from obspy.clients.fdsn.header import FDSNException, FDSNNoDataException
 from scipy.stats import median_abs_deviation
 from ..config import config, rq_exit
@@ -510,6 +509,11 @@ def process_waveforms(tr_or_st):
 
 def cc_waveform_pair(tr1, tr2, mode='events'):
     """Perform cross-correlation."""
+    # Lazy import: importing obspy.signal pulls in matplotlib through
+    # obspy.signal.spectral_estimation, which is unneeded for commands
+    # that do not cross-correlate waveforms (e.g. print_families).
+    # pylint: disable=import-outside-toplevel
+    from obspy.signal.cross_correlation import correlate, xcorr_max
     dt1 = tr1.stats.delta
     dt2 = tr2.stats.delta
     if dt1 != dt2:
