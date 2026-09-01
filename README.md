@@ -237,7 +237,7 @@ You can also cite the following abstract presented at the
 [docs-link]: https://requake.readthedocs.io/en/latest/?badge=latest
 [changelog-badge]: https://img.shields.io/badge/Changelog-136CB6.svg
 [changelog-link]: https://github.com/SeismicSource/requake/blob/main/CHANGELOG.md
-[DOI-badge]: https://zenodo.org/badge/DOI/10.5281/zenodo.10832203.svg
+[DOI-badge]: https://img.shields.io/badge/DOI-10.5281%2Fzenodo.10832203-blue.svg 
 [DOI-link]: https://doi.org/10.5281/zenodo.10832203
 [Requake GitHub repository]: https://github.com/SeismicSource/requake
 
