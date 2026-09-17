@@ -505,6 +505,13 @@ def parse_arguments(progname='requake'):
              'File must be in SAC format, with a P pick in the '
              '"A" header field'
     )
+    scan_templates.add_argument(
+        '--nprocs',
+        type=_nonnegative_int,
+        default=None,
+        help='number of worker processes for scan_templates '
+             '(0: auto, 1: disable parallelism)'
+    )
     # ---
     # --- wfcache
     wfcache = subparser.add_parser(
