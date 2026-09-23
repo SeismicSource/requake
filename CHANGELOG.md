@@ -4,6 +4,13 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- Stylized ``◀◀ RƎQuake`` logo, shown in the command line help.
+- Colored terminal output for help and usage messages, log messages,
+  errors, table headers and waveform-cache diagnostics. Colors are used
+  only on interactive terminals, and are therefore automatically removed
+  when the output is piped or redirected. The ``NO_COLOR`` and
+  ``FORCE_COLOR`` environment variables can be used to force colors off
+  or on.
 - New interactive curses pager for all ``print_`` commands
   (``print_catalog``, ``print_pairs``, ``print_families``).
   Automatically activated when output is a terminal; use ``--no-pager``

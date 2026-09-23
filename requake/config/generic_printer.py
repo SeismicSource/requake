@@ -15,8 +15,53 @@ import csv
 import contextlib
 import logging
 from tabulate import tabulate
+from ..terminal import color_enabled, style
 from .config import config
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
+
+# Characters appearing in a ``tabulate`` separator (or divider) line.
+_TABLE_SEPARATOR_CHARS = frozenset('-|=+: ')
+
+
+def _is_separator_line(line):
+    """Return True if ``line`` is a table separator (or divider) line."""
+    stripped = line.strip()
+    return bool(stripped) and set(stripped) <= _TABLE_SEPARATOR_CHARS
+
+
+def _style_table(text, has_header=True):
+    """
+    Colorize a plain-text table produced by :func:`tabulate`.
+
+    Header lines are highlighted in bold cyan, separator lines are
+    dimmed, and data rows are left untouched.
+
+    :param text: table text
+    :type text: str
+    :param has_header: whether the table starts with a header
+    :type has_header: bool
+
+    :return: colorized table text
+    :rtype: str
+    """
+    if not color_enabled():
+        return text
+    lines = text.split('\n')
+    separator_index = next(
+        (i for i, line in enumerate(lines) if _is_separator_line(line)),
+        None,
+    )
+    if separator_index is None:
+        separator_index = 1 if has_header else 0
+    styled_lines = []
+    for index, line in enumerate(lines):
+        if _is_separator_line(line):
+            styled_lines.append(style(line, 'dim'))
+        elif has_header and index < separator_index:
+            styled_lines.append(style(line, 'bold', 'cyan'))
+        else:
+            styled_lines.append(line)
+    return '\n'.join(styled_lines)
 
 
 def generic_printer(rows, headers_fmt, print_headers=True):
@@ -66,7 +111,7 @@ def generic_printer(rows, headers_fmt, print_headers=True):
             line = tabulate(rows, **kwargs)
             if not print_headers:
                 line = line.rsplit('\n', maxsplit=1)[-1]
-            print(line)
+            print(_style_table(line, has_header=print_headers))
 
 
 def _display_table(headers_fmt, rows=None, data_source=None,

@@ -14,6 +14,7 @@ import sys
 from ..config import config, rq_exit
 from ..config.generic_printer import _display_table
 from ..config.utils import status, run_with_spinner
+from ..terminal import style, warning
 from ..database.db import DatabaseCorruptError
 from ..database.pairs import (
     PairsMetadataError,
@@ -30,14 +31,14 @@ _PAIRS_WARNING_THRESHOLD = 10_000
 _COPY_FN = lambda r: f'{r[0]} {r[1]}'  # noqa: E731
 
 
-_WARNING_MESSAGE = (
-    '\nThere are {count} pairs to display.\n'
+_WARNING_HEADLINE = 'There are {count} pairs to display.'
+_WARNING_BODY = (
     'This may be slow and memory-intensive.\n'
     'Consider using --cc_min and --cc_max to reduce the number '
     'of pairs.\n'
     'Use --force to skip this warning.\n'
-    'Continue? [y/N] '
 )
+_WARNING_PROMPT = 'Continue? [y/N] '
 
 
 # Mapping from column index to SQL ORDER BY expression for
@@ -185,11 +186,16 @@ def _ask_large_dataset_confirmation():
     if not sys.stdout.isatty():
         return  # pipe/redirect: proceed silently
     try:
-        answer = input(
-            _WARNING_MESSAGE.format(
+        headline = warning(
+            _WARNING_HEADLINE.format(
                 count=f'more than {_PAIRS_WARNING_THRESHOLD:,}'
             )
         )
+        prompt = (
+            f'\n{headline}\n{_WARNING_BODY}'
+            f'{style(_WARNING_PROMPT, "dim")}'
+        )
+        answer = input(prompt)
     except (EOFError, KeyboardInterrupt):
         print()
         rq_exit(1)

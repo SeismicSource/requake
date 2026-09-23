@@ -20,6 +20,7 @@ import time
 import tqdm
 from .._version import get_versions
 from ..database.db import get_db_path
+from ..terminal import color_enabled, style
 from .config import config
 from .utils import (
     parse_configspec, read_config, validate_config, write_sample_config,
@@ -73,29 +74,28 @@ are doing.
 ''')
 
 
-def _color_handler_emit(fn):
+def _color_handler_emit(fn, stream=None):
     """
     Add color-coding to the logging handler emitter.
 
-    Source: https://stackoverflow.com/a/20707569/2021880
+    Colors follow the same rules as the rest of the terminal output
+    (see :func:`requake.terminal.color_enabled`) and are applied to
+    the stream the handler writes to.
     """
     def new(*args):
         levelno = args[0].levelno
-        if levelno >= logging.CRITICAL:
-            color = '\x1b[31;1m'  # red
-        elif levelno >= logging.ERROR:
-            color = '\x1b[31;1m'  # red
+        if levelno >= logging.ERROR:
+            styles = ('bold', 'red')
         elif levelno >= logging.WARNING:
-            color = '\x1b[33;1m'  # yellow
+            styles = ('bold', 'yellow')
         elif levelno >= logging.INFO:
-            # color = '\x1b[32;1m'  # green
-            color = '\x1b[0m'  # no color
+            styles = ()
         elif levelno >= logging.DEBUG:
-            color = '\x1b[35;1m'  # purple
+            styles = ('bold', 'magenta')
         else:
-            color = '\x1b[0m'  # no color
+            styles = ()
         # Color-code the message
-        args[0].msg = f'{color}{args[0].msg}\x1b[0m'
+        args[0].msg = style(args[0].msg, *styles, stream=stream)
         return fn(*args)
     return new
 
@@ -120,8 +120,8 @@ def _setup_tqdm_logging(logger_root):
     console.setLevel(logging.INFO)
     console.addFilter(_memory_log_filter)
     # Add logger color coding on all platforms but win32
-    if sys.platform != 'win32' and sys.stdout.isatty():
-        console.emit = _color_handler_emit(console.emit)
+    if sys.platform != 'win32' and color_enabled(sys.stdout):
+        console.emit = _color_handler_emit(console.emit, stream=sys.stdout)
     logger_root.addHandler(console)
 
 
@@ -160,6 +160,11 @@ def _setup_logging(progname, action_name):
         console.setLevel(logging.INFO)
         formatter = logging.Formatter('%(levelname)-8s %(message)s')
         console.setFormatter(formatter)
+        # Add logger color coding on all platforms but win32
+        if sys.platform != 'win32' and color_enabled(sys.stderr):
+            console.emit = _color_handler_emit(
+                console.emit, stream=sys.stderr
+            )
         logger_root.addHandler(console)
 
     logger = logging.getLogger(progname)
@@ -280,7 +285,7 @@ def configure(args):
         and not write_ok(get_db_path(), args.force)
     )
     if should_write_catalog:
-        print('Exiting now.')
+        print(style('Exiting now.', 'dim'))
         sys.exit(0)
     # config.inventory needs to exist
     config.inventory = None
@@ -324,7 +329,7 @@ def configure(args):
 def rq_exit(retval=0, abort=False, progname='requake'):
     """Exit as gracefully as possible."""
     if abort:
-        print('\nAborting.')
+        print(style('\nAborting.', 'bold', 'yellow'))
         if logger is not None:
             logger.debug(f'{progname} ABORTED\n\n')
     elif logger is not None:

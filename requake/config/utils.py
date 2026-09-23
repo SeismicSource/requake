@@ -16,6 +16,7 @@ import shutil
 import hashlib
 import threading
 from datetime import datetime
+from ..terminal import error, style
 from .configobj import ConfigObj, ParseError
 from .configobj.validate import Validator
 locale.setlocale(locale.LC_ALL, '')
@@ -58,8 +59,7 @@ def err_exit(msg):
     :param msg: Error message.
     :type msg: str
     """
-    msg = str(msg)
-    sys.stderr.write(msg + '\n')
+    sys.stderr.write(error(msg, stream=sys.stderr) + '\n')
     sys.exit(1)
 
 
@@ -86,8 +86,8 @@ def confirm_action(prompt, default=False):
     :return: True if user confirms, False otherwise.
     :rtype: bool
     """
-    suffix = '[Y/n] ' if default else '[y/N] '
-    answer = input(f'{prompt} {suffix}').strip()
+    suffix = style('[Y/n] ', 'dim') if default else style('[y/N] ', 'dim')
+    answer = input(f'{style(prompt, "bold")} {suffix}').strip()
     return answer.lower() in {'y', 'yes'} if answer else default
 
 
@@ -131,7 +131,7 @@ def write_sample_config(configspec, progname):
     if write_ok(configfile):
         with open(configfile, 'wb') as fp:
             c.write(fp)
-        print(f'Sample config file written to: "{configfile}"')
+        print(style(f'Sample config file written to: "{configfile}"', 'green'))
 
 
 def read_config(config_file, configspec=None):
@@ -230,7 +230,7 @@ def update_config_file(config_file, configspec):
     shutil.copyfile(config_file, config_file_old)
     with open(config_file, 'wb') as fp:
         config_new.write(fp)
-        print(f'{config_file}: updated')
+        print(style(f'{config_file}: updated', 'green'))
 
 
 def manage_uncaught_exception(exception):
@@ -254,14 +254,20 @@ def manage_uncaught_exception(exception):
         traceback.format_exception(
             type(exception), exception, exception.__traceback__))
     colored_tb = pygments.highlight(tb_str, PythonLexer(), TerminalFormatter())
+    bug_header = style(
+        "Congratulations, you've found a bug in Requake!", 'bold', 'red'
+    )
+    report_header = style(
+        'Include the following information in your report:', 'bold'
+    )
     sys.stderr.write(
         f'\n# BEGIN TRACEBACK {"#" * 62}\n'
         f'\n{colored_tb}'
         f'\n# END TRACEBACK {"#" * 62}\n\n'
-        "Congratulations, you've found a bug in Requake! 🐞\n\n"
+        f'{bug_header} 🐞\n\n'
         'Please report it on https://github.com/SeismicSource/requake/issues\n'
         'or by email to satriano@ipgp.fr.\n\n'
-        'Include the following information in your report:\n\n'
+        f'{report_header}\n\n'
         f'  Requake version: {__version__}\n'
         f'  Python version: {sys.version}\n'
         f'  NumPy version: {np.__version__}\n'
@@ -287,7 +293,7 @@ _SPINNER_FRAMES = ('⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇'
 
 def status(msg):
     """Print a progress message to stderr."""
-    print(msg, file=sys.stderr)
+    print(style(msg, 'dim', stream=sys.stderr), file=sys.stderr)
     sys.stderr.flush()
 
 
@@ -299,14 +305,14 @@ def run_with_spinner(message, func):
     so the terminal is left in a clean state.
     """
     done = threading.Event()
-    error = [None]
+    errors = [None]
     result = [None]
 
     def _target():
         try:
             result[0] = func()
         except Exception as exc:  # pylint: disable=broad-except
-            error[0] = exc
+            errors[0] = exc
         finally:
             done.set()
 
@@ -316,11 +322,10 @@ def run_with_spinner(message, func):
     i = 0
     try:
         while not done.wait(0.1):
-            print(
-                f'\r{_SPINNER_FRAMES[i % len(_SPINNER_FRAMES)]}'
-                f' {message}',
-                file=sys.stderr, end='',
-            )
+            frame = style(_SPINNER_FRAMES[i % len(_SPINNER_FRAMES)],
+                          'cyan', stream=sys.stderr)
+            text = style(message, 'dim', stream=sys.stderr)
+            print(f'\r{frame} {text}', file=sys.stderr, end='')
             sys.stderr.flush()
             i += 1
         # Clear the spinner line.
@@ -332,6 +337,6 @@ def run_with_spinner(message, func):
         sys.stderr.flush()
         raise
 
-    if error[0] is not None:
-        raise error[0]
+    if errors[0] is not None:
+        raise errors[0]
     return result[0]

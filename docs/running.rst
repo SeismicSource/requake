@@ -62,6 +62,20 @@ Or, alternatively, add the following line to your ``.bashrc`` or ``.zshrc``:
     eval "$(register-python-argcomplete requake)"
 
 
+Colored output
+^^^^^^^^^^^^^^
+
+Terminal output (help and usage messages, log messages, tables and
+waveform-cache diagnostics) is colored when writing to an interactive
+terminal. Colors are automatically removed when the output is
+redirected to a file or piped to another command.
+
+The standard `NO_COLOR <https://no-color.org/>`_ environment variable
+can be used to disable colors (e.g. when colors are not desired in a
+terminal), while setting the ``FORCE_COLOR`` environment variable
+forces colors on even when the output is piped.
+
+
 Typical workflow
 ^^^^^^^^^^^^^^^^
 

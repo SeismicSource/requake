@@ -20,6 +20,7 @@ from tqdm import tqdm
 
 from ..config import config, rq_exit
 from ..config.parse_arguments import _timespec_to_sec
+from ..terminal import style
 from .storage import (
     begin_cache_write_batch,
     clear_waveform_failure,
@@ -782,9 +783,13 @@ def wfcache_extract():
             continue
         written += 1
 
+    color = 'green' if failed == 0 else 'yellow'
     print(
-        f'Extracted {written:n} cached waveforms to {output_dir} '
-        f'(missing={missing:n}, failed={failed:n}).'
+        style(
+            f'Extracted {written:n} cached waveforms to {output_dir} '
+            f'(missing={missing:n}, failed={failed:n}).',
+            color,
+        )
     )
     rq_exit(0 if failed == 0 else 1)
 
@@ -841,6 +846,12 @@ def wfcache_print():
     rq_exit(0)
 
 
+def _print_cached_key(label, value):
+    """Print a ``label: value`` line, with a colored label."""
+    colored_label = style(f'{label}:', 'cyan')
+    print(f'{colored_label} {value}')
+
+
 def wfcache_inspect():
     """Print waveform-cache diagnostics and summary."""
     summary = read_waveform_cache_summary(
@@ -849,12 +860,12 @@ def wfcache_inspect():
     if bool(getattr(config.args, 'json', False)):
         print(json.dumps(summary, indent=2, sort_keys=True))
         rq_exit(0)
-    print(f'waveform cache path: {summary["path"]}')
-    print(f'cache exists: {summary["exists"]}')
+    _print_cached_key('waveform cache path', summary['path'])
+    _print_cached_key('cache exists', summary['exists'])
     if summary['exists']:
         _print_wfcache_details(summary)
     print(
-        'negative cache: '
+        f'{style("negative cache:", "cyan")} '
         f'total={summary["failure_rows"]:n}, '
         f'exhausted={summary["failure_exhausted_rows"]:n}, '
         f'retry-pending={summary["failure_retry_pending_rows"]:n}'
@@ -865,20 +876,20 @@ def wfcache_inspect():
 def _print_wfcache_details(summary):
     """Print waveform-cache details when the cache file exists."""
     size_mib = summary['file_size_bytes'] / (1024.0 * 1024.0)
-    print(f'file size: {size_mib:.3f} MiB')
-    print(f'schema version: {summary["schema_version"]}')
-    print(f'waveform rows: {summary["waveform_rows"]:n}')
-    print(
-        'time span: '
-        f'{summary["time_span_start"]} -> {summary["time_span_end"]}'
+    _print_cached_key('file size', f'{size_mib:.3f} MiB')
+    _print_cached_key('schema version', summary['schema_version'])
+    _print_cached_key('waveform rows', f'{summary["waveform_rows"]:n}')
+    _print_cached_key(
+        'time span',
+        f'{summary["time_span_start"]} -> {summary["time_span_end"]}',
     )
     top_trace_ids = summary['top_trace_ids']
     if top_trace_ids:
-        print('top trace IDs:')
+        print(f'{style("top trace IDs:", "cyan")}')
         for row in top_trace_ids:
             print(f'  {row["trace_id"]}: {row["rows"]:n}')
     if summary['integrity_check'] is not None:
-        print(f'integrity check: {summary["integrity_check"]}')
+        _print_cached_key('integrity check', summary['integrity_check'])
 
 
 def _read_event_ids_file(path):
@@ -915,5 +926,6 @@ def wfcache_reset_failures():
         clear_all=clear_all,
     )
     mode = 'would reset' if config.args.dry_run else 'reset'
-    print(f'{mode} {affected:n} waveform failure-cache rows')
+    message = f'{mode} {affected:n} waveform failure-cache rows'
+    print(style(message, 'green'))
     rq_exit(0)

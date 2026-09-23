@@ -23,6 +23,8 @@ import threading
 import time
 from contextlib import suppress
 
+from .terminal import color_enabled
+
 
 # ---------------------------------------------------------------------------
 #  Public API
@@ -1338,7 +1340,10 @@ def display_table_pager(
         if curses.has_colors():
             with suppress(curses.error):
                 curses.init_pair(1, -1, -1)
-                curses.init_pair(2, curses.COLOR_CYAN, -1)
+                row_color = (
+                    curses.COLOR_CYAN if color_enabled() else -1
+                )
+                curses.init_pair(2, row_color, -1)
         stdscr.keypad(True)
         with suppress(curses.error, AttributeError):
             curses.mousemask(0)
