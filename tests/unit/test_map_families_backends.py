@@ -91,6 +91,23 @@ def _make_families():
     return families
 
 
+class _StubFamily:
+    """Minimal family-like object, with a given number of events."""
+
+    def __init__(self, nevents):
+        self._nevents = nevents
+        self.duration = 1.0
+        self.depth = 1.0
+        self.lat = 45.0
+        self.lon = 10.0
+        self.cumul_moment = 1.0
+        self.cumul_slip = 1.0
+        self.slip_rate = 1.0
+
+    def __len__(self):
+        return self._nevents
+
+
 class _MapTestBase(unittest.TestCase):
     """Base class providing the config needed by the plot modules."""
 
@@ -216,11 +233,21 @@ class TestFamilyMarkerRadii(_MapTestBase):
         self.assertEqual(radii, [
             self.utils.MIN_MARKER_RADIUS, self.utils.MAX_MARKER_RADIUS
         ])
+        self.assertEqual([value for value, _ in legend], ['5', '10', '20'])
         self.assertEqual(
-            [radius for _value, radius in legend],
-            [self.utils.MIN_MARKER_RADIUS, 9.5, self.utils.MAX_MARKER_RADIUS]
+            [radius for _value, radius in legend], [5.0, 8.0, 14.0]
         )
-        self.assertEqual([value for value, _ in legend], ['5', '12.5', '20'])
+
+    def test_round_legend_values(self):
+        """The size legend should show round values."""
+        families = [_StubFamily(2), _StubFamily(877)]
+        _radii, legend, _label = self.utils.get_family_marker_radii(
+            families, 'number_of_events')
+        self.assertEqual([value for value, _ in legend], ['2', '50', '500'])
+        radii = [radius for _value, radius in legend]
+        self.assertEqual(radii, sorted(radii))
+        self.assertGreaterEqual(radii[0], self.utils.MIN_MARKER_RADIUS)
+        self.assertLessEqual(radii[-1], self.utils.MAX_MARKER_RADIUS)
 
     def test_linear_scale_for_narrow_ranges(self):
         """Values spanning less than a decade should use a linear scale."""
@@ -228,7 +255,7 @@ class TestFamilyMarkerRadii(_MapTestBase):
         self.families[1].depth = 25.0
         _radii, legend, label = self._radii('depth')
         self.assertEqual(label, 'Depth (km)')
-        self.assertEqual([value for value, _ in legend], ['5', '15', '25'])
+        self.assertEqual([value for value, _ in legend], ['5', '10', '20'])
 
     def test_logarithmic_scale_for_wide_ranges(self):
         """Values spanning decades should use a logarithmic scale."""
@@ -239,9 +266,9 @@ class TestFamilyMarkerRadii(_MapTestBase):
         self.assertEqual(radii, [
             self.utils.MIN_MARKER_RADIUS, self.utils.MAX_MARKER_RADIUS
         ])
-        # the middle legend entry is the geometric mean of the values
-        self.assertEqual([value for value, _ in legend], ['1e+10', '3.16e+12',
-                                                          '1e+15'])
+        self.assertEqual(
+            [value for value, _ in legend], ['1e+10', '5e+12', '1e+15']
+        )
 
     def test_missing_values_get_the_minimum_size(self):
         """Families with a missing value should get the minimum size."""
@@ -440,7 +467,7 @@ class TestCartopyBackend(_MapTestBase):
         self.assertEqual(legend.get_title().get_text(), 'Number of Events')
         self.assertEqual(
             [text.get_text() for text in legend.get_texts()],
-            ['5', '12.5', '20']
+            ['5', '10', '20']
         )
 
     def test_invalid_sizeby(self):

@@ -9,6 +9,7 @@ Utility functions for the map backends.
     GNU General Public License v3.0 or later
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
+import math
 import numpy as np
 from ..config import config
 
@@ -18,8 +19,10 @@ from ..config import config
 # pixels for the folium backend)
 MIN_MARKER_RADIUS = 5
 MAX_MARKER_RADIUS = 14
-# normalized sizes used for the size legend entries
-LEGEND_SIZES = (0.0, 0.5, 1.0)
+# maximum number of entries in the size legend
+MAX_LEGEND_ENTRIES = 3
+# mantissas of the round values used for the size legend
+_LEGEND_MANTISSAS = (1, 2, 5)
 
 _SIZE_LABELS = {
     'number_of_events': 'Number of Events',
@@ -165,10 +168,51 @@ def _value_from_size(size, vmin, vmax, use_log):
     )
 
 
-def _legend_entries(vmin, vmax, use_log):
+def _round_values(vmin, vmax, use_log):
+    """
+    Return round values inside the given range, for the size legend.
+
+    Values are taken from the 1-2-5 sequence, so that the size legend
+    shows round numbers (e.g., 5, 50, 500).
+
+    :param vmin: Minimum value of the scale
+    :type vmin: float
+    :param vmax: Maximum value of the scale
+    :type vmax: float
+    :param use_log: Whether to use a logarithmic scale
+    :type use_log: bool
+    :return: Round values
+    :rtype: list of float
+    """
+    exponent = math.floor(math.log10(vmin)) if vmin > 0 else 0
+    values = []
+    while 10 ** exponent <= vmax:
+        values.extend(
+            float(mantissa * 10 ** exponent)
+            for mantissa in _LEGEND_MANTISSAS
+            if vmin <= mantissa * 10 ** exponent <= vmax
+        )
+        exponent += 1
+    if len(values) < 2:
+        # no round values in the range: use the minimum, the middle and
+        # the maximum value, rounded to three significant digits
+        fallback = [vmin, _value_from_size(0.5, vmin, vmax, use_log), vmax]
+        return [float(f'{value:.3g}') for value in fallback]
+    if len(values) > MAX_LEGEND_ENTRIES:
+        # keep the first and the last value, and evenly spaced values
+        # in between
+        indices = np.linspace(0, len(values) - 1, MAX_LEGEND_ENTRIES)
+        indices = sorted({int(round(index)) for index in indices})
+        values = [values[index] for index in indices]
+    return values
+
+
+def _legend_entries(values, vmin, vmax, use_log):
     """
     Return the size legend entries.
 
+    :param values: Values of the size legend
+    :type values: list of float
     :param vmin: Minimum value of the scale
     :type vmin: float
     :param vmax: Maximum value of the scale
@@ -179,10 +223,11 @@ def _legend_entries(vmin, vmax, use_log):
     :rtype: list of tuple
     """
     entries = []
-    for size in LEGEND_SIZES:
-        value = _value_from_size(size, vmin, vmax, use_log)
-        radius = marker_radius(size)
-        entries.append((f'{value:.3g}', radius))
+    for value in values:
+        with np.errstate(divide='ignore', invalid='ignore'):
+            size = _normalized_size(value, vmin, vmax, use_log)
+        size = float(np.clip(size, 0.0, 1.0))
+        entries.append((f'{value:g}', marker_radius(size)))
     return entries
 
 
@@ -232,12 +277,13 @@ def get_family_marker_radii(families, sizeby):
                 _normalized_size(value, vmin, vmax, use_log)
                 for value in values
             ])
-        legend = _legend_entries(vmin, vmax, use_log)
+        legend = _legend_entries(
+            _round_values(vmin, vmax, use_log), vmin, vmax, use_log)
     else:
         # all the values are equal: use the maximum size
         sizes = np.ones(values.size)
         radius = marker_radius(1.0)
-        legend = [(f'{vmin:.3g}', radius)]
+        legend = [(f'{vmin:g}', radius)]
     # families with a missing value get the minimum size
     sizes = np.where(np.isfinite(values), sizes, 0.0)
     sizes = np.clip(sizes, 0.0, 1.0)
