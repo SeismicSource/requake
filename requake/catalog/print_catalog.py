@@ -31,7 +31,8 @@ def print_catalog():
         ('latitude', '.4f'),
         ('depth\n(km)', '.3f'),
         ('mag\ntype', None),
-        ('mag', '.1f')
+        ('mag', '.1f'),
+        ('dup', None)
     ]
     rows = [
         [
@@ -41,7 +42,8 @@ def print_catalog():
             ev.lat,
             ev.depth,
             ev.mag_type,
-            ev.mag
+            ev.mag,
+            'yes' if ev.duplicate else ''
         ]
         for ev in catalog
     ]

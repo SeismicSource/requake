@@ -56,8 +56,12 @@ The ``catalog`` table stores events read by ``requake read_catalog``.
      contributor     TEXT,
      contributor_id  TEXT,
      location_name   TEXT,
-     trace_id        TEXT
+     trace_id        TEXT,
+     duplicate       INTEGER NOT NULL DEFAULT 0
    )
+
+The ``duplicate`` column is set to ``1`` by ``requake deduplicate_pairs``
+for events that are considered duplicates of another catalog event.
 
 Event Keys Table
 ^^^^^^^^^^^^^^^^
@@ -109,6 +113,7 @@ Lag in seconds is reconstructed at read time from ``lag_samples`` and
      trace_key_id    INTEGER NOT NULL,
      lag_samples     INTEGER,
      cc_x100         INTEGER,
+     invalid         INTEGER NOT NULL DEFAULT 0,
      FOREIGN KEY (event1_id)
        REFERENCES event_keys(event_id)
        ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -123,6 +128,10 @@ Lag in seconds is reconstructed at read time from ``lag_samples`` and
 
 ``cc_x100`` stores ``cc_max`` with 0.01 precision using
 ``round(cc_max * 100)``.
+
+The ``invalid`` column is set to ``1`` by ``requake deduplicate_pairs``
+for all the pairs involving a duplicated event.  Invalid pairs are
+ignored when families are built and when pairs are printed.
 
 Trace Metadata Table
 ^^^^^^^^^^^^^^^^^^^^

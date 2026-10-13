@@ -4,6 +4,15 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- New ``deduplicate_pairs`` command: detects events that are likely
+  duplicates of each other, based on event pairs with high
+  cross-correlation coefficient which are also close in time and space.
+  One event per duplicate group is kept, the others are flagged as
+  duplicated in the catalog (new ``duplicate`` column) and all the pairs
+  involving them are flagged as invalid (new ``invalid`` column in
+  ``event_pairs``). A report is printed at the end, and
+  ``-n``/``--dry-run`` only prints the report. ``build_families`` now
+  ignores pairs flagged as invalid.
 - Stylized ``◀◀ RƎQuake`` logo, shown in the command line help.
 - Colored terminal output for help and usage messages, log messages,
   errors, table headers and waveform-cache diagnostics. Colors are used
@@ -26,6 +35,10 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   ``-s/--sizeby`` option (default: number of events), and a legend on the
   map explains the marker size. This applies to both the Cartopy and the
   Folium map backends.
+
+Note: the ``catalog`` and ``event_pairs`` tables have new columns
+(``duplicate`` and ``invalid``). Existing output databases are not
+migrated and must be recreated.
 
 ## [0.8.3] - 2026-06-19
 

@@ -26,7 +26,8 @@ class RequakeEvent():
     def __init__(self, evid=None, orig_time=None, lon=None, lat=None,
                  depth=None, mag_type=None, mag=None, author=None,
                  catalog=None, contributor=None, contributor_id=None,
-                 mag_author=None, location_name=None, trace_id=None):
+                 mag_author=None, location_name=None, trace_id=None,
+                 duplicate=False):
         """Initialize an event container."""
         self.evid = evid
         self.orig_time = orig_time
@@ -42,6 +43,7 @@ class RequakeEvent():
         self.mag_author = mag_author
         self.location_name = location_name
         self.trace_id = trace_id
+        self.duplicate = duplicate
         self.correlations = {}
 
     def __eq__(self, other):

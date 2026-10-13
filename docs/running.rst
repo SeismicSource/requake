@@ -23,6 +23,7 @@ Different commands are available:
    print_catalog       print the event catalog to screen
    scan_catalog        scan an existing catalog for earthquake pairs
    print_pairs         print pairs to screen
+   deduplicate_pairs   detect and flag duplicate events from close event pairs
    plot_pair           plot traces for a given event pair
    build_families      build families of repeating earthquakes from a catalog
                        of pairs
@@ -126,6 +127,46 @@ you are ready to build repeating earthquake families:
 .. code-block::
 
    requake build_families
+
+
+Flagging duplicate events
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Event catalogs often contain the same earthquake more than once (for
+example, the same event reported by different agencies or with slightly
+different origin times).  Since duplicates would artificially inflate
+families, they can be flagged before building families:
+
+.. code-block::
+
+   requake deduplicate_pairs
+
+The command looks for event pairs with a high cross-correlation
+coefficient which are also close in time and space: these are very
+likely to be the same earthquake.  The thresholds can be changed from
+the command line:
+
+* ``-c``/``--cc_min``: minimum cross-correlation coefficient
+  (default: ``0.98``);
+* ``-t``/``--max-time-diff``: maximum origin-time difference, in
+  seconds (default: ``60``);
+* ``-d``/``--max-distance``: maximum horizontal distance, in km
+  (default: ``2``).
+
+Within each group of duplicate events, one event is kept and the others
+are flagged as duplicated in the :doc:`catalog <database_schemas>`
+(the ``duplicate`` column).  All the event pairs involving a duplicated
+event are flagged as invalid (the ``invalid`` column of the
+``event_pairs`` table), so that they are ignored by
+``requake build_families``.
+
+A report of the duplicate pairs and groups found is printed at the end.
+Use ``-n``/``--dry-run`` to print the report without modifying the
+database.
+
+Note that a full re-scan of the catalog (``requake scan_catalog`` with
+overwrite) recreates the event pairs, so ``requake deduplicate_pairs``
+must be run again afterwards.
 
 
 Plotting families on a map

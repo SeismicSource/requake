@@ -106,6 +106,7 @@ PAIRS_SCHEMA_STATEMENTS = [
       trace_key_id    INTEGER NOT NULL,
       lag_samples     INTEGER,
       cc_x100         INTEGER,
+      invalid         INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (event1_id)
         REFERENCES {EVENT_KEYS_TABLE}(event_id)
         ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -139,6 +140,8 @@ def _is_incompatible_pairs_schema_error(err):
     return (
         'no such column: p.cc_x100' in message
         or 'no such column: cc_x100' in message
+        or 'no such column: p.invalid' in message
+        or 'has no column named invalid' in message
         or 'no such column: p.event1_id' in message
         or 'no such column: p.event2_id' in message
         or 'no such column: p.trace_key_id' in message
@@ -162,10 +165,15 @@ def _decode_cc_max(cc_x100):
 
 
 def _cc_filter_clause(cc_min, cc_max):
-    """Build SQL filter clause and params for readable pair rows."""
+    """Build SQL filter clause and params for readable pair rows.
+
+    Pairs flagged as invalid (e.g. because one of their events was
+    marked as a duplicate) are always excluded.
+    """
     conditions = [
         'p.cc_x100 IS NOT NULL',
         'p.lag_samples IS NOT NULL',
+        'p.invalid = 0',
     ]
     params = []
     if cc_min is not None:
@@ -394,6 +402,49 @@ def write_pair_records(pairs, append=True):
                 f'Requake version in db file {get_db_path()}'
             ) from err
         raise
+    finally:
+        conn.close()
+
+
+def mark_duplicate_pairs_invalid():
+    """
+    Mark all pairs involving a duplicated catalog event as invalid.
+
+    Duplicated events are those with ``duplicate = 1`` in the catalog
+    table.
+
+    :return: number of pairs newly flagged as invalid
+    :rtype: int
+    """
+    duplicated_events = (
+        f'SELECT k.event_id FROM {EVENT_KEYS_TABLE} AS k '
+        'JOIN catalog AS c ON c.evid = k.evid '
+        'WHERE c.duplicate = 1'
+    )
+    conn = get_db_connection(initdb=False)
+    try:
+        cursor = conn.cursor()
+        try:
+            execute_with_retry(
+                lambda: cursor.execute(
+                    f'UPDATE {EVENT_PAIRS_TABLE} SET invalid = 1 '
+                    'WHERE invalid = 0 AND ('
+                    f'event1_id IN ({duplicated_events}) '
+                    f'OR event2_id IN ({duplicated_events})'
+                    ')'
+                ),
+                'mark duplicate pairs as invalid',
+            )
+            count = cursor.rowcount
+        except sqlite3.OperationalError as err:
+            if _is_incompatible_pairs_schema_error(err):
+                raise PairsSchemaError(
+                    'Stored event pairs schema is incompatible with this '
+                    f'Requake version in db file {get_db_path()}'
+                ) from err
+            raise
+        conn.commit()
+        return count
     finally:
         conn.close()
 

@@ -57,5 +57,28 @@ class TestPrintFormat(unittest.TestCase):
         self._assert_format_disables_pager('print_pairs', 'csv')
 
 
+class TestDeduplicatePairsOptions(unittest.TestCase):
+    """Test the ``deduplicate_pairs`` command line options."""
+
+    def test_default_thresholds(self):
+        """Default thresholds must be the documented ones."""
+        args = _parse_args('deduplicate_pairs')
+        self.assertEqual(args.cc_min, 0.98)
+        self.assertEqual(args.max_time_diff, 60.)
+        self.assertEqual(args.max_distance, 2.)
+        self.assertFalse(args.dry_run)
+
+    def test_thresholds_can_be_overridden(self):
+        """Thresholds and dry-run must be settable from the command line."""
+        args = _parse_args(
+            'deduplicate_pairs',
+            '-c', '0.99', '-t', '30', '-d', '1.5', '-n',
+        )
+        self.assertEqual(args.cc_min, 0.99)
+        self.assertEqual(args.max_time_diff, 30.)
+        self.assertEqual(args.max_distance, 1.5)
+        self.assertTrue(args.dry_run)
+
+
 if __name__ == '__main__':
     unittest.main()

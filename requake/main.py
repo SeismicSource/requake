@@ -32,6 +32,9 @@ def run():
     if args.action == 'print_pairs':
         from .families import print_pairs
         print_pairs()
+    if args.action == 'deduplicate_pairs':
+        from .families import deduplicate_pairs
+        deduplicate_pairs()
     if args.action == 'scan_templates':
         from .scan import scan_templates
         scan_templates()
