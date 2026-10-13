@@ -367,6 +367,44 @@ def _legend_tick_labels(colorby, vmin, vmax):
     return labels or [vmin, vmax]
 
 
+def _colorbar_css():
+    """
+    Return the CSS that makes the colorbar labels readable.
+
+    A white outline is drawn around the black labels, so that they can be
+    read also on dark base map tiles.
+
+    :return: CSS code
+    :rtype: str
+    """
+    return (
+        '<style>'
+        '.legend.leaflet-control { '
+        'overflow: visible !important; '
+        'padding-bottom: 26px; '
+        '} '
+        '.legend.leaflet-control svg { '
+        'overflow: visible !important; '
+        '} '
+        '#legend text { '
+        'font-size: 13px !important; '
+        'paint-order: stroke; '
+        'stroke: #ffffff; '
+        'stroke-width: 2.5px; '
+        'stroke-linejoin: round; '
+        '} '
+        '#legend .caption { '
+        'font-size: 15px !important; '
+        'font-weight: 600; '
+        'paint-order: stroke; '
+        'stroke: #ffffff; '
+        'stroke-width: 3px; '
+        'stroke-linejoin: round; '
+        '} '
+        '</style>'
+    )
+
+
 def _time_label_script():
     """
     Return the JavaScript code that relabels legend ticks as UTC dates.
@@ -440,6 +478,9 @@ def _add_colormap(m, cmap, norm, colorby):
     legend.width = 520
     legend.height = 64
     legend.add_to(m)
+    m.get_root().header.add_child(
+        branca.element.Element(_colorbar_css())
+    )
     if colorby == 'time':
         m.get_root().header.add_child(
             branca.element.Element(_time_label_script())

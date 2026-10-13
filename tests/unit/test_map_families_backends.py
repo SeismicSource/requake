@@ -391,6 +391,17 @@ class TestFoliumBackend(_MapTestBase):
         self.assertIn('"radius": 14.0', html)
 
     @unittest.skipUnless(FOLIUM_AVAILABLE, 'folium is not installed')
+    def test_colorbar_labels_have_a_white_outline(self):
+        """Colorbar labels should be readable on dark base maps."""
+        out_file = self._out_file()
+        self.module.plot_families_map_with_folium(self.families)
+        with open(out_file, encoding='utf8') as file_obj:
+            html = file_obj.read()
+        self.assertIn('paint-order: stroke', html)
+        self.assertIn('stroke: #ffffff', html)
+        self.assertIn('#legend .caption', html)
+
+    @unittest.skipUnless(FOLIUM_AVAILABLE, 'folium is not installed')
     def test_size_legend(self):
         """The map should show a legend explaining the marker size."""
         out_file = self._out_file()
