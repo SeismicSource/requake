@@ -636,6 +636,17 @@ def parse_arguments(progname='requake'):
              'ending in ".html" to save the map to a file'
     )
     map_families.add_argument(
+        '-s', '--sizeby', type=str, default='number_of_events',
+        metavar='QUANTITY',
+        choices=[
+            'number_of_events', 'duration', 'depth', 'latitude', 'longitude',
+            'distance_from', 'cumul_moment', 'cumul_slip', 'slip_rate'
+        ],
+        help='quantity to scale the family marker size by. Choose among '
+             '{%(choices)s} (default: %(default)s). A logarithmic scale is '
+             'used when the values span more than one order of magnitude'
+    )
+    map_families.add_argument(
         '-M', '--mapstyle', type=str, default='satellite',
         metavar='STYLE',
         choices=[

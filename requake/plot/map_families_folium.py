@@ -21,6 +21,7 @@ from matplotlib.dates import date2num
 from matplotlib.ticker import MaxNLocator
 from ..config import config, rq_exit
 from .plot_utils import family_colors, duration_string
+from .map_families_utils import get_family_marker_radii
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 # folium is an optional dependency: this module must be importable without it
@@ -35,9 +36,6 @@ except ImportError:
 _DEFAULT_OUTPUT_BASENAME = 'family_map'
 # output formats supported by image-based backends only
 _IMAGE_FORMATS = ('pdf', 'svg', 'png', 'jpg', 'jpeg')
-# marker radius, in pixels, matching the default marker size of the
-# cartopy backend
-_MARKER_RADIUS = 5
 # matplotlib date number of the Unix epoch, used to convert the matplotlib
 # dates of the family start times into JavaScript dates; cast to float, so
 # that it is rendered as a plain number in the JavaScript code
@@ -262,7 +260,7 @@ def _family_popup_html(family):
     return '<br>'.join(lines)
 
 
-def _add_family_markers(m, families, fcolors):
+def _add_family_markers(m, families, fcolors, radii):
     """
     Add the family markers to the map.
 
@@ -272,8 +270,10 @@ def _add_family_markers(m, families, fcolors):
     :type families: list of requake.families.Family
     :param fcolors: Colors for the families, as RGBA tuples
     :type fcolors: list of tuple
+    :param radii: Marker radii, in pixels
+    :type radii: list of float
     """
-    for family, color in zip(families, fcolors):
+    for family, color, radius in zip(families, fcolors, radii):
         if family.lon is None or family.lat is None:
             logger.warning(
                 f'Family "{family.number}" has no coordinates. Skipping it.'
@@ -287,7 +287,7 @@ def _add_family_markers(m, families, fcolors):
         hexcolor = to_hex(color)
         folium.CircleMarker(
             location=[family.lat, family.lon],
-            radius=_MARKER_RADIUS,
+            radius=radius,
             color=hexcolor,
             weight=1,
             fill=True,
@@ -295,6 +295,42 @@ def _add_family_markers(m, families, fcolors):
             fill_opacity=0.8,
             popup=popup,
         ).add_to(m)
+
+
+def _add_size_legend(m, legend, label):
+    """
+    Add an HTML legend explaining the marker size.
+
+    :param m: The folium map
+    :type m: folium.Map
+    :param legend: Size legend entries, as (value label, radius) pairs
+    :type legend: list of tuple
+    :param label: Description of the quantity used for the marker size
+    :type label: str
+    """
+    if not legend:
+        return
+    rows = []
+    for value_label, radius in legend:
+        diameter = 2 * radius
+        rows.append(
+            '<div style="display: flex; align-items: center; '
+            f'height: {diameter:.0f}px;">'
+            '<span style="display: inline-block; box-sizing: border-box; '
+            f'width: {diameter:.0f}px; height: {diameter:.0f}px; '
+            'border-radius: 50%; border: 1px solid #555555; '
+            'background-color: rgba(136, 136, 136, 0.3); '
+            'margin-right: 6px;"></span>'
+            f'{escape(value_label)}</div>'
+        )
+    html = (
+        '<div style="position: fixed; bottom: 25px; left: 20px; '
+        'z-index: 9999; background-color: rgba(255, 255, 255, 0.8); '
+        'padding: 6px 10px; border-radius: 4px; font-size: 13px;">'
+        '<div style="font-weight: 600; margin-bottom: 2px;">'
+        f'{escape(label)}</div>{"".join(rows)}</div>'
+    )
+    m.get_root().html.add_child(branca.element.Element(html))
 
 
 def _legend_tick_labels(colorby, vmin, vmax):
@@ -481,9 +517,12 @@ def plot_families_map_with_folium(families):
     _add_title(m, families)
     try:
         fcolors, norm, cmap = family_colors(families)
+        radii, legend, size_label = get_family_marker_radii(
+            families, args.sizeby)
     except ValueError as msg:
         logger.error(msg)
         rq_exit(1)
-    _add_family_markers(m, families, fcolors)
+    _add_family_markers(m, families, fcolors, radii)
     _add_colormap(m, cmap, norm, args.colorby)
+    _add_size_legend(m, legend, size_label)
     _save_or_open_map(m, out_file)

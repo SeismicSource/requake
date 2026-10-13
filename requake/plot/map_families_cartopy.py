@@ -21,6 +21,7 @@ from .plot_utils import (
     plot_title, hover_annotation, duration_string, family_colors,
     plot_colorbar, save_or_show_plot
 )
+from .map_families_utils import get_family_marker_radii
 from .cached_tiler import CachedTiler
 from .map_tiles import (
     EsriHillshade,
@@ -105,6 +106,39 @@ def _make_basemap():
     return fig, ax
 
 
+def _plot_size_legend(ax, legend, label):
+    """
+    Add a legend explaining the marker size.
+
+    :param ax: Matplotlib axis
+    :type ax: matplotlib.axes.Axes
+    :param legend: Size legend entries, as (value label, radius) pairs
+    :type legend: list of tuple
+    :param label: Description of the quantity used for the marker size
+    :type label: str
+    """
+    if not legend:
+        return
+    handles = [
+        plt.Line2D(
+            [], [], marker='o', linestyle='', markersize=2 * radius,
+            markerfacecolor='none', markeredgecolor='0.3'
+        )
+        for _label, radius in legend
+    ]
+    ax.legend(
+        handles,
+        [value_label for value_label, _radius in legend],
+        title=label,
+        loc='lower right',
+        framealpha=0.8,
+        fontsize=8,
+        title_fontsize=9,
+        labelspacing=1.5,
+        borderpad=1.0
+    )
+
+
 def plot_families_map_with_cartopy(families):
     """
     Plot families on a map, using cartopy.
@@ -116,11 +150,13 @@ def plot_families_map_with_cartopy(families):
     trans = ccrs.PlateCarree()
     try:
         fcolors, norm, cmap = family_colors(families)
+        radii, legend, size_label = get_family_marker_radii(
+            families, config.args.sizeby)
     except ValueError as msg:
         logger.error(msg)
         rq_exit(1)
     trace_ids = []
-    for family, color in zip(families, fcolors):
+    for family, color, radius in zip(families, fcolors, radii):
         if family.trace_id not in trace_ids and family.trace_id is not None:
             trace_ids.append(family.trace_id)
         fn = family.number
@@ -135,11 +171,12 @@ def plot_families_map_with_cartopy(families):
         pe = [patheffects.withStroke(linewidth=2, foreground='k')]
         marker = ax.scatter(
             family.lon, family.lat,
-            marker='o', s=100,
+            marker='o', s=(2 * radius) ** 2,
             linewidths=1, facecolor=color, edgecolor='w', path_effects=pe,
             transform=trans, label=label, zorder=10)
         marker.to_annotate = True
     plot_colorbar(fig, ax, cmap, norm)
+    _plot_size_legend(ax, legend, size_label)
     plot_title(
         ax, len(families), trace_ids, vertical_position=1.05, fontsize=10)
 

@@ -161,10 +161,14 @@ Two map backends are available, selected with ``-b/--backend``:
 
 In both cases, the base map style is selected with ``-M/--mapstyle`` and
 the families are colored according to ``-c/--colorby``, with the
-corresponding colorbar shown on the map. With the folium backend, the
-base map styles can also be switched interactively and clicking on a
-family marker shows the family details. The ``stamen_terrain`` map style
-requires an API key, to be provided with ``-k/--apikey``.
+corresponding colorbar shown on the map. The family marker size is scaled
+with the ``-s/--sizeby`` quantity (default: ``number_of_events``), and a
+legend on the map explains the marker size. A logarithmic scale is used
+when the values span more than one order of magnitude. With the folium
+backend, the base map styles can also be switched interactively and
+clicking on a family marker shows the family details. The
+``stamen_terrain`` map style requires an API key, to be provided with
+``-k/--apikey``.
 
 
 Interactive pager

@@ -22,6 +22,10 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   the default static Cartopy map. Folium is an optional dependency (not
   installed by default): the folium backend is only used if folium is
   installed.
+- Family marker size is now scaled with a quantity selected with the new
+  ``-s/--sizeby`` option (default: number of events), and a legend on the
+  map explains the marker size. This applies to both the Cartopy and the
+  Folium map backends.
 
 ## [0.8.3] - 2026-06-19
 
