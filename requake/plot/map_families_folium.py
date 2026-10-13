@@ -405,16 +405,24 @@ def _colorbar_css():
     )
 
 
-def _time_label_script():
+def _legend_label_script(relabel_dates):
     """
-    Return the JavaScript code that relabels legend ticks as UTC dates.
+    Return the JavaScript code that adjusts the colorbar tick labels.
 
+    The first and the last tick label are aligned with the colorbar ends,
+    so that they are not cut, and, for a time scale, the numeric tick
+    labels are rewritten as UTC dates.
+
+    :param relabel_dates: Whether to relabel the ticks as UTC dates
+    :type relabel_dates: bool
     :return: JavaScript code
     :rtype: str
     """
+    relabel_flag = 'true' if relabel_dates else 'false'
     return (
         '<script>'
         '(function () {'
+        f'var relabelDates = {relabel_flag};'
         'function pad(v) { return String(v).padStart(2, "0"); }'
         'function utcDate(mplDate) {'
         f'  var ms = (mplDate - {_UNIX_EPOCH_MPL_DATE!r}) * 86400000;'
@@ -431,9 +439,15 @@ def _time_label_script():
         '    if (attempts > 40) { clearInterval(timer); }'
         '    return;'
         '  }'
-        '  ticks.forEach(function (node) {'
+        '  ticks.forEach(function (node, index) {'
         '    var val = Number(String(node.textContent).replace(/,/g, ""));'
-        '    if (isFinite(val)) { node.textContent = utcDate(val); }'
+        '    if (relabelDates && isFinite(val)) {'
+        '      node.textContent = utcDate(val);'
+        '    }'
+        '    if (index === 0) { node.style.textAnchor = "start"; }'
+        '    if (index === ticks.length - 1) {'
+        '      node.style.textAnchor = "end";'
+        '    }'
         '  });'
         '  clearInterval(timer);'
         '}, 100);'
@@ -481,10 +495,9 @@ def _add_colormap(m, cmap, norm, colorby):
     m.get_root().header.add_child(
         branca.element.Element(_colorbar_css())
     )
-    if colorby == 'time':
-        m.get_root().header.add_child(
-            branca.element.Element(_time_label_script())
-        )
+    m.get_root().header.add_child(
+        branca.element.Element(_legend_label_script(colorby == 'time'))
+    )
 
 
 def _get_output_file(output):

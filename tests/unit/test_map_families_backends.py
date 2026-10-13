@@ -413,6 +413,17 @@ class TestFoliumBackend(_MapTestBase):
         self.assertIn('>20</div>', html)
 
     @unittest.skipUnless(FOLIUM_AVAILABLE, 'folium is not installed')
+    def test_legend_labels_are_kept_inside_the_colorbar(self):
+        """The first and last colorbar labels should not be cut."""
+        out_file = self._out_file()
+        self.module.plot_families_map_with_folium(self.families)
+        with open(out_file, encoding='utf8') as file_obj:
+            html = file_obj.read()
+        self.assertIn('node.style.textAnchor = "start"', html)
+        self.assertIn('node.style.textAnchor = "end"', html)
+        self.assertIn('var relabelDates = false;', html)
+
+    @unittest.skipUnless(FOLIUM_AVAILABLE, 'folium is not installed')
     def test_time_legend_labels_are_relabeled(self):
         """Colorby time should add the JavaScript date relabeling."""
         out_file = self._out_file()
@@ -422,6 +433,7 @@ class TestFoliumBackend(_MapTestBase):
             html = file_obj.read()
         self.assertIn('Family Start Time', html)
         self.assertIn('utcDate', html)
+        self.assertIn('var relabelDates = true;', html)
         # the JavaScript must contain plain numbers, not numpy repr's
         self.assertNotIn('np.float64', html)
 
