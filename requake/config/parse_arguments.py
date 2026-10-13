@@ -211,6 +211,21 @@ def _nonnegative_int(value):
     return int_value
 
 
+class _PrintFormatAction(argparse.Action):
+    """
+    Store the output format and disable the interactive pager.
+
+    The pager draws the table with its own layout and ignores the
+    requested output format, hence an explicitly requested format
+    implies plain-text output.
+    """
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Set the output format and disable the pager."""
+        setattr(namespace, self.dest, values)
+        setattr(namespace, 'no_pager', True)
+
+
 def parse_arguments(progname='requake'):
     """
     Parse command line arguments.
@@ -314,9 +329,16 @@ def parse_arguments(progname='requake'):
     print_format.add_argument(
         '-f', '--format', type=str, default='simple',
         choices=['simple', 'markdown', 'csv'],
-        help='format for the output table (default: %(default)s)'
+        action=_PrintFormatAction,
+        help='format for the output table (default: %(default)s); '
+             'implies --no-pager'
     )
-    print_format.add_argument(
+    # ---
+    # --- print_pager
+    #     a parent parser for the "no_pager" option,
+    #     used by the "print" subparsers
+    print_pager = argparse.ArgumentParser(add_help=False)
+    print_pager.add_argument(
         '--no-pager', action='store_true',
         help='disable the interactive curses pager'
     )
@@ -324,7 +346,7 @@ def parse_arguments(progname='requake'):
     # --- print_catalog
     subparser.add_parser(
         'print_catalog',
-        parents=[print_format],
+        parents=[print_format, print_pager],
         help='print the event catalog to screen'
     )
     # ---
@@ -357,7 +379,7 @@ def parse_arguments(progname='requake'):
     # --- print_pairs
     print_pairs = subparser.add_parser(
         'print_pairs',
-        parents=[print_format],
+        parents=[print_format, print_pager],
         help='print pairs to screen'
     )
     print_pairs.add_argument(
@@ -516,14 +538,16 @@ def parse_arguments(progname='requake'):
     print_families = subparser.add_parser(
         'print_families',
         parents=[
-            longerthan, shorterthan, minevents, family_numbers
+            longerthan, shorterthan, minevents, family_numbers, print_pager
         ],
         help='print families to screen'
     )
     print_families.add_argument(
         '-f', '--format', type=str, default='simple',
         choices=['simple', 'markdown', 'csv', 'stats'],
-        help='format for the output (default: %(default)s)'
+        action=_PrintFormatAction,
+        help='format for the output (default: %(default)s); '
+             'implies --no-pager'
     )
     print_families.add_argument(
         '-d', '--detailed', action='store_true',

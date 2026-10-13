@@ -14,7 +14,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 - New interactive curses pager for all ``print_`` commands
   (``print_catalog``, ``print_pairs``, ``print_families``).
   Automatically activated when output is a terminal; use ``--no-pager``
-  to fall back to plain-text output.
+  to fall back to plain-text output. Requesting a specific output format
+  with ``-f``/``--format`` implies ``--no-pager``.
 
 ## [0.8.3] - 2026-06-19
 

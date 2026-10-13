@@ -58,6 +58,26 @@ You can install it easily through ``pip``\ :
    pip install requake
 
 
+Interactive pager
+^^^^^^^^^^^^^^^^^
+
+The interactive pager of the ``print_`` commands (see :doc:`running`)
+uses the `curses
+<https://en.wikipedia.org/wiki/Curses_(programming_library)>`_ module,
+which is part of the Python standard library on Linux and macOS.  On
+Windows, ``curses`` is not available by default and must be installed
+separately:
+
+.. code-block:: text
+
+   pip install windows-curses
+
+
+Without ``curses``, the pager cannot start: run the ``print_`` commands
+with ``--no-pager`` (or with a specific ``-f``/``--format``) to get
+plain-text output.
+
+
 Installing a development snapshot
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
