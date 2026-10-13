@@ -58,6 +58,24 @@ You can install it easily through ``pip``\ :
    pip install requake
 
 
+Optional dependencies
+^^^^^^^^^^^^^^^^^^^^^
+
+The ``folium`` backend of the ``map_families`` command (see
+:doc:`running`) requires the optional `folium
+<https://python-visualization.github.io/folium/>`_ package, which is not
+installed by default:
+
+.. code-block:: text
+
+   pip install requake[folium]
+
+
+The ``folium`` package is only needed to plot interactive HTML maps: all
+the other commands, including the default (Cartopy) map backend, work
+without it.
+
+
 Interactive pager
 ^^^^^^^^^^^^^^^^^
 

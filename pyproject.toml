@@ -38,6 +38,11 @@ dependencies = [
     "pygments",
 ]
 
+[project.optional-dependencies]
+folium = [
+    "folium",
+]
+
 [project.urls]
 Homepage = "https://requake.seismicsource.org"
 Source = "https://github.com/SeismicSource/requake"

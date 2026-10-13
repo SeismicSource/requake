@@ -628,6 +628,14 @@ def parse_arguments(progname='requake'):
         help='plot families on a map'
     )
     map_families.add_argument(
+        '-b', '--backend', type=str, default='cartopy',
+        choices=['cartopy', 'folium'],
+        help='map backend (default: %(default)s). The "folium" backend '
+             'produces an interactive HTML map and requires the optional '
+             '"folium" package; use "-o html" or an output filename '
+             'ending in ".html" to save the map to a file'
+    )
+    map_families.add_argument(
         '-M', '--mapstyle', type=str, default='satellite',
         metavar='STYLE',
         choices=[
@@ -645,7 +653,9 @@ def parse_arguments(progname='requake'):
     map_families.add_argument(
         '-z', '--zoom', type=int, default=None,
         help='zoom level for the map tiles (default: None). Note that '
-             'certain map tiles might not be available at all zoom levels'
+             'certain map tiles might not be available at all zoom levels. '
+             'For the folium backend, this sets the initial zoom level of '
+             'the map, instead of fitting the map to the families'
     )
     # ---
     # --- flag_family

@@ -128,6 +128,45 @@ you are ready to build repeating earthquake families:
    requake build_families
 
 
+Plotting families on a map
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Once families are built, they can be plotted on a map with:
+
+.. code-block::
+
+   requake map_families
+
+
+Two map backends are available, selected with ``-b/--backend``:
+
+``cartopy`` (default)
+   Produce a static image, using Matplotlib and Cartopy. The output
+   format is determined by the ``-o/--output`` file extension (e.g.,
+   ``.png``, ``.pdf``, ``.svg``).
+
+``folium``
+   Produce an interactive HTML map. This backend requires the optional
+   ``folium`` package (see :doc:`installation`) and the output must be
+   an HTML file, e.g.:
+
+   .. code-block::
+
+      requake map_families -b folium -o family_map.html
+
+
+   Use ``-o html`` to save the map to the default file name
+   (``family_map.html``), or omit ``-o`` to open the map in the default
+   web browser.
+
+In both cases, the base map style is selected with ``-M/--mapstyle`` and
+the families are colored according to ``-c/--colorby``, with the
+corresponding colorbar shown on the map. With the folium backend, the
+base map styles can also be switched interactively and clicking on a
+family marker shows the family details. The ``stamen_terrain`` map style
+requires an API key, to be provided with ``-k/--apikey``.
+
+
 Interactive pager
 ^^^^^^^^^^^^^^^^^
 

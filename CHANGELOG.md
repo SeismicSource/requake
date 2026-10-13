@@ -16,6 +16,12 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   Automatically activated when output is a terminal; use ``--no-pager``
   to fall back to plain-text output. Requesting a specific output format
   with ``-f``/``--format`` implies ``--no-pager``.
+- New ``-b/--backend`` option for ``map_families``, to plot families on
+  an interactive HTML map using
+  [folium](https://python-visualization.github.io/folium/), instead of
+  the default static Cartopy map. Folium is an optional dependency (not
+  installed by default): the folium backend is only used if folium is
+  installed.
 
 ## [0.8.3] - 2026-06-19
 
