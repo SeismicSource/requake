@@ -15,6 +15,9 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   ignores pairs flagged as invalid.
 - ``dedup_events --reset`` clears the duplicate and the invalid flags
   and exits, without performing duplicate detection.
+- ``print_pairs`` hides pairs flagged as invalid by default; the new
+  ``--include-invalid`` option lists them as well, adding an ``invalid``
+  column to the table.
 - Stylized ``◀◀ RƎQuake`` logo, shown in the command line help.
 - Colored terminal output for help and usage messages, log messages,
   errors, table headers and waveform-cache diagnostics. Colors are used

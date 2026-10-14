@@ -164,17 +164,19 @@ def _decode_cc_max(cc_x100):
     return cc_x100 / 100.0
 
 
-def _cc_filter_clause(cc_min, cc_max):
+def _cc_filter_clause(cc_min, cc_max, include_invalid=False):
     """Build SQL filter clause and params for readable pair rows.
 
     Pairs flagged as invalid (e.g. because one of their events was
-    marked as a duplicate) are always excluded.
+    marked as a duplicate) are excluded, unless *include_invalid* is
+    true.
     """
     conditions = [
         'p.cc_x100 IS NOT NULL',
         'p.lag_samples IS NOT NULL',
-        'p.invalid = 0',
     ]
+    if not include_invalid:
+        conditions.append('p.invalid = 0')
     params = []
     if cc_min is not None:
         conditions.append('p.cc_x100 >= ?')
@@ -186,7 +188,7 @@ def _cc_filter_clause(cc_min, cc_max):
     return where, params
 
 
-def count_pairs_upper_bound(cc_min, cc_max, limit):
+def count_pairs_upper_bound(cc_min, cc_max, limit, include_invalid=False):
     """Return a fast upper-bound count, capped at *limit* + 1.
 
     Queries only the ``event_pairs`` table (no JOINs), so the result
@@ -194,7 +196,9 @@ def count_pairs_upper_bound(cc_min, cc_max, limit):
     (e.g. when orphan rows exist).  Use for quick threshold checks
     where a conservative over-estimate is acceptable.
     """
-    where, params = _cc_filter_clause(cc_min, cc_max)
+    where, params = _cc_filter_clause(
+        cc_min, cc_max, include_invalid=include_invalid
+    )
     conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
@@ -208,7 +212,7 @@ def count_pairs_upper_bound(cc_min, cc_max, limit):
         conn.close()
 
 
-def count_pairs_up_to(cc_min, cc_max, limit):
+def count_pairs_up_to(cc_min, cc_max, limit, include_invalid=False):
     """Return the number of matching pairs, capped at *limit* + 1.
 
     Uses the same FROM / JOIN / WHERE clauses as :func:`read_pairs`
@@ -216,7 +220,9 @@ def count_pairs_up_to(cc_min, cc_max, limit):
     is accurate (orphan rows are excluded).  The ``LIMIT`` stops
     scanning early.
     """
-    where, params = _cc_filter_clause(cc_min, cc_max)
+    where, params = _cc_filter_clause(
+        cc_min, cc_max, include_invalid=include_invalid
+    )
     conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
@@ -338,6 +344,7 @@ def _pair_from_row(row):
         row['lag_samples'],
         row['lag_samples'] / row['sampling_rate_hz'],
         _decode_cc_max(row['cc_x100']),
+        invalid=bool(row['invalid']),
     )
 
 
@@ -545,7 +552,7 @@ def read_packed_pair_ids(event_id_to_idx, nevents):
 
 
 def read_pairs(cc_min=None, cc_max=None, offset=None, limit=None,
-               count_only=False, order_by=None):
+               count_only=False, order_by=None, include_invalid=False):
     """
     Read event pairs from SQLite, optionally filtering by cc_max.
 
@@ -563,13 +570,18 @@ def read_pairs(cc_min=None, cc_max=None, offset=None, limit=None,
     :param order_by: Optional (column_expr, asc) tuple for ORDER BY.
         When None, the default ordering is used.
     :type order_by: tuple or None
+    :param include_invalid: If True, also return pairs flagged as
+        invalid.
+    :type include_invalid: bool
     :return: list of RequakeEventPair objects or, when count_only is
         True, an integer row count.
     :rtype: list or int
 
     :raise PairsTableNotFoundError: if the stored pairs table is missing
     """
-    where, params = _cc_filter_clause(cc_min, cc_max)
+    where, params = _cc_filter_clause(
+        cc_min, cc_max, include_invalid=include_invalid
+    )
     if order_by is None:
         order_clause = (
             'ORDER BY c1.orig_time, c2.orig_time, '
@@ -636,7 +648,8 @@ def read_pairs(cc_min=None, cc_max=None, offset=None, limit=None,
                   c2.mag AS mag2,
                   tm.sampling_rate_hz,
                   tm.elevation,
-                  tm.local_depth
+                  tm.local_depth,
+                  p.invalid
                 FROM {EVENT_PAIRS_TABLE} AS p
                 JOIN {EVENT_KEYS_TABLE} AS e1
                   ON e1.event_id = p.event1_id

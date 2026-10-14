@@ -393,6 +393,11 @@ def parse_arguments(progname='requake'):
         help='maximum cross-correlation coefficient (default: %(default)s)'
     )
     print_pairs.add_argument(
+        '--include-invalid', action='store_true',
+        help='also show pairs flagged as invalid (e.g., pairs involving an '
+             'event marked as duplicate), adding an "invalid" column'
+    )
+    print_pairs.add_argument(
         '--force', action='store_true',
         help='skip the large-dataset warning'
     )

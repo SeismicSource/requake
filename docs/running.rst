@@ -177,6 +177,10 @@ table, it can take a while on large catalogs.  For example:
 
    requake dedup_events --reset
 
+The invalid pairs are hidden by ``requake print_pairs`` (use
+``--include-invalid`` to list them, see below) and ignored by
+``requake build_families``.
+
 Note that a full re-scan of the catalog (``requake scan_catalog`` with
 overwrite) recreates the event pairs, so ``requake dedup_events``
 must be run again afterwards.
@@ -282,4 +286,13 @@ When more than 10,000 pairs match the current filter, ``print_pairs``
 shows a confirmation prompt before opening the pager.  Use
 ``--cc-min`` / ``--cc-max`` to narrow the selection, or ``--force``
 to skip the warning.
+
+Invalid pairs
+"""""""""""""
+
+``print_pairs`` shows only valid pairs.  Pairs flagged as invalid (see
+`Flagging duplicate events`_), i.e. pairs involving an event marked as
+duplicate, are hidden.  Use ``--include-invalid`` to list them as well;
+an ``invalid`` column is then added to the table, and the table can be
+sorted on it to show the invalid pairs first.
 

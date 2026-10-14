@@ -56,6 +56,13 @@ class TestPrintFormat(unittest.TestCase):
         self._assert_format_disables_pager('print_catalog', 'csv')
         self._assert_format_disables_pager('print_pairs', 'csv')
 
+    def test_include_invalid_option(self):
+        """``--include-invalid`` must be off by default for print_pairs."""
+        self.assertFalse(_parse_args('print_pairs').include_invalid)
+        self.assertTrue(
+            _parse_args('print_pairs', '--include-invalid').include_invalid
+        )
+
     def test_reset_option(self):
         """``--reset`` must be off by default for dedup_events."""
         self.assertFalse(_parse_args('dedup_events').reset)

@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 class RequakeEventPair:
     """A pair of events."""
 
-    def __init__(self, event1, event2, trace_id, lag_samples, lag_sec, cc_max):
+    def __init__(self, event1, event2, trace_id, lag_samples, lag_sec, cc_max,
+                 invalid=False):
         """
         Initialize a pair of events.
 
@@ -32,6 +33,8 @@ class RequakeEventPair:
         :type lag_sec: float
         :param cc_max: maximum cross-correlation coefficient
         :type cc_max: float
+        :param invalid: whether the pair is flagged as invalid
+        :type invalid: bool
         """
         if not isinstance(event1, RequakeEvent):
             raise TypeError('event1 must be a RequakeEvent')
@@ -51,6 +54,7 @@ class RequakeEventPair:
         self.lag_samples = lag_samples
         self.lag_sec = lag_sec
         self.cc_max = cc_max
+        self.invalid = invalid
 
     def __repr__(self):
         """Return the debug representation of the pair."""
@@ -58,7 +62,7 @@ class RequakeEventPair:
             f'RequakeEventPair(event1={self.event1}, event2={self.event2}, '
             f'trace_id={self.trace_id}, '
             f'lag_samples={self.lag_samples}, lag_sec={self.lag_sec}, '
-            f'cc_max={self.cc_max})'
+            f'cc_max={self.cc_max}, invalid={self.invalid})'
         )
 
     def __str__(self):

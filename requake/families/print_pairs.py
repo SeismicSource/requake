@@ -62,6 +62,7 @@ _PAIRS_SORT_COLUMNS = [
     'p.lag_samples',  # 15: lag (samp)
     'p.lag_samples',  # 16: lag (sec) — approximate, same order
     'p.cc_x100',      # 17: cc max
+    'p.invalid',      # 18: invalid
 ]
 
 
@@ -74,10 +75,20 @@ _PAIRS_FIELDS = [
     'lag (samp)', 'lag (sec)', 'cc max'
 ]
 
+_INVALID_FIELD = 'invalid'
 
-def _row_from_pair(pair):
+
+def _pairs_fields(include_invalid):
+    """Return the table fields, optionally including the invalid flag."""
+    fields = list(_PAIRS_FIELDS)
+    if include_invalid:
+        fields.append(_INVALID_FIELD)
+    return fields
+
+
+def _row_from_pair(pair, include_invalid=False):
     """Convert a RequakeEventPair to a flat row list."""
-    return [
+    row = [
         pair.event1.evid,
         pair.event2.evid,
         pair.trace_id,
@@ -97,9 +108,13 @@ def _row_from_pair(pair):
         pair.lag_sec,
         pair.cc_max
     ]
+    if include_invalid:
+        row.append(pair.invalid)
+    return row
 
 
-def _build_pairs_db_source(cc_min, cc_max, total_count=None):
+def _build_pairs_db_source(cc_min, cc_max, include_invalid=False,
+                           total_count=None):
     """Build a DatabaseDataSource for pairs.
 
     When *total_count* is provided it is used directly, avoiding
@@ -111,17 +126,21 @@ def _build_pairs_db_source(cc_min, cc_max, total_count=None):
             order_by = (_PAIRS_SORT_COLUMNS[sort_col], sort_asc)
         pairs = read_pairs(
             cc_min=cc_min, cc_max=cc_max,
-            offset=offset, limit=limit,
-            order_by=order_by
+            offset=offset, limit=limit, order_by=order_by,
+            include_invalid=include_invalid
         )
-        return [_row_from_pair(p) for p in pairs]
+        return [_row_from_pair(p, include_invalid) for p in pairs]
 
     def count_fn():
         if total_count is not None:
             return total_count
-        return read_pairs(cc_min=cc_min, cc_max=cc_max, count_only=True)
+        return read_pairs(
+            cc_min=cc_min, cc_max=cc_max, count_only=True,
+            include_invalid=include_invalid
+        )
 
-    return DatabaseDataSource(_PAIRS_FIELDS, query_fn, count_fn)
+    return DatabaseDataSource(_pairs_fields(include_invalid), query_fn,
+                              count_fn)
 
 
 def print_pairs():
@@ -129,11 +148,13 @@ def print_pairs():
     status('Preparing pairs table...')
     cc_min = config.args.cc_min
     cc_max = config.args.cc_max
+    include_invalid = getattr(config.args, 'include_invalid', False)
     try:
         count = run_with_spinner(
             'Counting matching pairs...',
             lambda: count_pairs_up_to(
-                cc_min, cc_max, _PAIRS_WARNING_THRESHOLD
+                cc_min, cc_max, _PAIRS_WARNING_THRESHOLD,
+                include_invalid=include_invalid
             ),
         )
         if (
@@ -141,7 +162,7 @@ def print_pairs():
             and not getattr(config.args, 'force', False)
         ):
             _ask_large_dataset_confirmation()
-        _print_pairs_table(cc_min, cc_max, count)
+        _print_pairs_table(cc_min, cc_max, count, include_invalid)
     except (
         DatabaseCorruptError,
         FileNotFoundError,
@@ -153,15 +174,18 @@ def print_pairs():
         rq_exit(1)
 
 
-def _print_pairs_table(cc_min, cc_max, count):
+def _print_pairs_table(cc_min, cc_max, count, include_invalid=False):
     """Display pairs, using in-memory mode for small result sets."""
     if count <= _PAIRS_WARNING_THRESHOLD:
         pairs = run_with_spinner(
             f'Loading {count} pairs...',
-            lambda: read_pairs(cc_min=cc_min, cc_max=cc_max),
+            lambda: read_pairs(
+                cc_min=cc_min, cc_max=cc_max,
+                include_invalid=include_invalid
+            ),
         )
-        rows = [_row_from_pair(p) for p in pairs]
-        headers_fmt = [(f, None) for f in _PAIRS_FIELDS]
+        rows = [_row_from_pair(p, include_invalid) for p in pairs]
+        headers_fmt = [(f, None) for f in _pairs_fields(include_invalid)]
         _display_table(
             headers_fmt, rows,
             row_label='Pairs',
@@ -171,7 +195,10 @@ def _print_pairs_table(cc_min, cc_max, count):
         )
     else:
         # Use database-backed pager for large result sets.
-        db_source = _build_pairs_db_source(cc_min, cc_max, count)
+        db_source = _build_pairs_db_source(
+            cc_min, cc_max, include_invalid=include_invalid,
+            total_count=count
+        )
         _display_table(
             None, data_source=db_source,
             row_label='Pairs',

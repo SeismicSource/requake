@@ -43,7 +43,7 @@ def print_catalog():
             ev.depth,
             ev.mag_type,
             ev.mag,
-            'yes' if ev.duplicate else ''
+            ev.duplicate
         ]
         for ev in catalog
     ]

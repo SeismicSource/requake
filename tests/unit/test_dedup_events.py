@@ -145,6 +145,21 @@ class TestDedupEvents(unittest.TestCase):
         with patch.object(dedup_module, 'logger'):
             dedup_events()
 
+    def test_include_invalid_reads_all_pairs(self):
+        """Pairs flagged as invalid can be read back on demand."""
+        events = self._events()
+        with self._patch_config():
+            self._seed_db(events)
+            self._run_dedup()
+            valid_pairs = list(read_pairs_from_db())
+            all_pairs = list(read_pairs_from_db(include_invalid=True))
+            n_invalid = sum(pair.invalid for pair in all_pairs)
+
+        self.assertEqual(len(valid_pairs), 1)
+        self.assertFalse(valid_pairs[0].invalid)
+        self.assertEqual(len(all_pairs), 4)
+        self.assertEqual(n_invalid, 3)
+
     def test_dedup_events_keeps_highest_magnitude(self):
         """The lowest-magnitude event of a close pair is flagged."""
         events = self._events()
