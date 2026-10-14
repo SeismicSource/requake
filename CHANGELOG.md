@@ -4,7 +4,7 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
-- New ``deduplicate_pairs`` command: detects events that are likely
+- New ``dedup_events`` command: detects events that are likely
   duplicates of each other, based on event pairs with high
   cross-correlation coefficient which are also close in time and space.
   One event per duplicate group is kept, the others are flagged as

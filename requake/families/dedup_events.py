@@ -271,7 +271,7 @@ def _print_report(report):
         _print_groups_table(report['groups_info'])
 
 
-def deduplicate_pairs():
+def dedup_events():
     """Find duplicate events from close pairs and flag them."""
     cc_min = config.args.cc_min
     max_time_diff = config.args.max_time_diff

@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Unit tests for the ``deduplicate_pairs`` command.
+Unit tests for the ``dedup_events`` command.
 
 :copyright:
     2021-2026 Claudio Satriano <satriano@ipgp.fr>
@@ -28,16 +28,16 @@ from requake.database.pairs import (
     write_pair_records as write_pairs,
 )
 from requake.families import build_families
-from requake.families.deduplicate_pairs import deduplicate_pairs
+from requake.families.dedup_events import dedup_events
 from requake.families.pairs import read_events_from_pairs
 
 
 dedup_module = importlib.import_module(
-    'requake.families.deduplicate_pairs'
+    'requake.families.dedup_events'
 )
 
 
-class TestDeduplicatePairs(unittest.TestCase):
+class TestDedupEvents(unittest.TestCase):
     """Test duplicate-event detection and flagging."""
 
     def setUp(self):
@@ -138,11 +138,11 @@ class TestDeduplicatePairs(unittest.TestCase):
         return row[0]
 
     def _run_dedup(self):
-        """Run deduplicate_pairs() with a patched logger."""
+        """Run dedup_events() with a patched logger."""
         with patch.object(dedup_module, 'logger'):
-            deduplicate_pairs()
+            dedup_events()
 
-    def test_deduplicate_pairs_keeps_highest_magnitude(self):
+    def test_dedup_events_keeps_highest_magnitude(self):
         """The lowest-magnitude event of a close pair is flagged."""
         events = self._events()
         with self._patch_config():
@@ -162,7 +162,7 @@ class TestDeduplicatePairs(unittest.TestCase):
         )
         self.assertEqual(n_invalid, 3)
 
-    def test_deduplicate_pairs_dry_run(self):
+    def test_dedup_events_dry_run(self):
         """A dry run must not modify the database."""
         events = self._events()
         with self._patch_config(dry_run=True):
@@ -195,7 +195,7 @@ class TestDeduplicatePairs(unittest.TestCase):
         self.assertNotIn('ev_a', pair_evids)
         self.assertIn('ev_b', pair_evids)
 
-    def test_deduplicate_pairs_is_idempotent(self):
+    def test_dedup_events_is_idempotent(self):
         """A second run must not flag additional pairs as invalid."""
         events = self._events()
         with self._patch_config():

@@ -60,7 +60,7 @@ The ``catalog`` table stores events read by ``requake read_catalog``.
      duplicate       INTEGER NOT NULL DEFAULT 0
    )
 
-The ``duplicate`` column is set to ``1`` by ``requake deduplicate_pairs``
+The ``duplicate`` column is set to ``1`` by ``requake dedup_events``
 for events that are considered duplicates of another catalog event.
 
 Event Keys Table
@@ -129,7 +129,7 @@ Lag in seconds is reconstructed at read time from ``lag_samples`` and
 ``cc_x100`` stores ``cc_max`` with 0.01 precision using
 ``round(cc_max * 100)``.
 
-The ``invalid`` column is set to ``1`` by ``requake deduplicate_pairs``
+The ``invalid`` column is set to ``1`` by ``requake dedup_events``
 for all the pairs involving a duplicated event.  Invalid pairs are
 ignored when families are built and when pairs are printed.
 

@@ -397,30 +397,31 @@ def parse_arguments(progname='requake'):
         help='skip the large-dataset warning'
     )
     # ---
-    # --- deduplicate_pairs
-    deduplicate_pairs = subparser.add_parser(
-        'deduplicate_pairs',
-        help='detect and flag duplicate events from close event pairs'
+    # --- dedup_events
+    dedup_events = subparser.add_parser(
+        'dedup_events',
+        help='detect and flag duplicate events in the catalog from close '
+             'event pairs'
     )
-    deduplicate_pairs.add_argument(
+    dedup_events.add_argument(
         '-c', '--cc_min',
         type=float, default=0.98,
         help='minimum cross-correlation coefficient for two events to be '
              'considered duplicates (default: %(default)s)'
     )
-    deduplicate_pairs.add_argument(
+    dedup_events.add_argument(
         '-t', '--max-time-diff',
         type=float, default=60., metavar='SECONDS',
         help='maximum origin-time difference for two events to be '
              'considered duplicates (default: %(default)s s)'
     )
-    deduplicate_pairs.add_argument(
+    dedup_events.add_argument(
         '-d', '--max-distance',
         type=float, default=2., metavar='KM',
         help='maximum horizontal distance for two events to be '
              'considered duplicates (default: %(default)s km)'
     )
-    deduplicate_pairs.add_argument(
+    dedup_events.add_argument(
         '-n', '--dry-run', action='store_true',
         help='only print the report, without modifying the database'
     )

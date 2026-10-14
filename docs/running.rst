@@ -23,7 +23,8 @@ Different commands are available:
    print_catalog       print the event catalog to screen
    scan_catalog        scan an existing catalog for earthquake pairs
    print_pairs         print pairs to screen
-   deduplicate_pairs   detect and flag duplicate events from close event pairs
+   dedup_events        detect and flag duplicate events in the catalog from
+                       close event pairs
    plot_pair           plot traces for a given event pair
    build_families      build families of repeating earthquakes from a catalog
                        of pairs
@@ -139,7 +140,7 @@ families, they can be flagged before building families:
 
 .. code-block::
 
-   requake deduplicate_pairs
+   requake dedup_events
 
 The command looks for event pairs with a high cross-correlation
 coefficient which are also close in time and space: these are very
@@ -165,7 +166,7 @@ Use ``-n``/``--dry-run`` to print the report without modifying the
 database.
 
 Note that a full re-scan of the catalog (``requake scan_catalog`` with
-overwrite) recreates the event pairs, so ``requake deduplicate_pairs``
+overwrite) recreates the event pairs, so ``requake dedup_events``
 must be run again afterwards.
 
 
