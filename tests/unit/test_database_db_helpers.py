@@ -29,6 +29,7 @@ from requake.database.db import (
     execute_with_retry,
     get_db_connection,
     get_db_path,
+    is_abort_interruption,
     set_db_version,
 )
 from requake.database.pairs import DatabaseCorruptError, read_pairs
@@ -133,6 +134,24 @@ class TestDatabaseDbHelpers(unittest.TestCase):
                     conn.execute(_LONG_QUERY).fetchone()
             finally:
                 conn.close()
+
+    def test_abort_interruption_is_recognized(self):
+        """An interrupted query must be recognized as a user abort."""
+        self.addCleanup(request_abort, False)
+        err = sqlite3.OperationalError('interrupted')
+        request_abort(False)
+        self.assertFalse(is_abort_interruption(err))
+        request_abort()
+        self.assertTrue(is_abort_interruption(err))
+
+    def test_only_interruption_errors_are_recognized(self):
+        """Other errors must never be mistaken for an abort."""
+        self.addCleanup(request_abort, False)
+        request_abort()
+        self.assertFalse(
+            is_abort_interruption(sqlite3.OperationalError('no such table'))
+        )
+        self.assertFalse(is_abort_interruption(ValueError('interrupted')))
 
     def test_execute_with_retry_non_retryable_error(self):
         """Non-retryable sqlite errors should surface immediately."""

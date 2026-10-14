@@ -25,6 +25,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   (pressed twice within 2 seconds): the running query is stopped and its
   database connection is closed, so that no stray ``-wal``/``-shm``
   files are left behind.
+- Interrupting a query is no longer reported as a bug in Requake: the
+  abort exits cleanly, as any other ``Ctrl+C`` abort.
 - Stylized ``◀◀ RƎQuake`` logo, shown in the command line help.
 - Colored terminal output for help and usage messages, log messages,
   errors, table headers and waveform-cache diagnostics. Colors are used

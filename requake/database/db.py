@@ -119,6 +119,28 @@ def _abort_check():
     return int(abort_requested())
 
 
+def is_abort_interruption(err):
+    """
+    Return True when *err* is an interrupted query caused by an abort.
+
+    SQLite reports an abort requested through the progress handler as
+    an ``interrupted`` error and, more importantly, converts to it any
+    exception raised by the handler itself — including the
+    ``SystemExit`` raised by the SIGINT handler — so an aborted query
+    must be recognized here, or it would be mistaken for a bug.
+
+    :param err: the exception raised by the aborted query
+    :type err: Exception
+    :return: whether the error is an abort interruption
+    :rtype: bool
+    """
+    return (
+        abort_requested()
+        and isinstance(err, sqlite3.OperationalError)
+        and str(err).strip().lower() == 'interrupted'
+    )
+
+
 def _is_retryable_sqlite_error(err):
     """Return True when sqlite error is transient and retryable."""
     message = str(err).lower()

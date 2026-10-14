@@ -44,6 +44,10 @@ SIGINT_CONFIRM_WINDOW_S = 2.0
 SIGINT_PAUSE_POLL_S = 0.05
 _LAST_SIGINT_TS = None
 _SIGINT_PAUSE_UNTIL_TS = None
+# The abort message must be shown only once, even when the abort exits
+# through several layers (the SIGINT handler and, afterwards, the code
+# that catches the interrupted query).
+_ABORT_MESSAGE_PRINTED = False
 
 
 def _check_library_versions():
@@ -328,8 +332,11 @@ def configure(args):
 
 def rq_exit(retval=0, abort=False, progname='requake'):
     """Exit as gracefully as possible."""
+    global _ABORT_MESSAGE_PRINTED  # pylint: disable=global-statement
     if abort:
-        print(style('\nAborting.', 'bold', 'yellow'))
+        if not _ABORT_MESSAGE_PRINTED:
+            print(style('\nAborting.', 'bold', 'yellow'))
+            _ABORT_MESSAGE_PRINTED = True
         if logger is not None:
             logger.debug(f'{progname} ABORTED\n\n')
     elif logger is not None:

@@ -89,5 +89,11 @@ def main():
         run()
     # pylint: disable=broad-except
     except Exception as err:
+        # pylint: disable=import-outside-toplevel
+        from .database.db import is_abort_interruption
+        if is_abort_interruption(err):
+            # An aborted query is not a bug: exit like any other abort.
+            from .config.rq_setup import rq_exit
+            rq_exit(1, abort=True)
         from .config.utils import manage_uncaught_exception
         manage_uncaught_exception(err)
