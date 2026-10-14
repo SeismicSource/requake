@@ -4,36 +4,21 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
-- New ``dedup_events`` command: detects events that are likely
-  duplicates of each other, based on event pairs with high
-  cross-correlation coefficient which are also close in time and space.
-  One event per duplicate group is kept, the others are flagged as
-  duplicated in the catalog (new ``duplicate`` column) and all the pairs
-  involving them are flagged as invalid (new ``invalid`` column in
-  ``event_pairs``). A compact report is printed at the end, and
-  ``-n``/``--dry-run`` only prints the report. ``build_families`` now
-  ignores pairs flagged as invalid.
-- ``dedup_events --reset`` clears the duplicate and the invalid flags
-  and exits, without performing duplicate detection.
-- ``print_pairs`` hides pairs flagged as invalid by default; the new
-  ``--include-invalid`` option lists them as well, adding an ``invalid``
-  column to the table.
-- Fixed the non-paged table output (``--no-pager``): when a table was
-  printed in more than one batch, all the batches but the last one were
-  replaced by their header, so most of the rows were lost.
-- Long database operations can now be interrupted with ``Ctrl+C``
-  (pressed twice within 2 seconds): the running query is stopped and its
-  database connection is closed, so that no stray ``-wal``/``-shm``
-  files are left behind.
-- Interrupting a query is no longer reported as a bug in Requake: the
-  abort exits cleanly, as any other ``Ctrl+C`` abort.
-- Long-running operations now show an animated progress indicator on
-  the terminal, instead of a static message: reading the event catalog
-  and the event pairs, looking for duplicate events and flagging them
-  (``dedup_events``), reading the events from the event pairs and
-  building the families (``build_families``), reading or downloading
-  the event catalog (``read_catalog``), downloading station metadata
-  and loading the existing pair IDs (``scan_catalog``).
+- New ``dedup_events`` command: flags likely duplicate events (event
+  pairs with high cross-correlation, close in time and space) with the
+  new ``duplicate`` column in the catalog, and marks all the pairs
+  involving them as invalid (new ``invalid`` column in ``event_pairs``);
+  ``build_families`` ignores the invalid pairs. A compact report is
+  printed at the end (``-n``/``--dry-run`` only prints it) and
+  ``--reset`` clears the flags.
+- ``print_pairs`` hides the invalid pairs by default; the new
+  ``--include-invalid`` option lists them as well.
+- Long operations now show a progress indicator, and long database
+  queries can be interrupted with ``Ctrl+C`` (pressed twice): the
+  database is closed cleanly (no stray ``-wal``/``-shm`` files) and the
+  abort is no longer reported as a bug.
+- Fixed the non-paged table output (``--no-pager``), which dropped all
+  the rows but the last batch.
 - Stylized ``◀◀ RƎQuake`` logo, shown in the command line help.
 - Colored terminal output for help and usage messages, log messages,
   errors, table headers and waveform-cache diagnostics. Colors are used
