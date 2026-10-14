@@ -297,6 +297,59 @@ def status(msg):
     sys.stderr.flush()
 
 
+# Maximum time (in seconds) to wait for an aborted operation to stop, so
+# that it can release its resources (e.g. close its database connection)
+# before the process exits.
+ABORT_JOIN_TIMEOUT_S = 5.0
+
+_abort_requested = False
+
+
+def request_abort(abort=True):
+    """
+    Request (or clear) a pending abort.
+
+    Long-running operations poll this flag — including through a SQLite
+    progress handler — and stop as soon as possible. Note that the flag
+    is global: while it is set, every running database query is
+    interrupted, so callers that abort a single operation must clear it
+    once that operation has stopped (see :func:`abort_operation`).
+
+    :param abort: whether an abort is requested
+    :type abort: bool
+    """
+    global _abort_requested  # pylint: disable=global-statement
+    _abort_requested = abort
+
+
+def abort_requested():
+    """
+    Return True when an abort has been requested.
+
+    :return: whether an abort is pending
+    :rtype: bool
+    """
+    return _abort_requested
+
+
+def abort_operation(thread):
+    """
+    Request the operation running in *thread* to stop and wait for it.
+
+    Waiting gives the operation the chance to release its resources
+    (e.g. close its database connection, so that no ``-wal``/``-shm``
+    files are left behind). The abort request is cleared before
+    returning, since the process might keep running (e.g. after a pager
+    popup has been cancelled).
+
+    :param thread: the thread running the operation to abort
+    :type thread: threading.Thread
+    """
+    request_abort()
+    thread.join(timeout=ABORT_JOIN_TIMEOUT_S)
+    request_abort(False)
+
+
 def run_with_spinner(message, func):
     r"""Run *func* in a thread, showing a braille spinner on stderr.
 
@@ -331,8 +384,10 @@ def run_with_spinner(message, func):
         # Clear the spinner line.
         print('\r' + ' ' * 79, file=sys.stderr, end='\r')
         sys.stderr.flush()
-    except KeyboardInterrupt:
-        # Leave a clean line after the spinner.
+    except (KeyboardInterrupt, SystemExit):
+        # Leave a clean line after the spinner and stop the running
+        # operation, waiting for it to release its resources.
+        abort_operation(thread)
         print(file=sys.stderr)
         sys.stderr.flush()
         raise

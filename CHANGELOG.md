@@ -21,6 +21,10 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 - Fixed the non-paged table output (``--no-pager``): when a table was
   printed in more than one batch, all the batches but the last one were
   replaced by their header, so most of the rows were lost.
+- Long database operations can now be interrupted with ``Ctrl+C``
+  (pressed twice within 2 seconds): the running query is stopped and its
+  database connection is closed, so that no stray ``-wal``/``-shm``
+  files are left behind.
 - Stylized ``◀◀ RƎQuake`` logo, shown in the command line help.
 - Colored terminal output for help and usage messages, log messages,
   errors, table headers and waveform-cache diagnostics. Colors are used

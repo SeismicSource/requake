@@ -171,7 +171,10 @@ The flags can be cleared with ``--reset``, which resets the ``duplicate``
 column of the catalog and the ``invalid`` column of the event pairs, and
 exits without performing duplicate detection (combine with ``-n`` to only
 report what would be cleared).  Since it scans the whole event-pairs
-table, it can take a while on large catalogs.  For example:
+table, it can take a while on large catalogs.  Long database
+operations like this one can be interrupted with ``Ctrl+C`` (press it
+twice within 2 seconds to confirm): the running query is stopped and
+the database is closed cleanly.  For example:
 
 .. code-block::
 

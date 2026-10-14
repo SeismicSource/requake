@@ -24,7 +24,7 @@ from ..terminal import color_enabled, style
 from .config import config
 from .utils import (
     parse_configspec, read_config, validate_config, write_sample_config,
-    update_config_file, write_ok
+    update_config_file, write_ok, request_abort
 )
 # Note: modules are lazily imported to speed up the startup time.
 # pylint: disable=relative-beyond-top-level,import-outside-toplevel
@@ -352,6 +352,7 @@ def sigint_handler(_sig, _frame):
         _LAST_SIGINT_TS is not None
         and now - _LAST_SIGINT_TS <= SIGINT_CONFIRM_WINDOW_S
     ):
+        request_abort()
         rq_exit(1, abort=True)
     _LAST_SIGINT_TS = now
     _SIGINT_PAUSE_UNTIL_TS = now + SIGINT_CONFIRM_WINDOW_S

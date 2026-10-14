@@ -21,6 +21,7 @@ from obspy import UTCDateTime
 
 from requake.catalog import RequakeEvent
 from requake.config.config import config
+from requake.config.utils import request_abort
 from requake.database.catalog import read_catalog, write_catalog
 from requake.database.db import (
     check_db_exists,
@@ -31,6 +32,14 @@ from requake.database.db import (
     set_db_version,
 )
 from requake.database.pairs import DatabaseCorruptError, read_pairs
+
+
+# Long-running query, used to check that a pending abort interrupts it.
+_LONG_QUERY = (
+    'WITH RECURSIVE series(x) AS ('
+    'SELECT 1 UNION ALL SELECT x + 1 FROM series WHERE x < 1000000) '
+    'SELECT COUNT(*) FROM series'
+)
 
 
 class TestDatabaseDbHelpers(unittest.TestCase):
@@ -99,6 +108,29 @@ class TestDatabaseDbHelpers(unittest.TestCase):
                 cursor.execute('PRAGMA foreign_keys')
                 row = cursor.fetchone()
                 self.assertEqual(row[0], 1)
+            finally:
+                conn.close()
+
+    def test_no_abort_lets_long_running_query_complete(self):
+        """Queries should run normally when no abort is pending."""
+        request_abort(False)
+        with self._patch_runtime_config():
+            conn = get_db_connection(initdb=True)
+            try:
+                row = conn.execute(_LONG_QUERY).fetchone()
+            finally:
+                conn.close()
+        self.assertEqual(row[0], 1000000)
+
+    def test_abort_request_interrupts_long_running_query(self):
+        """A pending abort should interrupt a long-running query."""
+        self.addCleanup(request_abort, False)
+        with self._patch_runtime_config():
+            conn = get_db_connection(initdb=True)
+            try:
+                request_abort()
+                with self.assertRaises(sqlite3.OperationalError):
+                    conn.execute(_LONG_QUERY).fetchone()
             finally:
                 conn.close()
 

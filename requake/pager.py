@@ -23,6 +23,7 @@ import threading
 import time
 from contextlib import suppress
 
+from .config.utils import abort_operation
 from .terminal import color_enabled
 
 
@@ -531,6 +532,11 @@ def _run_with_busy_popup(stdscr, message, operation):
                 abort_since[0] = time.monotonic()
             else:
                 abort_pending[0] = False
+    except KeyboardInterrupt:
+        # Stop the running operation and wait for it, so that it can
+        # release its resources (e.g. close its database connection).
+        abort_operation(thread)
+        raise
     finally:
         with suppress(curses.error):
             stdscr.nodelay(False)

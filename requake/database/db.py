@@ -15,10 +15,14 @@ import random
 import sqlite3
 import time
 from ..config.config import config
+from ..config.utils import abort_requested
 
 DB_VERSION = 1
 DB_FILENAME = 'requake.sqlite'
 BUSY_TIMEOUT_MS = 30000
+# Number of SQLite virtual-machine instructions between two calls to the
+# abort-progress handler.
+ABORT_CHECK_INTERVAL = 100000
 MAX_RETRIES = 6
 RETRY_BASE_DELAY = 0.05
 RETRY_MULTIPLIER = 2.0
@@ -110,6 +114,11 @@ def _configure_connection(conn):
     conn.execute('PRAGMA journal_mode = WAL')
 
 
+def _abort_check():
+    """Progress handler that aborts the running query on request."""
+    return int(abort_requested())
+
+
 def _is_retryable_sqlite_error(err):
     """Return True when sqlite error is transient and retryable."""
     message = str(err).lower()
@@ -155,6 +164,7 @@ def get_db_connection(initdb=False, db_path=None):
     conn = sqlite3.connect(db_path)
     _configure_connection(conn)
     conn.row_factory = sqlite3.Row
+    conn.set_progress_handler(_abort_check, ABORT_CHECK_INTERVAL)
     cursor = conn.cursor()
     if initdb:
         initialize_database(cursor)
