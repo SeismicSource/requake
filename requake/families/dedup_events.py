@@ -20,18 +20,31 @@ import logging
 from tabulate import tabulate
 from obspy.geodetics import gps2dist_azimuth
 from ..config import config, rq_exit
+from ..config.utils import run_with_spinner
 from ..catalog import read_stored_catalog
 from ..terminal import style
 from ..database.db import DatabaseCorruptError, get_db_path
-from ..database.catalog import update_events_duplicate
+from ..database.catalog import (
+    count_duplicate_events,
+    reset_duplicate_flags,
+    update_events_duplicate,
+)
 from ..database.pairs import (
     PairsMetadataError,
     PairsSchemaError,
     PairsTableNotFoundError,
+    count_invalid_pairs,
     mark_duplicate_pairs_invalid,
     read_pairs,
+    reset_invalid_pair_flags,
 )
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
+
+
+# Maximum number of table rows and duplicate event IDs per row printed
+# in the final report, to keep it compact for large catalogs.
+_MAX_REPORT_ROWS = 20
+_MAX_REPORT_EVIDS = 10
 
 
 class _UnionFind:
@@ -199,14 +212,30 @@ def _group_duplicates(groups, events):
     return groups_info, duplicate_evids
 
 
+def _table_title(name, count):
+    """Return a table title, mentioning truncation when needed."""
+    if count > _MAX_REPORT_ROWS:
+        return f'{name} (first {_MAX_REPORT_ROWS} of {count})'
+    return name
+
+
+def _compact_evids(evids):
+    """Return a compact string for a list of event IDs."""
+    if len(evids) <= _MAX_REPORT_EVIDS:
+        return ', '.join(evids)
+    shown = ', '.join(evids[:_MAX_REPORT_EVIDS])
+    remaining = len(evids) - _MAX_REPORT_EVIDS
+    return f'{shown}, ... (+{remaining} more)'
+
+
 def _print_pairs_table(duplicate_pairs, duplicate_evids):
-    """Print the table of duplicate-suspect event pairs."""
+    """Print a (possibly truncated) table of duplicate event pairs."""
     headers = [
         'evid1', 'evid2', 'cc max', 'time diff (s)',
         'distance (km)', 'duplicate evid'
     ]
     rows = []
-    for entry in duplicate_pairs:
+    for entry in duplicate_pairs[:_MAX_REPORT_ROWS]:
         duplicated = ','.join(
             evid for evid in (entry['evid1'], entry['evid2'])
             if evid in duplicate_evids
@@ -215,6 +244,7 @@ def _print_pairs_table(duplicate_pairs, duplicate_evids):
             entry['evid1'], entry['evid2'], entry['cc_max'],
             entry['time_diff'], entry['distance_km'], duplicated,
         ])
+    print(style(_table_title('Duplicate pairs', len(duplicate_pairs)), 'bold'))
     print(tabulate(
         rows, headers=headers, tablefmt='simple',
         floatfmt=('.6g', '.6g', '.2f', '.3f', '.3f', '.6g'),
@@ -222,12 +252,15 @@ def _print_pairs_table(duplicate_pairs, duplicate_evids):
 
 
 def _print_groups_table(groups_info):
-    """Print the table of duplicate groups."""
+    """Print a (possibly truncated) table of duplicate groups."""
     headers = ['group', 'kept evid', 'duplicate evids']
     rows = [
-        [index, kept_evid, ', '.join(duplicates)]
-        for index, (kept_evid, duplicates) in enumerate(groups_info, start=1)
+        [index, kept_evid, _compact_evids(duplicates)]
+        for index, (kept_evid, duplicates) in enumerate(
+            groups_info[:_MAX_REPORT_ROWS], start=1
+        )
     ]
+    print(style(_table_title('Duplicate groups', len(groups_info)), 'bold'))
     print(tabulate(rows, headers=headers, tablefmt='simple'))
 
 
@@ -261,22 +294,72 @@ def _print_report(report):
         print(f'Event pairs flagged as invalid: {report["n_invalid"]}')
     if report['duplicate_pairs']:
         print()
-        print(style('Duplicate pairs', 'bold'))
         _print_pairs_table(
             report['duplicate_pairs'], report['duplicate_evids']
         )
     if report['groups_info']:
         print()
-        print(style('Duplicate groups', 'bold'))
         _print_groups_table(report['groups_info'])
+
+
+def _reset_flags(dry_run):
+    """
+    Reset the duplicate and invalid flags.
+
+    This scans the whole event-pairs table, so on large catalogs it can
+    take a while: an animated progress indicator is shown while it runs.
+
+    :param dry_run: when True, only count the flagged rows
+    :type dry_run: bool
+    :return: a ``(n_events, n_pairs)`` tuple
+    :rtype: tuple
+    """
+    if dry_run:
+        return run_with_spinner(
+            'Counting flagged events and invalid event pairs...',
+            lambda: (count_duplicate_events(), count_invalid_pairs()),
+        )
+    return run_with_spinner(
+        'Resetting duplicate and invalid flags...',
+        lambda: (reset_duplicate_flags(), reset_invalid_pair_flags()),
+    )
+
+
+def _print_reset_report(n_events, n_pairs, dry_run):
+    """Print the flag-reset report to screen."""
+    title = 'Duplicate events report'
+    print()
+    print(style(title, 'bold'))
+    print('-' * len(title))
+    if dry_run:
+        print('Reset mode: duplicate and invalid flags would be cleared, '
+              'no detection performed.')
+        print(f'Catalog events to un-flag: {n_events}')
+        print(f'Event pairs to un-flag: {n_pairs}')
+        print(style('Dry run: the database was not modified.', 'dim'))
+    else:
+        print('Reset mode: duplicate and invalid flags cleared, '
+              'no detection performed.')
+        print(f'Catalog events un-flagged: {n_events}')
+        print(f'Event pairs un-flagged: {n_pairs}')
 
 
 def dedup_events():
     """Find duplicate events from close pairs and flag them."""
+    dry_run = config.args.dry_run
+    if config.args.reset:
+        n_events, n_pairs = _reset_flags(dry_run)
+        _print_reset_report(n_events, n_pairs, dry_run)
+        if dry_run:
+            logger.info(
+                f'{n_events} events and {n_pairs} event pairs would be reset'
+            )
+        else:
+            logger.info(f'{n_events} events and {n_pairs} event pairs reset')
+        return
     cc_min = config.args.cc_min
     max_time_diff = config.args.max_time_diff
     max_distance_km = config.args.max_distance
-    dry_run = config.args.dry_run
     logger.info('Reading event catalog...')
     try:
         catalog = read_stored_catalog()

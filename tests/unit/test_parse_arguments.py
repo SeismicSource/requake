@@ -56,6 +56,12 @@ class TestPrintFormat(unittest.TestCase):
         self._assert_format_disables_pager('print_catalog', 'csv')
         self._assert_format_disables_pager('print_pairs', 'csv')
 
+    def test_reset_option(self):
+        """``--reset`` must be off by default for dedup_events."""
+        self.assertFalse(_parse_args('dedup_events').reset)
+        self.assertTrue(_parse_args('dedup_events', '--reset').reset)
+        self.assertTrue(_parse_args('dedup_events', '--reset', '-n').dry_run)
+
 
 class TestDedupEventsOptions(unittest.TestCase):
     """Test the ``dedup_events`` command line options."""

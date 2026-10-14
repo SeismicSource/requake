@@ -10,9 +10,11 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   One event per duplicate group is kept, the others are flagged as
   duplicated in the catalog (new ``duplicate`` column) and all the pairs
   involving them are flagged as invalid (new ``invalid`` column in
-  ``event_pairs``). A report is printed at the end, and
+  ``event_pairs``). A compact report is printed at the end, and
   ``-n``/``--dry-run`` only prints the report. ``build_families`` now
   ignores pairs flagged as invalid.
+- ``dedup_events --reset`` clears the duplicate and the invalid flags
+  and exits, without performing duplicate detection.
 - Stylized ``◀◀ RƎQuake`` logo, shown in the command line help.
 - Colored terminal output for help and usage messages, log messages,
   errors, table headers and waveform-cache diagnostics. Colors are used

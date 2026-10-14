@@ -178,3 +178,60 @@ def update_events_duplicate(evids, duplicate=True, db_path=None):
     finally:
         conn.close()
     return changed
+
+
+def reset_duplicate_flags(db_path=None):
+    """
+    Clear the duplicate flag for all the events in the catalog.
+
+    :param db_path: path to the database file
+    :type db_path: str or None
+    :return: number of catalog rows changed
+    :rtype: int
+    """
+    conn = get_db_connection(initdb=False, db_path=db_path)
+    try:
+        cursor = conn.cursor()
+        try:
+            execute_with_retry(
+                lambda: cursor.execute(
+                    f'UPDATE {CATALOG_TABLE} SET duplicate = 0 '
+                    'WHERE duplicate != 0'
+                ),
+                'reset event duplicate flags',
+            )
+            changed = cursor.rowcount
+        except sqlite3.OperationalError as err:
+            if MISSING_CATALOG_TABLE in str(err):
+                return 0
+            raise
+        conn.commit()
+    finally:
+        conn.close()
+    return changed
+
+
+def count_duplicate_events(db_path=None):
+    """
+    Return the number of events flagged as duplicate.
+
+    :param db_path: path to the database file
+    :type db_path: str or None
+    :return: number of duplicated events
+    :rtype: int
+    """
+    conn = get_db_connection(initdb=False, db_path=db_path)
+    try:
+        cursor = conn.cursor()
+        try:
+            row = cursor.execute(
+                f'SELECT COUNT(*) FROM {CATALOG_TABLE} '
+                'WHERE duplicate != 0'
+            ).fetchone()
+        except sqlite3.OperationalError as err:
+            if MISSING_CATALOG_TABLE in str(err):
+                return 0
+            raise
+        return row[0]
+    finally:
+        conn.close()

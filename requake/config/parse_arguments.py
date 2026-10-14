@@ -425,6 +425,11 @@ def parse_arguments(progname='requake'):
         '-n', '--dry-run', action='store_true',
         help='only print the report, without modifying the database'
     )
+    dedup_events.add_argument(
+        '--reset', action='store_true',
+        help='reset the duplicate and invalid flags and exit, without '
+             'performing duplicate detection'
+    )
     # ---
     # --- traceid
     #     a parent parser for the "traceid" option,

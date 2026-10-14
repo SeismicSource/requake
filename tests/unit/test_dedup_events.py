@@ -10,10 +10,12 @@ Unit tests for the ``dedup_events`` command.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 
+import io
 import unittest
 import tempfile
 import sqlite3
 import importlib
+import contextlib
 from argparse import Namespace
 from unittest.mock import patch
 from obspy import UTCDateTime
@@ -97,7 +99,7 @@ class TestDedupEvents(unittest.TestCase):
             append=False,
         )
 
-    def _patch_config(self, dry_run=False):
+    def _patch_config(self, dry_run=False, reset=False):
         """Patch the global config for the temporary database."""
         args = Namespace(
             outdir=self.test_dir.name,
@@ -105,6 +107,7 @@ class TestDedupEvents(unittest.TestCase):
             max_time_diff=60.,
             max_distance=2.,
             dry_run=dry_run,
+            reset=reset,
         )
         return patch.dict(
             config,
@@ -208,6 +211,40 @@ class TestDedupEvents(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(second, 3)
 
+    def test_reset_clears_flags(self):
+        """The reset mode must clear the duplicate and invalid flags."""
+        events = self._events()
+        with self._patch_config():
+            self._seed_db(events)
+            self._run_dedup()
+            flags_after_dedup = self._duplicate_flags()
+            n_invalid_after_dedup = self._invalid_pair_count()
+        with self._patch_config(reset=True):
+            self._run_dedup()
+            flags_after_reset = self._duplicate_flags()
+            n_invalid_after_reset = self._invalid_pair_count()
+            remaining = list(read_pairs_from_db())
+
+        self.assertTrue(flags_after_dedup['ev_a'])
+        self.assertEqual(n_invalid_after_dedup, 3)
+        self.assertFalse(any(flags_after_reset.values()))
+        self.assertEqual(n_invalid_after_reset, 0)
+        self.assertEqual(len(remaining), 4)
+
+    def test_reset_dry_run_keeps_flags(self):
+        """The reset mode with --dry-run must not modify the database."""
+        events = self._events()
+        with self._patch_config():
+            self._seed_db(events)
+            self._run_dedup()
+        with self._patch_config(reset=True, dry_run=True):
+            self._run_dedup()
+            flags = self._duplicate_flags()
+            n_invalid = self._invalid_pair_count()
+
+        self.assertTrue(flags['ev_a'])
+        self.assertEqual(n_invalid, 3)
+
     def test_schema_exposes_new_flags(self):
         """The catalog and event_pairs tables must expose the new flags."""
         events = self._events()
@@ -228,6 +265,63 @@ class TestDedupEvents(unittest.TestCase):
             conn.close()
         self.assertIn('duplicate', catalog_columns)
         self.assertIn('invalid', pair_columns)
+
+
+class TestReportCompaction(unittest.TestCase):
+    """Test the compactness of the final report."""
+
+    def test_table_title_mentions_truncation(self):
+        """Titles mention truncation only when the table is truncated."""
+        max_rows = dedup_module._MAX_REPORT_ROWS
+        self.assertEqual(
+            dedup_module._table_title('Duplicate pairs', 3),
+            'Duplicate pairs',
+        )
+        self.assertEqual(
+            dedup_module._table_title('Duplicate pairs', max_rows + 5),
+            f'Duplicate pairs (first {max_rows} of {max_rows + 5})',
+        )
+
+    def test_compact_evids_truncates_long_lists(self):
+        """Long lists of event IDs are truncated."""
+        max_evids = dedup_module._MAX_REPORT_EVIDS
+        evids = [f'ev_{i:03d}' for i in range(max_evids + 5)]
+        text = dedup_module._compact_evids(evids)
+        self.assertIn('ev_000', text)
+        self.assertIn('+5 more', text)
+        self.assertNotIn(evids[-1], text)
+        self.assertEqual(dedup_module._compact_evids(['ev_a']), 'ev_a')
+
+    def test_pairs_table_is_capped(self):
+        """The duplicate pairs table shows at most _MAX_REPORT_ROWS rows."""
+        max_rows = dedup_module._MAX_REPORT_ROWS
+        pairs = [
+            {
+                'evid1': f'ev_a{i}', 'evid2': f'ev_b{i}',
+                'cc_max': 0.99, 'time_diff': 0.5, 'distance_km': 0.1,
+            }
+            for i in range(max_rows + 5)
+        ]
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            dedup_module._print_pairs_table(pairs, {'ev_a0'})
+        lines = out.getvalue().strip().split('\n')
+        self.assertIn(f'first {max_rows} of {max_rows + 5}', lines[0])
+        self.assertEqual(len(lines), max_rows + 3)  # + header, sep, trailer
+
+    def test_groups_table_is_capped(self):
+        """The duplicate groups table shows at most _MAX_REPORT_ROWS rows."""
+        max_rows = dedup_module._MAX_REPORT_ROWS
+        groups_info = [
+            (f'kept_{i:03d}', [f'dup_{i:03d}'])
+            for i in range(max_rows + 5)
+        ]
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            dedup_module._print_groups_table(groups_info)
+        lines = out.getvalue().strip().split('\n')
+        self.assertIn(f'first {max_rows} of {max_rows + 5}', lines[0])
+        self.assertEqual(len(lines), max_rows + 3)
 
 
 if __name__ == '__main__':

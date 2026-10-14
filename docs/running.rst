@@ -162,8 +162,20 @@ event are flagged as invalid (the ``invalid`` column of the
 ``requake build_families``.
 
 A report of the duplicate pairs and groups found is printed at the end.
-Use ``-n``/``--dry-run`` to print the report without modifying the
-database.
+The report is intentionally compact for large catalogs: it lists at most
+the first 20 duplicate pairs and the first 20 duplicate groups, while the
+counts always refer to the whole dataset.  Use ``-n``/``--dry-run`` to
+print the report without modifying the database.
+
+The flags can be cleared with ``--reset``, which resets the ``duplicate``
+column of the catalog and the ``invalid`` column of the event pairs, and
+exits without performing duplicate detection (combine with ``-n`` to only
+report what would be cleared).  Since it scans the whole event-pairs
+table, it can take a while on large catalogs.  For example:
+
+.. code-block::
+
+   requake dedup_events --reset
 
 Note that a full re-scan of the catalog (``requake scan_catalog`` with
 overwrite) recreates the event pairs, so ``requake dedup_events``

@@ -688,3 +688,56 @@ def read_pairs(cc_min=None, cc_max=None, offset=None, limit=None,
     finally:
         conn.close()
     return [_pair_from_row(row) for row in rows]
+
+
+def reset_invalid_pair_flags():
+    """
+    Clear the invalid flag for all the stored event pairs.
+
+    :return: number of pair rows changed
+    :rtype: int
+    """
+    conn = get_db_connection(initdb=False)
+    try:
+        cursor = conn.cursor()
+        try:
+            execute_with_retry(
+                lambda: cursor.execute(
+                    f'UPDATE {EVENT_PAIRS_TABLE} SET invalid = 0 '
+                    'WHERE invalid != 0'
+                ),
+                'reset event pair invalid flags',
+            )
+            changed = cursor.rowcount
+        except sqlite3.OperationalError as err:
+            if _is_missing_pairs_table_error(err):
+                return 0
+            raise
+        conn.commit()
+    finally:
+        conn.close()
+    return changed
+
+
+def count_invalid_pairs():
+    """
+    Return the number of pairs flagged as invalid.
+
+    :return: number of invalid pairs
+    :rtype: int
+    """
+    conn = get_db_connection(initdb=False)
+    try:
+        cursor = conn.cursor()
+        try:
+            row = cursor.execute(
+                f'SELECT COUNT(*) FROM {EVENT_PAIRS_TABLE} '
+                'WHERE invalid != 0'
+            ).fetchone()
+        except sqlite3.OperationalError as err:
+            if _is_missing_pairs_table_error(err):
+                return 0
+            raise
+        return row[0]
+    finally:
+        conn.close()
