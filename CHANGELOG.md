@@ -18,6 +18,9 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 - ``print_pairs`` hides pairs flagged as invalid by default; the new
   ``--include-invalid`` option lists them as well, adding an ``invalid``
   column to the table.
+- Fixed the non-paged table output (``--no-pager``): when a table was
+  printed in more than one batch, all the batches but the last one were
+  replaced by their header, so most of the rows were lost.
 - Stylized ``◀◀ RƎQuake`` logo, shown in the command line help.
 - Colored terminal output for help and usage messages, log messages,
   errors, table headers and waveform-cache diagnostics. Colors are used

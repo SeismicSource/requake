@@ -64,6 +64,28 @@ def _style_table(text, has_header=True):
     return '\n'.join(styled_lines)
 
 
+def _drop_header_block(text):
+    """
+    Return ``text`` without the table header and its separator line.
+
+    Used for continuation batches, which must not repeat the header
+    but must keep all their data rows.
+
+    :param text: table text
+    :type text: str
+    :return: table text without the header block
+    :rtype: str
+    """
+    lines = text.split('\n')
+    separator_index = next(
+        (i for i, line in enumerate(lines) if _is_separator_line(line)),
+        None,
+    )
+    if separator_index is None:
+        return '\n'.join(lines[1:])
+    return '\n'.join(lines[separator_index + 1:])
+
+
 def generic_printer(rows, headers_fmt, print_headers=True):
     """
     Print rows using the configured output format.
@@ -110,7 +132,9 @@ def generic_printer(rows, headers_fmt, print_headers=True):
             }
             line = tabulate(rows, **kwargs)
             if not print_headers:
-                line = line.rsplit('\n', maxsplit=1)[-1]
+                line = _drop_header_block(line)
+                if not line:
+                    return
             print(_style_table(line, has_header=print_headers))
 
 
