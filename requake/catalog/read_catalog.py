@@ -13,6 +13,7 @@ import os
 import logging
 import contextlib
 from ..config import config, rq_exit
+from ..config.utils import run_with_spinner
 from ..database.db import get_db_path
 from ..database.catalog import write_catalog as write_stored_catalog
 from .catalog import RequakeEvent, RequakeCatalog
@@ -120,11 +121,14 @@ def read_catalog():
                 f'{nevs_read:n} events read from db file '
                 f'{get_db_path()}'
             )
-    logger.info('Reading catalog...')
+    logger.debug('Reading catalog...')
     input_cat_file = config.args.catalog_file
     if input_cat_file is not None:
         try:
-            catalog += _read_catalog_from_file()
+            catalog += run_with_spinner(
+                'Reading catalog...',
+                _read_catalog_from_file,
+            )
             # Filter catalog based on configuration
             catalog = _filter_catalog(catalog)
         except FileNotFoundError:

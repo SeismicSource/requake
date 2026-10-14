@@ -13,6 +13,7 @@ import logging
 from itertools import combinations
 from scipy.cluster.hierarchy import average, fcluster
 from ..config import config, rq_exit
+from ..config.utils import run_with_spinner
 from ..database.db import DatabaseCorruptError, get_db_path
 from ..database.pairs import (
     PairsMetadataError,
@@ -142,16 +143,20 @@ def build_families():
         logger.error(msg)
         rq_exit(1)
     try:
-        logger.info(
-            'Reading events from event pairs in '
-            f'db file {get_db_path()}...'
-        )
         cc_min = (
             config.cc_min
             if config.clustering_algorithm == 'shared'
             else None
         )
-        events = read_events_from_pairs(cc_min=cc_min)
+        read_message = (
+            'Reading events from event pairs in '
+            f'db file {get_db_path()}...'
+        )
+        logger.debug(read_message)
+        events = run_with_spinner(
+            read_message,
+            lambda: read_events_from_pairs(cc_min=cc_min),
+        )
     except (FileNotFoundError, PairsTableNotFoundError):
         logger.error(
             'Unable to find event pairs in database: '
@@ -165,10 +170,18 @@ def build_families():
         logger.error(msg)
         rq_exit(1)
     if config.clustering_algorithm == 'shared':
-        logger.info('Building families from shared events...')
-        families = _build_families_from_shared_events(events)
+        build_message = 'Building families from shared events...'
+        logger.debug(build_message)
+        families = run_with_spinner(
+            build_message,
+            lambda: _build_families_from_shared_events(events),
+        )
     elif config.clustering_algorithm == 'UPGMA':
-        logger.info('Building families using UPGMA...')
-        families = _build_families_from_upgma(events, config.cc_min)
+        build_message = 'Building families using UPGMA...'
+        logger.debug(build_message)
+        families = run_with_spinner(
+            build_message,
+            lambda: _build_families_from_upgma(events, config.cc_min),
+        )
     _write_families(families)
     logger.info(f'Done! Output written to: {get_db_path()}')

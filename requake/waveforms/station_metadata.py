@@ -15,6 +15,7 @@ from obspy import read_inventory
 from obspy.core.inventory import Inventory, Network, Station, Channel
 from obspy.clients.fdsn.header import FDSNNoDataException
 from ..config import config
+from ..config.utils import run_with_spinner
 from ..formulas import float_or_none, guess_field_names
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -190,6 +191,22 @@ def _read_station_metadata():
     logger.info(f'Reading station metadata from local path: {smd_path}')
 
 
+def _download_trace_id_metadata(cl, net, sta, loc, chan, trace_id,
+                                start_time, end_time):
+    """Download the channel metadata of a single trace ID."""
+    try:
+        return cl.get_stations(
+            network=net, station=sta, location=loc, channel=chan,
+            starttime=start_time, endtime=end_time, level='channel'
+        )
+    except FDSNNoDataException as err:
+        msg = str(err).replace('\n', ' ')
+        raise NoMetadataError(
+            f'Unable to download metadata for trace id: {trace_id}.\n'
+            f'Error message: {msg}'
+        ) from err
+
+
 def _download_metadata():
     """
     Download metadata for the trace_ids specified in config file.
@@ -200,7 +217,8 @@ def _download_metadata():
     :raises MetadataMismatchError: if the metadata does not match
         the expected format
     """
-    logger.info('Downloading station metadata...')
+    download_message = 'Downloading station metadata...'
+    logger.debug(download_message)
     if config.station_client is None:
         from obspy.clients.fdsn import Client as FDSNClient
         config.station_client = FDSNClient(config.fdsn_station_url)
@@ -223,17 +241,12 @@ def _download_metadata():
                 f'Invalid trace_id: {trace_id}. Must be in the format '
                 'NET.STA.LOC.CHAN'
             ) from err
-        try:
-            inv += cl.get_stations(
-                network=net, station=sta, location=loc, channel=chan,
-                starttime=start_time, endtime=end_time, level='channel'
-            )
-        except FDSNNoDataException as err:
-            msg = str(err).replace('\n', ' ')
-            raise NoMetadataError(
-                f'Unable to download metadata for trace id: {trace_id}.\n'
-                f'Error message: {msg}'
-            ) from err
+        inv += run_with_spinner(
+            download_message,
+            lambda: _download_trace_id_metadata(
+                cl, net, sta, loc, chan, trace_id, start_time, end_time
+            ),
+        )
     channels = inv.get_contents()['channels']
     unique_channels = set(channels)
     channel_count = [channels.count(id) for id in unique_channels]

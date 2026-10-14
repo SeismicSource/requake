@@ -81,6 +81,28 @@ class TestRunWithSpinner(unittest.TestCase):
         self.assertGreaterEqual(max(len(run) for run in runs),
                                 len(message) + 2)
 
+    def test_spinner_runs_in_place_outside_main_process(self):
+        """Worker processes must not animate the spinner."""
+        calls = []
+
+        class _FakeProcess:
+            """Stand-in for a worker process."""
+
+            name = 'ForkPoolWorker-1'
+
+        def _worker():
+            calls.append(1)
+            return 'done'
+
+        with patch.object(
+            utils.multiprocessing, 'current_process',
+            staticmethod(lambda: _FakeProcess()),
+        ), contextlib.redirect_stderr(io.StringIO()) as stderr:
+            result = run_with_spinner('working...', _worker)
+        self.assertEqual(result, 'done')
+        self.assertEqual(calls, [1])
+        self.assertEqual(stderr.getvalue(), '')
+
     def test_spinner_abort_joins_worker(self):
         """An abort should stop the worker and wait for it to finish."""
         released = []

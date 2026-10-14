@@ -360,18 +360,23 @@ def dedup_events():
     cc_min = config.args.cc_min
     max_time_diff = config.args.max_time_diff
     max_distance_km = config.args.max_distance
-    logger.info('Reading event catalog...')
     try:
-        catalog = read_stored_catalog()
+        catalog = run_with_spinner(
+            'Reading event catalog...',
+            read_stored_catalog,
+        )
     except (ValueError, FileNotFoundError) as msg:
         logger.error(msg)
         rq_exit(1)
-    logger.info(
+    pairs_message = (
         f'Reading event pairs with cc >= {cc_min:.2f} from '
         f'db file {get_db_path()}...'
     )
     try:
-        pairs = read_pairs(cc_min=cc_min)
+        pairs = run_with_spinner(
+            pairs_message,
+            lambda: read_pairs(cc_min=cc_min),
+        )
     except (
         DatabaseCorruptError,
         FileNotFoundError,
@@ -381,19 +386,30 @@ def dedup_events():
     ) as msg:
         logger.error(msg)
         rq_exit(1)
-    duplicate_pairs, groups, n_missing_location = _find_duplicate_pairs(
-        pairs, max_time_diff, max_distance_km
+    detection_message = (
+        f'Looking for duplicate events in {len(pairs):n} event pairs...'
+    )
+    duplicate_pairs, groups, n_missing_location = run_with_spinner(
+        detection_message,
+        lambda: _find_duplicate_pairs(
+            pairs, max_time_diff, max_distance_km
+        ),
     )
     events = {event.evid: event for event in catalog}
     groups_info, duplicate_evids = _group_duplicates(groups, events)
     n_flagged = 0
     n_invalid = 0
     if not dry_run and duplicate_evids:
-        logger.info(
+        flag_message = (
             f'Flagging {len(duplicate_evids)} events as duplicate...'
         )
-        n_flagged = update_events_duplicate(duplicate_evids)
-        n_invalid = mark_duplicate_pairs_invalid()
+        n_flagged, n_invalid = run_with_spinner(
+            flag_message,
+            lambda: (
+                update_events_duplicate(duplicate_evids),
+                mark_duplicate_pairs_invalid(),
+            ),
+        )
     report = {
         'cc_min': cc_min,
         'max_time_diff': max_time_diff,

@@ -27,6 +27,13 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   files are left behind.
 - Interrupting a query is no longer reported as a bug in Requake: the
   abort exits cleanly, as any other ``Ctrl+C`` abort.
+- Long-running operations now show an animated progress indicator on
+  the terminal, instead of a static message: reading the event catalog
+  and the event pairs, looking for duplicate events and flagging them
+  (``dedup_events``), reading the events from the event pairs and
+  building the families (``build_families``), reading or downloading
+  the event catalog (``read_catalog``), downloading station metadata
+  and loading the existing pair IDs (``scan_catalog``).
 - Stylized ``◀◀ RƎQuake`` logo, shown in the command line help.
 - Colored terminal output for help and usage messages, log messages,
   errors, table headers and waveform-cache diagnostics. Colors are used

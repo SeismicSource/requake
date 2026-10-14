@@ -15,6 +15,7 @@ import locale
 import shutil
 import hashlib
 import threading
+import multiprocessing
 from datetime import datetime
 from ..terminal import error, style
 from .configobj import ConfigObj, ParseError
@@ -356,7 +357,13 @@ def run_with_spinner(message, func):
     The spinner animates on a single line via ``\r``.  When the
     operation completes the line is cleared.  ``Ctrl+C`` is handled
     so the terminal is left in a clean state.
+
+    Outside the main process (e.g. in parallel workers) *func* is
+    simply run in place, to keep the terminal output of the workers
+    clean.
     """
+    if multiprocessing.current_process().name != 'MainProcess':
+        return func()
     done = threading.Event()
     errors = [None]
     result = [None]

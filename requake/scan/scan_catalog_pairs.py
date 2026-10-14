@@ -15,6 +15,7 @@ import logging
 import numpy as np
 from scipy.spatial import cKDTree
 from ..config import config
+from ..config.utils import run_with_spinner
 from ..database.pairs import read_event_key_rows, read_packed_pair_ids
 
 logger = logging.getLogger('scan_catalog')
@@ -120,9 +121,22 @@ def log_pair_grouping_stats(valid_pair_idx):
 def load_existing_pair_ids(catalog):
     """Return packed pair IDs already present in the database."""
     t_read_keys_start = time.monotonic()
-    logger.info(
-        '[rq:pairs] Loading existing pair key IDs from db file...'
+    message = '[rq:pairs] Loading existing pair key IDs from db file...'
+    logger.debug(message)
+    existing_ids = run_with_spinner(
+        message,
+        lambda: _read_existing_pair_ids(catalog),
     )
+    read_keys_dt = time.monotonic() - t_read_keys_start
+    logger.info(
+        f'[rq:pairs] {len(existing_ids):n} unique pairs '
+        f'loaded and packed in {read_keys_dt:.1f}s'
+    )
+    return existing_ids
+
+
+def _read_existing_pair_ids(catalog):
+    """Read and pack the pair IDs already stored in the database."""
     event_key_rows = read_event_key_rows()
     # Map event string IDs to their position in the catalog.
     _evid_to_idx = {
@@ -136,13 +150,7 @@ def load_existing_pair_ids(catalog):
         if evid in _evid_to_idx
     }
     nevents = len(catalog)
-    existing_ids = read_packed_pair_ids(_db_id_to_idx, nevents)
-    read_keys_dt = time.monotonic() - t_read_keys_start
-    logger.info(
-        f'[rq:pairs] {len(existing_ids):n} unique pairs '
-        f'loaded and packed in {read_keys_dt:.1f}s'
-    )
-    return existing_ids
+    return read_packed_pair_ids(_db_id_to_idx, nevents)
 
 
 def mask_existing_pair_indices(valid_pair_idx, existing_pair_ids, nevents):

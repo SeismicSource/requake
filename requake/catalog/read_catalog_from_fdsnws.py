@@ -15,6 +15,7 @@ import urllib.request
 from obspy import UTCDateTime
 from obspy.clients.fdsn.header import URL_MAPPINGS
 from ..config import config
+from ..config.utils import run_with_spinner
 from .catalog import RequakeCatalog, RequakeEvent
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -110,7 +111,19 @@ def read_catalog_from_fdsnws():
     :return: Event catalog.
     :rtype: requake.catalog.RequakeCatalog
     """
-    logger.info('Downloading events from FDSN web services...')
+    download_message = 'Downloading events from FDSN web services...'
+    logger.debug(download_message)
+    event_list = run_with_spinner(
+        download_message,
+        _download_catalog_events,
+    )
+    catalog = RequakeCatalog(event_list)
+    logger.info(f'{len(catalog)} events downloaded')
+    return catalog
+
+
+def _download_catalog_events():
+    """Download events for all the configured FDSN web services."""
     cat_info = zip(
         config.catalog_fdsn_event_urls,
         config.catalog_start_times,
@@ -135,6 +148,4 @@ def read_catalog_from_fdsnws():
                 f'Unable to download events from {url} for period '
                 f'{start_time} - {end_time}. {msg}'
             )
-    catalog = RequakeCatalog(event_list)
-    logger.info(f'{len(catalog)} events downloaded')
-    return catalog
+    return event_list
