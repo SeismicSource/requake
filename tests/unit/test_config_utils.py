@@ -11,6 +11,7 @@ Unit tests for configuration utility helpers.
 """
 
 import io
+import re
 import time
 import threading
 import unittest
@@ -70,6 +71,15 @@ class TestRunWithSpinner(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(ValueError):
                 run_with_spinner('working...', _worker)
+
+    def test_spinner_clears_the_whole_line(self):
+        """The spinner must erase the line it printed, however long."""
+        message = 'x' * 120
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            run_with_spinner(message, lambda: time.sleep(0.15))
+        runs = re.findall(r' +', stderr.getvalue())
+        self.assertGreaterEqual(max(len(run) for run in runs),
+                                len(message) + 2)
 
     def test_spinner_abort_joins_worker(self):
         """An abort should stop the worker and wait for it to finish."""

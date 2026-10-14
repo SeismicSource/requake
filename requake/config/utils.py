@@ -372,6 +372,9 @@ def run_with_spinner(message, func):
     thread = threading.Thread(target=_target, daemon=True)
     thread.start()
 
+    # Visible width of the spinner line: a braille frame (one column) plus
+    # a space plus the message, whose ANSI styling adds no visible column.
+    width = len(message) + 2
     i = 0
     try:
         while not done.wait(0.1):
@@ -381,8 +384,10 @@ def run_with_spinner(message, func):
             print(f'\r{frame} {text}', file=sys.stderr, end='')
             sys.stderr.flush()
             i += 1
-        # Clear the spinner line.
-        print('\r' + ' ' * 79, file=sys.stderr, end='\r')
+        # Clear the spinner line: erase as many columns as the widest line
+        # printed, or part of it is left over when the next message is
+        # shorter than this one.
+        print('\r' + ' ' * width, file=sys.stderr, end='\r')
         sys.stderr.flush()
     except (KeyboardInterrupt, SystemExit):
         # Leave a clean line after the spinner and stop the running
