@@ -4,6 +4,9 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- New ``-E``/``--events`` option for ``print_families``, to print one
+  row per event (ordered by family number and origin time), instead of
+  one row per family; combine with ``-f csv`` to export the list.
 - New ``dedup_events`` command: flags likely duplicate events (event
   pairs with high cross-correlation, close in time and space) with the
   new ``duplicate`` column in the catalog, and marks all the pairs

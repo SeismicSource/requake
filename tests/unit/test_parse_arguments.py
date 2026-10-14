@@ -10,7 +10,9 @@ Unit tests for the ``print_`` command line options.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 
+import io
 import sys
+import contextlib
 import unittest
 from unittest.mock import patch
 
@@ -91,6 +93,40 @@ class TestDedupEventsOptions(unittest.TestCase):
         self.assertEqual(args.max_time_diff, 30.)
         self.assertEqual(args.max_distance, 1.5)
         self.assertTrue(args.dry_run)
+
+
+class TestPrintFamiliesOptions(unittest.TestCase):
+    """Test the ``print_families`` command line options."""
+
+    def test_events_off_by_default(self):
+        """``--events`` must be off by default."""
+        self.assertFalse(_parse_args('print_families').events)
+
+    def test_events_option(self):
+        """``-E``/``--events`` must select the per-event listing."""
+        self.assertTrue(_parse_args('print_families', '-E').events)
+        self.assertTrue(_parse_args('print_families', '--events').events)
+
+    def test_events_combines_with_format(self):
+        """``--events`` must be usable with an explicit format."""
+        args = _parse_args('print_families', '-E', '-f', 'csv')
+        self.assertTrue(args.events)
+        self.assertEqual(args.format, 'csv')
+        self.assertTrue(args.no_pager)
+
+    def test_events_conflicts_with_detailed(self):
+        """``--events`` and ``--detailed`` must be mutually exclusive."""
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as cm:
+                _parse_args('print_families', '-E', '-d')
+        self.assertEqual(cm.exception.code, 2)
+
+    def test_events_conflicts_with_stats(self):
+        """``--events`` must not be allowed with a statistics output."""
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as cm:
+                _parse_args('print_families', '-E', '-f', 'stats')
+        self.assertEqual(cm.exception.code, 2)
 
 
 if __name__ == '__main__':

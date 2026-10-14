@@ -588,10 +588,17 @@ def parse_arguments(progname='requake'):
         help='format for the output (default: %(default)s); '
              'implies --no-pager'
     )
-    print_families.add_argument(
+    print_families_details = print_families.add_mutually_exclusive_group()
+    print_families_details.add_argument(
         '-d', '--detailed', action='store_true',
         help='print detailed information for each family, including a list '
              'of events'
+    )
+    print_families_details.add_argument(
+        '-E', '--events', action='store_true',
+        help='print one row per event of the selected families, instead '
+             'of one row per family; can be combined with -f/--format to '
+             'export the event list (e.g., "-f csv")'
     )
     # ---
     # --- plot_families
@@ -944,6 +951,16 @@ def parse_arguments(progname='requake'):
     # args.traceid need to exist
     if not hasattr(args, 'traceid'):
         args.traceid = None
+    # --events is not meaningful together with a statistics output
+    if (
+        getattr(args, 'events', False)
+        and getattr(args, 'format', '') == 'stats'
+    ):
+        sys.stderr.write(
+            f'{progname} print_families: '
+            "error: argument -E/--events: not allowed with '-f stats'\n"
+        )
+        sys.exit(2)
     return args
 
 

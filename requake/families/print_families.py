@@ -17,6 +17,9 @@ from ..config.generic_printer import _display_table
 from .families import FamilyNotFoundError, read_selected_families
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
+# The event ID is the second column of the events table
+_EVENT_COPY_FN = lambda row: str(row[1])  # noqa: E731
+
 
 def _family_distance_stats(family):
     """
@@ -89,6 +92,49 @@ def _print_family_details(family, duration_units, duration_multiplier):
     print('Events:')
     for event in family:
         print(f'  {event}')
+
+
+def _print_family_events(families):
+    """
+    Print one row per event of the selected families.
+
+    Rows are ordered by family number, then by origin time (events are
+    sorted by origin time within each family).
+
+    :param families: Families whose events are printed.
+    :type families: list of requake.families.Family
+    """
+    headers_fmt = [
+        ('family', None),
+        ('evid', None),
+        ('origin time', None),
+        ('longitude', '.4f'),
+        ('latitude', '.4f'),
+        ('depth\n(km)', '.3f'),
+        ('mag\ntype', None),
+        ('mag', '.1f')
+    ]
+    rows = [
+        [
+            family.number,
+            event.evid,
+            event.orig_time,
+            event.lon,
+            event.lat,
+            event.depth,
+            event.mag_type,
+            event.mag
+        ]
+        for family in families
+        for event in family
+    ]
+    _display_table(
+        headers_fmt, rows,
+        row_label='Events',
+        copy_label='evid',
+        copy_fn=_EVENT_COPY_FN,
+        detail_title='Event Details',
+    )
 
 
 def _print_family_list(families, duration_units, duration_multiplier):
@@ -243,7 +289,9 @@ def print_families():
         duration_multiplier = 365 * 24 * 60
         duration_units = 'mins'
 
-    if config.args.format == 'stats':
+    if config.args.events:
+        _print_family_events(families)
+    elif config.args.format == 'stats':
         _print_family_stats(families)
     elif config.args.detailed:
         for family in families:

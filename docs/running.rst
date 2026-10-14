@@ -237,6 +237,51 @@ clicking on a family marker shows the family details. The
 ``-k/--apikey``.
 
 
+Printing families
+^^^^^^^^^^^^^^^^^
+
+``print_families`` prints one row per family, with the family number,
+the number of events, the mean coordinates, the start and end time, the
+duration, the horizontal and vertical distance ranges, the slip rate and
+the magnitude range:
+
+.. code-block::
+
+   requake print_families
+
+Only valid families are printed (use ``flag_family`` to set the validity
+flag of a family).  Individual families can be selected with the
+``family_numbers`` argument (e.g., ``requake print_families 0,2-4``) and
+filtered by duration and number of events with ``-l``/``--longerthan``,
+``-S``/``--shorterthan`` and ``-m``/``--minevents``.
+
+Use ``-d``/``--detailed`` to print a detailed report for each family,
+including the list of its events.
+
+Use ``-E``/``--events`` to print one row per event of the selected
+families instead, with the family number, the event ID, the origin time,
+the coordinates, the depth, the magnitude type and the magnitude.  The
+events are ordered by family number, then by origin time, i.e. the
+equivalent of:
+
+.. code-block:: sql
+
+   SELECT family_number, orig_time, lon, lat, depth_km, mag
+   FROM families WHERE valid = 1
+   ORDER BY family_number, orig_time
+
+Since ``-f``/``--format`` selects the output format, the event list can
+be exported in CSV or Markdown format:
+
+.. code-block::
+
+   requake print_families -E -f csv > families.csv
+
+The same formats (``simple``, ``markdown``, ``csv``) apply to the family
+list, while ``-f stats`` prints summary statistics on the selected
+families, instead of a table.
+
+
 Interactive pager
 ^^^^^^^^^^^^^^^^^
 
