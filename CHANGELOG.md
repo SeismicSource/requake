@@ -36,10 +36,6 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   map explains the marker size. This applies to both the Cartopy and the
   Folium map backends.
 
-Note: the ``catalog`` and ``event_pairs`` tables have new columns
-(``duplicate`` and ``invalid``). Existing output databases are not
-migrated and must be recreated.
-
 ## [0.8.3] - 2026-06-19
 
 Note: you should run `requake update_config` to update your config file

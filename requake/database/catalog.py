@@ -47,21 +47,6 @@ def _ensure_catalog_table(cursor):
         cursor.execute(statement)
 
 
-def _check_catalog_schema(cursor, db_path=None):
-    """Ensure the stored catalog table has the expected columns."""
-    columns = {
-        row[1]
-        for row in cursor.execute(f'PRAGMA table_info({CATALOG_TABLE})')
-    }
-    if 'duplicate' not in columns:
-        raise RuntimeError(
-            'Stored catalog schema is outdated: missing "duplicate" column '
-            f'in db file {get_db_path(db_path=db_path)}. '
-            'Please remove the database file and re-run the catalog '
-            'pipeline.'
-        )
-
-
 def _event_row(event):
     """Convert a RequakeEvent into a database row tuple."""
     return (
@@ -112,7 +97,6 @@ def write_catalog(catalog, db_path=None):
     try:
         cursor = conn.cursor()
         _ensure_catalog_table(cursor)
-        _check_catalog_schema(cursor)
         execute_with_retry(
             lambda: cursor.execute(f'DELETE FROM {CATALOG_TABLE}'),
             'clear catalog table',
@@ -142,7 +126,6 @@ def read_catalog(db_path=None):
         rows = conn.execute(
             f'SELECT * FROM {CATALOG_TABLE} ORDER BY orig_time'
         ).fetchall()
-        _check_catalog_schema(conn.cursor(), db_path=db_path)
     except sqlite3.OperationalError as err:
         if MISSING_CATALOG_TABLE in str(err):
             raise FileNotFoundError(
@@ -178,7 +161,6 @@ def update_events_duplicate(evids, duplicate=True, db_path=None):
     changed = 0
     try:
         cursor = conn.cursor()
-        _check_catalog_schema(cursor, db_path=db_path)
         for start in range(0, len(evids), _MAX_SQL_VARIABLES):
             chunk = evids[start:start + _MAX_SQL_VARIABLES]
             placeholders = ','.join('?' * len(chunk))
