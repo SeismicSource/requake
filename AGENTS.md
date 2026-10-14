@@ -11,6 +11,8 @@
   - Private functions (name starting with `_`) are only used internally within
     a module
   - Only functions that are used across different modules are public
+- Add short CHANGELOG entries for user-facing changes, following the style
+  of existing entries.
 
 ## Before Finalizing
 
@@ -38,7 +40,7 @@ flake8 <modified_python_files> && sourcery review <modified_files>
 Run once per clone:
 
 ```bash
-scripts/setup_local_hooks.sh 
+scripts/setup_local_hooks.sh
 ```
 
 This installs the pre-commit hook used to enforce local style checks.
