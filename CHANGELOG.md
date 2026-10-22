@@ -4,6 +4,12 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- ``plot_families``: families with more than 15 events are now drawn
+  in compact mode: only a subset of the traces is labeled and
+  highlighted, the other traces are drawn lighter and the traces are
+  scaled up, so that large families remain readable. The threshold is
+  set by the new ``--compact-above`` option (use 0 to always label all
+  the traces).
 - New ``-E``/``--events`` option for ``print_families``, to print one
   row per event (ordered by family number and origin time), instead of
   one row per family; combine with ``-f csv`` to export the list.

@@ -622,6 +622,15 @@ def parse_arguments(progname='requake'):
         '-T', '--template', action='store_true',
         help='plot family members found with template scan'
     )
+    plot_families.add_argument(
+        '--compact-above', type=int, default=15, metavar='NEVENTS',
+        help='families with more than NEVENTS events are drawn in compact '
+             'mode: only a subset of the traces is labeled and '
+             'highlighted, the other traces are drawn lighter, and the '
+             'trace amplitude is scaled with the number of events. The '
+             'number of labeled traces is chosen automatically. Use 0 to '
+             'always label all the traces (default: %(default)s)'
+    )
     # ---
     # --- plot_timespans
     plot_timespans = subparser.add_parser(

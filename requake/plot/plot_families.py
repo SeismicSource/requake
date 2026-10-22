@@ -37,6 +37,106 @@ mpl.rcParams['keymap.forward'].remove('right')
 with contextlib.suppress(KeyError):
     mpl.rcParams['keymap.all_axes'].remove('a')
 
+# Maximum number of labeled traces in a compact family plot. With more
+# traces, only every n-th trace is labeled, to avoid overlapping labels.
+MAX_LABELS = 15
+# Number of traces above which the trace amplitude is scaled up, so that
+# waveforms remain visible even when traces overlap each other.
+AMPLITUDE_REF_TRACES = 35
+MAX_AMPLITUDE = 15
+# Trace amplitude, in trace spacings, used in classic mode
+BASE_AMPLITUDE = 0.5
+# Line styles
+DEFAULT_LINEWIDTH = 0.5
+LABELED_LINEWIDTH = 1.0
+UNLABELED_LINEWIDTH = 0.25
+UNLABELED_COLOR = 'black'
+# Alpha used for the unlabeled traces when there are
+# UNLABELED_ALPHA_REF_TRACES unlabeled traces; with more unlabeled
+# traces, they are drawn lighter, to compensate for overplotting
+UNLABELED_ALPHA = 0.7
+UNLABELED_ALPHA_REF_TRACES = 100
+
+
+def _is_compact(ntraces, compact_above):
+    """
+    Return whether a family must be plotted in compact mode.
+
+    :param ntraces: Number of traces in the plot.
+    :type ntraces: int
+    :param compact_above: Number of events above which the traces are
+        plotted in compact mode; 0 or less disables the compact mode.
+    :type compact_above: int
+    :return: True if the family must be plotted in compact mode.
+    :rtype: bool
+    """
+    return 0 < compact_above < ntraces
+
+
+def _label_stride(ntraces, max_labels=MAX_LABELS):
+    """
+    Return the stride used to label the traces of a family plot.
+
+    At most ``max_labels`` traces are labeled, so that labels do not
+    overlap when the family has many events.
+
+    :param ntraces: Number of traces in the plot.
+    :type ntraces: int
+    :param max_labels: Maximum number of labeled traces.
+    :type max_labels: int
+    :return: Labeling stride, always at least 1.
+    :rtype: int
+    """
+    return max(1, -(-ntraces // max_labels))
+
+
+def _trace_amplitude(ntraces, ref_traces=AMPLITUDE_REF_TRACES,
+                     max_amplitude=MAX_AMPLITUDE):
+    """
+    Return the amplitude of the traces of a family plot.
+
+    For families with many events, the amplitude is scaled up so that the
+    waveform shape remains visible in the figure; traces will then overlap
+    each other.
+
+    :param ntraces: Number of traces in the plot.
+    :type ntraces: int
+    :param ref_traces: Number of traces for which the base amplitude is used.
+    :type ref_traces: int
+    :param max_amplitude: Maximum amplitude, in trace spacings.
+    :type max_amplitude: float
+    :return: Trace amplitude, in trace spacings.
+    :rtype: float
+    """
+    amplitude = BASE_AMPLITUDE * max(1, ntraces / ref_traces)
+    return min(amplitude, max_amplitude)
+
+
+def _unlabeled_alpha(ntraces, base_alpha=UNLABELED_ALPHA,
+                     ref_traces=UNLABELED_ALPHA_REF_TRACES):
+    """
+    Return the alpha of the unlabeled traces of a family plot.
+
+    The more traces are left unlabeled, the lighter they are drawn, so
+    that overlapping traces do not make the plot too dark.
+
+    :param ntraces: Number of traces in the plot.
+    :type ntraces: int
+    :param base_alpha: Alpha used for ``ref_traces`` unlabeled traces.
+    :type base_alpha: float
+    :param ref_traces: Number of unlabeled traces for which the base alpha
+        is used.
+    :type ref_traces: int
+    :return: Alpha value, between 0 and 1.
+    :rtype: float
+    """
+    stride = _label_stride(ntraces)
+    nlabeled = -(-ntraces // stride)
+    nunlabeled = ntraces - nlabeled
+    if nunlabeled <= 0:
+        return base_alpha
+    return base_alpha * min(1, (ref_traces / nunlabeled) ** 0.75)
+
 
 def _plot_family(family):
     try:
@@ -64,33 +164,64 @@ def _plot_family(family):
     if t1 is None:
         t1 = times[env > 0.3 * env_max][-1]
 
+    st.sort()
+    ntraces = len(st)
+    if _is_compact(ntraces, config.args.compact_above):
+        stride = _label_stride(ntraces)
+        amplitude = _trace_amplitude(ntraces)
+        unlabeled_alpha = _unlabeled_alpha(ntraces)
+        labeled_linewidth = LABELED_LINEWIDTH
+    else:
+        stride = 1
+        amplitude = BASE_AMPLITUDE
+        unlabeled_alpha = UNLABELED_ALPHA
+        labeled_linewidth = DEFAULT_LINEWIDTH
+
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
     tracelines = []
     p_bars = []
     s_bars = []
-    for n, tr in enumerate(st.sort()):
+    for n, tr in enumerate(st):
         average_trace = 'average' in tr.stats.evid
+        # with stride == 1 (families below the compact threshold) all
+        # traces are labeled
+        labeled = average_trace or n % stride == 0
         # Normalize trace between t0 and t1
         tt0 = tr.stats.starttime + t0
         tt1 = tr.stats.starttime + t1
         tr2 = tr.copy().trim(tt0, tt1)
         tr.data /= abs(tr2.max())
         tr.detrend('demean')
-        tr.data *= 0.5
+        tr.data *= amplitude
         # substract t0, so that time axis starts at 0
-        color = '#cc8800' if average_trace else 'black'
+        if not labeled:
+            color = UNLABELED_COLOR
+            linewidth = UNLABELED_LINEWIDTH
+            alpha = unlabeled_alpha
+            zorder = 1
+        else:
+            color = '#cc8800' if average_trace else 'black'
+            linewidth = labeled_linewidth
+            alpha = 1
+            zorder = 2
         l, = ax.plot(
             tr.times() - t0,
             tr.data + n,
             color=color,
-            linewidth=0.5,
+            linewidth=linewidth,
+            alpha=alpha,
+            zorder=zorder,
         )
         tracelines.append(l)
+        if not labeled:
+            continue
         p_arrival = tr.stats.P_arrival_time - tr.stats.starttime - t0
         s_arrival = tr.stats.S_arrival_time - tr.stats.starttime - t0
-        hh = 0.15  # pick line half-height
-        p_bar, = ax.plot((p_arrival, p_arrival), (n - hh, n + hh), color='g')
-        s_bar, = ax.plot((s_arrival, s_arrival), (n - hh, n + hh), color='r')
+        hh = 0.3 * amplitude  # pick line half-height
+        p_bar, = ax.plot(
+            (p_arrival, p_arrival), (n - hh, n + hh), color='g', zorder=2)
+        s_bar, = ax.plot(
+            (s_arrival, s_arrival), (n - hh, n + hh), color='r', zorder=2)
         p_bars.append(p_bar)
         s_bars.append(s_bar)
         trans = ax.get_yaxis_transform()
@@ -127,7 +258,7 @@ def _plot_family(family):
             txt.set_path_effects(
                 [PathEffects.withStroke(linewidth=3, foreground='w')])
     legend = ax.legend(
-        [p_bar, s_bar], ['P theo', 'S theo'], loc='lower right')
+        [p_bars[-1], s_bars[-1]], ['P theo', 'S theo'], loc='lower right')
     legend.set_visible(False)
     for ps_bar in p_bars + s_bars:
         ps_bar.set_visible(False)
@@ -138,13 +269,18 @@ def _plot_family(family):
     ax.set_xlim(0, t1 - t0)
     ax.set_xlabel('Time (s)')
     title = f'Family {family.number} | {len(st) - 1} events'
-    ax.set_title(title, loc='left')
+    # a smaller font is needed when the labeling hint makes the title longer
+    title_kwargs = {}
+    if stride > 1:
+        title += f' | labeled every {stride}th'
+        title_kwargs['fontsize'] = 10
+    ax.set_title(title, loc='left', **title_kwargs)
     fig.canvas.manager.set_window_title(title)
     title = (
         f'{tr0.id} | {tr0.stats.distance:.1f} km | '
         f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f} Hz'
     )
-    ax.set_title(title, loc='right')
+    ax.set_title(title, loc='right', **title_kwargs)
     figure_name = (
         f'family_{family.number}_{tr0.id}_'
         f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f}Hz'
