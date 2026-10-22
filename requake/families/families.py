@@ -279,8 +279,11 @@ def get_family_waveforms(family):
         except NoWaveformError as msg:
             sys.stdout.write('\n')
             logger.error(msg)
+    nwaves = len(st)
+    plural = '' if nwaves == 1 else 's'
     sys.stdout.write(
-        f'{clear_line}Family {family.number}: reading waveforms: done.\n'
+        f'{clear_line}Family {family.number}: reading waveforms: '
+        f'{nwaves} waveform{plural} read.\n'
     )
     if not st:
         raise NoWaveformError(f'No traces found for family {family.number}')
