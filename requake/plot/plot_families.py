@@ -11,9 +11,11 @@ Download and plot traces for one or more event families.
 """
 import contextlib
 import logging
+import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as PathEffects
+from matplotlib.ticker import FuncFormatter
 from obspy.signal.filter import envelope
 from obspy.signal.util import smooth
 from ..config import config, rq_exit
@@ -53,12 +55,21 @@ UNLABELED_COLOR = 'black'
 # traces, they are drawn lighter, to compensate for overplotting
 UNLABELED_ALPHA = 0.7
 UNLABELED_ALPHA_REF_TRACES = 100
+# Colormap and interpolation used to render trace amplitudes in
+# heatmap mode
+AMPLITUDE_CMAP = 'seismic'
+AMPLITUDE_INTERPOLATION = 'bilinear'
 # Color of the average (template) trace
 AVERAGE_COLOR = '#cc8800'
 # Font size of the trace labels
 LABEL_FONTSIZE = 8
 # Default maximum number of labeled traces, when --max-labels is not given
 DEFAULT_MAX_LABELS = 15
+# Above this number of decimals, the colorbar labels switch to
+# exponential notation, to keep them short
+MAX_FIXED_DECIMALS = 3
+# Maximum width, in characters, of the colorbar tick labels
+MAX_LABEL_CHARS = 8
 
 
 def _labeled_rows(ntraces, max_labels):
@@ -104,6 +115,55 @@ def _ordinal(number):
     else:
         suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(number % 10, 'th')
     return f'{number}{suffix}'
+
+
+def _colorbar_formatter(half_span):
+    """
+    Return a colorbar tick label formatter.
+
+    The number of decimals follows the color range, so that the labels
+    remain meaningful when the range is changed. For very small or very
+    large ranges, exponential notation is used, to keep the labels short.
+
+    :param half_span: half of the color range
+    :type half_span: float
+    :return: formatter function
+    :rtype: callable
+    """
+    decimals = 2
+    if half_span > 0:
+        decimals = max(2, int(np.ceil(-np.log10(half_span))) + 1)
+    digits = (
+        int(np.floor(np.log10(half_span))) + 1 if half_span >= 1 else 1
+    )
+    # sign + digits + decimal point + decimals
+    exponential = (
+        decimals > MAX_FIXED_DECIMALS
+        or digits + decimals + 2 > MAX_LABEL_CHARS
+    )
+
+    def _format(value, _position):
+        if not value:
+            return '0'
+        return (
+            f'{value:+.1e}' if exponential
+            else f'{value:+.{decimals}f}'
+        )
+    return _format
+
+
+def _update_colorbar_labels(colorbar, image):
+    """
+    Update the colorbar tick label format to the current color range.
+
+    :param colorbar: colorbar to update
+    :type colorbar: matplotlib.colorbar.Colorbar
+    :param image: image whose color range drives the colorbar
+    :type image: matplotlib.image.AxesImage
+    """
+    vmin, vmax = image.get_clim()
+    colorbar.ax.yaxis.set_major_formatter(
+        FuncFormatter(_colorbar_formatter(0.5 * (vmax - vmin))))
 
 
 def _max_labels():
@@ -224,6 +284,41 @@ def _time_limits(st):
     return t0, t1
 
 
+def _build_amplitude_matrix(traces, t0, t1):
+    """
+    Build a matrix of normalized trace amplitudes.
+
+    Each row of the matrix is a trace, demeaned and normalized to the
+    [-1, 1] range within the [t0, t1] time window, and resampled on a
+    common time axis.
+
+    :param traces: traces, in the order of the matrix rows
+    :type traces: list of obspy.Trace
+    :param t0: start of the time window, in seconds relative to trace start
+    :type t0: float
+    :param t1: end of the time window, in seconds relative to trace start
+    :type t1: float
+    :return: matrix of amplitudes (one row per trace) and time axis
+    :rtype: numpy.ndarray, numpy.ndarray
+    """
+    dt = 1.0 / traces[0].stats.sampling_rate
+    nsamples = int(round((t1 - t0) / dt)) + 1
+    times = t0 + np.arange(nsamples) * dt
+    matrix = np.zeros((len(traces), nsamples))
+    for n, tr in enumerate(traces):
+        tr_times = tr.times()
+        data = tr.data.astype(float)
+        window = data[(tr_times >= t0) & (tr_times <= t1)]
+        if window.size:
+            mean = window.mean()
+            data = data - mean
+            amplitude = np.abs(window - mean).max()
+            if amplitude:
+                data = data / amplitude
+        matrix[n] = np.interp(times, tr_times, data, left=0., right=0.)
+    return matrix, times
+
+
 def _is_average(trace):
     """
     Return whether a trace is the average (template) trace of a family.
@@ -267,6 +362,25 @@ def _coordinates_text(trace):
     )
 
 
+def _row_labels(traces, max_labels):
+    """
+    Return the rows of a heatmap plot that carry a label, and their labels.
+
+    :param traces: traces, in the order of the matrix rows
+    :type traces: list of obspy.Trace
+    :param max_labels: maximum number of labeled rows
+    :type max_labels: int
+    :return: row positions and labels
+    :rtype: list, list
+    """
+    positions = _labeled_rows(len(traces), max_labels)
+    labels = [
+        traces[n].stats.orig_time.strftime('%Y-%m-%d\n%H:%M:%S')
+        for n in positions
+    ]
+    return positions, labels
+
+
 def _time_zoom(fig, ax, zoom_level):
     """
     Zoom the time axis of a family plot.
@@ -302,7 +416,7 @@ def _pan_plot(fig, ax, amount):
 
 
 def _plot_family(family):
-    """Plot the traces of a family as wiggles, one per event."""
+    """Plot the traces of a family, using the selected plot mode."""
     try:
         st = get_family_aligned_waveforms_and_template(family)
     except NoWaveformError as msg:
@@ -311,6 +425,13 @@ def _plot_family(family):
     st = process_waveforms(st)
     tr0 = st[0]
     t0, t1 = _time_limits(st)
+    if getattr(config.args, 'mode', 'wiggle') == 'heatmap':
+        return _plot_family_heatmap(family, st, tr0, t0, t1)
+    return _plot_family_wiggle(family, st, tr0, t0, t1)
+
+
+def _plot_family_wiggle(family, st, tr0, t0, t1):
+    """Plot the traces of a family as wiggles, one per event."""
     st.sort()
     ntraces = len(st)
     labeled_rows = set(_labeled_rows(ntraces, _max_labels()))
@@ -476,6 +597,179 @@ def _plot_family(family):
     return fig, figure_name
 
 
+def _plot_family_heatmap(family, st, tr0, t0, t1):
+    """Plot the traces of a family as a heatmap, one row per event."""
+    st.sort()
+    events = [tr for tr in st if not _is_average(tr)]
+    average = [tr for tr in st if _is_average(tr)]
+    ntraces = len(events)
+    matrix, _ = _build_amplitude_matrix(events, t0, t1)
+    # fixed margins leave a constant room for the tick and colorbar
+    # labels, so that the layout does not change when the color range is
+    # changed; the colorbar gets its own column, so that the heatmap and
+    # the average trace panel have the same width
+    fig = plt.figure(figsize=(8, 8))
+    gs = fig.add_gridspec(
+        2, 2, width_ratios=(1, 0.03), height_ratios=(8, 1),
+        left=0.17, right=0.87, bottom=0.07, top=0.93, hspace=0.10,
+        wspace=0.03)
+    ax = fig.add_subplot(gs[0, 0])
+    ax_template = fig.add_subplot(gs[1, 0], sharex=ax)
+    colorbar_ax = fig.add_subplot(gs[0, 1])
+    image = ax.imshow(
+        matrix, aspect='auto', origin='upper', cmap=AMPLITUDE_CMAP,
+        vmin=-1, vmax=1, extent=(0, t1 - t0, ntraces - 0.5, -0.5),
+        interpolation=AMPLITUDE_INTERPOLATION,
+    )
+    # leave room for the labels of the first and last rows
+    margin = max(0.1, 0.03 * ntraces)
+    ax.set_ylim(ntraces - 0.5 + margin, -0.5 - margin)
+    colorbar = fig.colorbar(image, cax=colorbar_ax)
+    colorbar.set_label('Normalized amplitude')
+    _update_colorbar_labels(colorbar, image)
+    positions, labels = _row_labels(events, _max_labels())
+    _warn_if_max_labels_ignored(family, len(positions))
+    ax.set_yticks(positions)
+    ax.set_yticklabels(labels, fontsize=LABEL_FONTSIZE, linespacing=1.5)
+    trans = ax.get_yaxis_transform()
+    for n in positions:
+        tr = events[n]
+        info_text = _event_info_text(tr)
+        txt = ax.text(
+            0.01, n, info_text, transform=trans, va='center',
+            color='black', fontsize=LABEL_FONTSIZE, linespacing=1.5)
+        txt.set_path_effects(
+            [PathEffects.withStroke(linewidth=3, foreground='w')])
+        txt = ax.text(
+            0.98, n, f'CC mean {tr.stats.cc_mean:.2f}', transform=trans,
+            ha='right', va='center', color='black',
+            fontsize=LABEL_FONTSIZE)
+        txt.set_path_effects(
+            [PathEffects.withStroke(linewidth=3, foreground='w')])
+    ax.minorticks_on()
+    ax.tick_params(
+        which='both', top=True, labeltop=False, labelbottom=False)
+    title = f'Family {family.number} | {ntraces} events'
+    # a smaller font is needed when the labeling hint makes the title longer
+    title_kwargs = {}
+    if len(positions) < ntraces:
+        step = round((ntraces - 1) / (len(positions) - 1))
+        title += f' | labeled every {_ordinal(step)}'
+        title_kwargs['fontsize'] = 9
+    ax.set_title(title, loc='left', **title_kwargs)
+    fig.canvas.manager.set_window_title(title)
+    title = (
+        f'{tr0.id} | {tr0.stats.distance:.1f} km | '
+        f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f} Hz'
+    )
+    ax.set_title(title, loc='right', **title_kwargs)
+    figure_name = (
+        f'family_{family.number}_{tr0.id}_'
+        f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f}Hz_heatmap'
+    )
+    rows = np.arange(ntraces)
+    p_arrivals = np.array(
+        [tr.stats.P_arrival_time - tr.stats.starttime for tr in events]) - t0
+    s_arrivals = np.array(
+        [tr.stats.S_arrival_time - tr.stats.starttime for tr in events]) - t0
+    arrival_artists = [
+        ax.plot(
+            p_arrivals, rows, linestyle='', marker='|', color='g',
+            markersize=4, zorder=3)[0],
+        ax.plot(
+            s_arrivals, rows, linestyle='', marker='|', color='r',
+            markersize=4, zorder=3)[0],
+    ]
+    if average:
+        tr_average = average[0]
+        data = tr_average.data.astype(float)
+        times = tr_average.times() - t0
+        in_window = (times >= 0) & (times <= t1 - t0)
+        data = data - data[in_window].mean()
+        amplitude = np.abs(data[in_window]).max()
+        if amplitude:
+            data = data / amplitude
+        ax_template.plot(
+            times, data, color=AVERAGE_COLOR, linewidth=0.8)
+        ax_template.set_ylim(-1.1, 1.1)
+        ax_template.set_yticks([])
+        ax_template.set_ylabel(
+            'average', rotation=0, ha='right', va='center',
+            color=AVERAGE_COLOR, fontsize=LABEL_FONTSIZE)
+        txt = ax_template.text(
+            0.01, 0.9, _coordinates_text(tr_average),
+            transform=ax_template.transAxes, va='top',
+            color=AVERAGE_COLOR, fontsize=LABEL_FONTSIZE)
+        txt.set_path_effects(
+            [PathEffects.withStroke(linewidth=3, foreground='w')])
+        for key in ('P_arrival_time', 'S_arrival_time'):
+            arrival = (
+                getattr(tr_average.stats, key)
+                - tr_average.stats.starttime
+            )
+            color = 'g' if key.startswith('P') else 'r'
+            arrival_artists.append(
+                ax_template.axvline(
+                    arrival - t0, color=color, linewidth=0.8))
+    else:
+        ax_template.set_visible(False)
+    ax_template.set_xlim(0, t1 - t0)
+    ax_template.set_xlabel('Time (s)')
+    ax_template.minorticks_on()
+    ax_template.tick_params(axis='x', which='both', direction='in')
+    for artist in arrival_artists:
+        artist.set_visible(False)
+
+    def _contrast_zoom(zoom_level):
+        vmin, vmax = image.get_clim()
+        center = 0.5 * (vmin + vmax)
+        half_span = 0.5 * (vmax - vmin) * zoom_level
+        image.set_clim(center - half_span, center + half_span)
+        _update_colorbar_labels(colorbar, image)
+        fig.canvas.draw_idle()
+
+    def _toggle_arrivals():
+        visible = not arrival_artists[0].get_visible()
+        for artist in arrival_artists:
+            artist.set_visible(visible)
+        fig.canvas.draw_idle()
+
+    def _keypress(event):
+        if event.key == 'up':
+            _keypress.contrast_level /= 2
+            _contrast_zoom(0.5)
+        elif event.key == 'down':
+            _keypress.contrast_level *= 2
+            _contrast_zoom(2)
+        elif event.key == 'right':
+            _keypress.pan_amount += 1
+            _pan_plot(fig, ax, 1)
+        elif event.key == 'left':
+            _keypress.pan_amount -= 1
+            _pan_plot(fig, ax, -1)
+        elif event.key == 'shift+right':
+            _keypress.time_zoom_level /= 2
+            _time_zoom(fig, ax, 0.5)
+        elif event.key == 'shift+left':
+            _keypress.time_zoom_level *= 2
+            _time_zoom(fig, ax, 2)
+        elif event.key == '0':
+            _contrast_zoom(1.0 / _keypress.contrast_level)
+            _time_zoom(fig, ax, 1.0 / _keypress.time_zoom_level)
+            _pan_plot(fig, ax, -_keypress.pan_amount)
+            _keypress.contrast_level = 1
+            _keypress.time_zoom_level = 1
+            _keypress.pan_amount = 0
+        elif event.key == 'a':
+            _toggle_arrivals()
+
+    _keypress.contrast_level = 1
+    _keypress.time_zoom_level = 1
+    _keypress.pan_amount = 0
+    fig.canvas.mpl_connect('key_press_event', _keypress)
+    return fig, figure_name
+
+
 def plot_families():
     """Plot traces for one or more event families."""
     try:
@@ -498,10 +792,18 @@ def plot_families():
         fig, figure_name = result
         save_or_show_plot(fig, figure_name, show=False)
     if config.args.output == 'NO_OUTPUT':
-        print('''
+        if getattr(config.args, 'mode', 'wiggle') == 'heatmap':
+            amplitude_help = (
+                'Use up/down arrow keys to increase/decrease the color scale.'
+            )
+        else:
+            amplitude_help = (
+                'Use up/down arrow keys to increase/decrease trace amplitude.'
+            )
+        print(f'''
         Use left/right arrow keys to scroll backwards/forward in time.
         Use shift+left/shift+right to increase/decrease the time window.
-        Use up/down arrow keys to increase/decrease trace amplitude.
+        {amplitude_help}
         Press '0' to reset the view.
         Press 'a' to show/hide theoretical arrivals.
         Press 'q' to close a plot.

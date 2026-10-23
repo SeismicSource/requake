@@ -4,6 +4,10 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- ``plot_families``: new ``--mode`` option, to draw the families as a
+  heatmap (``--mode heatmap``): one row per event, with the trace
+  amplitudes encoded in color and the family average drawn as a wiggle
+  below. The default remains the wiggle plot (``--mode wiggle``).
 - ``plot_families``: new ``--max-labels`` option (default 15), to set
   the maximum number of traces carrying a label. When a family has more
   traces than that, only a subset of them is labeled (in wiggle mode,

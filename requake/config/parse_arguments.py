@@ -623,6 +623,14 @@ def parse_arguments(progname='requake'):
         help='plot family members found with template scan'
     )
     plot_families.add_argument(
+        '--mode', type=str, default='wiggle',
+        choices=['wiggle', 'heatmap'],
+        help='plot mode. "wiggle" draws one trace per event, as a line; '
+             '"heatmap" draws the traces as an image, one row per event, '
+             'with the normalized amplitude encoded in color. '
+             'Default: %(default)s'
+    )
+    plot_families.add_argument(
         '--max-labels', type=int, default=None, metavar='NLABELS',
         help='maximum number of traces carrying a label; when a family has '
              'more traces than this, only a subset of them is labeled, at '

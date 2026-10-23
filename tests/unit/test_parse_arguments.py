@@ -132,6 +132,26 @@ class TestPrintFamiliesOptions(unittest.TestCase):
 class TestPlotFamiliesOptions(unittest.TestCase):
     """Test the ``plot_families`` command line options."""
 
+    def test_default_mode(self):
+        """The wiggle plot mode must be the default."""
+        self.assertEqual(_parse_args('plot_families').mode, 'wiggle')
+
+    def test_mode_option(self):
+        """``--mode`` must select the requested plot mode."""
+        self.assertEqual(
+            _parse_args('plot_families', '--mode', 'heatmap').mode,
+            'heatmap')
+        self.assertEqual(
+            _parse_args('plot_families', '--mode', 'wiggle').mode,
+            'wiggle')
+
+    def test_invalid_mode(self):
+        """An unknown plot mode must be rejected by argparse."""
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as cm:
+                _parse_args('plot_families', '--mode', 'matrix')
+        self.assertEqual(cm.exception.code, 2)
+
     def test_default_max_labels(self):
         """``--max-labels`` must be unset by default."""
         self.assertIsNone(_parse_args('plot_families').max_labels)
