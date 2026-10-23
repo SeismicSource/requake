@@ -262,7 +262,13 @@ class TestTheoreticalArrivals(unittest.TestCase):
         st = _make_stream()
         fig, _ = plot_families_module._plot_family_wiggle(
             Namespace(number=1), st, st[0], 1.0, 4.0)
-        return fig, fig.axes[0], len(st)
+        # the average trace is not in the wiggle panel
+        return fig, fig.axes[0], len(st) - 1
+
+    def test_wiggle_and_bottom_panels(self):
+        """The figure must show a wiggle panel and a bottom panel."""
+        fig, _, _ = self._plot()
+        self.assertEqual(len(fig.axes), 2)
 
     def test_arrivals_on_all_traces(self):
         """A P and an S bar must be drawn for every trace."""

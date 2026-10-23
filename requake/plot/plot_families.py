@@ -61,6 +61,13 @@ AMPLITUDE_CMAP = 'seismic'
 AMPLITUDE_INTERPOLATION = 'bilinear'
 # Color of the average (template) trace
 AVERAGE_COLOR = '#cc8800'
+# Bottom panel, where all the traces are stacked on top of each other,
+# with the average trace drawn on top of them
+AVERAGE_LINEWIDTH = 1.2
+STACKED_AMPLITUDE = 1.0
+STACKED_COLOR = '0.2'
+STACKED_LINEWIDTH = 0.4
+PANEL_MARGIN = 0.15
 # Font size of the trace labels
 LABEL_FONTSIZE = 8
 # Default maximum number of labeled traces, when --max-labels is not given
@@ -306,17 +313,38 @@ def _build_amplitude_matrix(traces, t0, t1):
     times = t0 + np.arange(nsamples) * dt
     matrix = np.zeros((len(traces), nsamples))
     for n, tr in enumerate(traces):
-        tr_times = tr.times()
-        data = tr.data.astype(float)
-        window = data[(tr_times >= t0) & (tr_times <= t1)]
-        if window.size:
-            mean = window.mean()
-            data = data - mean
-            amplitude = np.abs(window - mean).max()
-            if amplitude:
-                data = data / amplitude
+        tr_times, data = _normalized_trace_data(tr, t0, t1)
         matrix[n] = np.interp(times, tr_times, data, left=0., right=0.)
     return matrix, times
+
+
+def _normalized_trace_data(trace, t0, t1):
+    """
+    Return the times and the data of a trace, normalized in a window.
+
+    The data is demeaned and normalized to the [-1, 1] range within the
+    [t0, t1] time window. The same normalization is applied to the whole
+    trace.
+
+    :param trace: trace to normalize
+    :type trace: obspy.Trace
+    :param t0: start of the time window, in seconds relative to trace start
+    :type t0: float
+    :param t1: end of the time window, in seconds relative to trace start
+    :type t1: float
+    :return: times and normalized data
+    :rtype: numpy.ndarray, numpy.ndarray
+    """
+    data = trace.data.astype(float)
+    times = trace.times()
+    in_window = (times >= t0) & (times <= t1)
+    if not in_window.any():
+        return times, data
+    data = data - data[in_window].mean()
+    amplitude = np.abs(data[in_window]).max()
+    if amplitude:
+        data = data / amplitude
+    return times, data
 
 
 def _is_average(trace):
@@ -329,6 +357,20 @@ def _is_average(trace):
     :rtype: bool
     """
     return 'average' in trace.stats.evid
+
+
+def _events_and_average(st):
+    """
+    Return the event traces and the average (template) trace.
+
+    :param st: stream of aligned traces
+    :type st: obspy.Stream
+    :return: event traces and average trace (None if missing)
+    :rtype: list of obspy.Trace, obspy.Trace or None
+    """
+    events = [tr for tr in st if not _is_average(tr)]
+    averages = [tr for tr in st if _is_average(tr)]
+    return events, averages[0] if averages else None
 
 
 def _event_info_text(trace):
@@ -415,6 +457,194 @@ def _pan_plot(fig, ax, amount):
     fig.canvas.draw_idle()
 
 
+def _family_figure(with_colorbar=False):
+    """
+    Create the figure of a family plot.
+
+    The figure has a main panel and a bottom panel. The bottom panel is
+    an extra column for the colorbar, when requested.
+
+    :param with_colorbar: whether to reserve a column for the colorbar
+    :type with_colorbar: bool
+    :return: figure, main axes, bottom axes and colorbar axes (or None)
+    :rtype: matplotlib.figure.Figure, matplotlib.axes.Axes,
+        matplotlib.axes.Axes, matplotlib.axes.Axes or None
+    """
+    fig = plt.figure(figsize=(8, 7.5))
+    if with_colorbar:
+        gs = fig.add_gridspec(
+            2, 2, width_ratios=(1, 0.03), height_ratios=(12, 2),
+            left=0.17, right=0.87, bottom=0.07, top=0.93, hspace=0.04,
+            wspace=0.03)
+    else:
+        gs = fig.add_gridspec(
+            2, 1, height_ratios=(12, 2), left=0.17, right=0.97,
+            bottom=0.07, top=0.93, hspace=0.04)
+    ax = fig.add_subplot(gs[0, 0])
+    ax_bottom = fig.add_subplot(gs[1, 0], sharex=ax)
+    colorbar_ax = fig.add_subplot(gs[0, 1]) if with_colorbar else None
+    return fig, ax, ax_bottom, colorbar_ax
+
+
+def _arrival_lines(ax, trace, t0):
+    """
+    Draw the theoretical arrivals of a trace in the bottom panel.
+
+    :param ax: axes to draw in
+    :type ax: matplotlib.axes.Axes
+    :param trace: trace whose arrivals are drawn
+    :type trace: obspy.Trace
+    :param t0: start of the time window, in seconds relative to trace start
+    :type t0: float
+    :return: P and S arrival lines
+    :rtype: list
+    """
+    ymin = -STACKED_AMPLITUDE
+    ymax = STACKED_AMPLITUDE
+    artists = []
+    for color, key in (('g', 'P_arrival_time'), ('r', 'S_arrival_time')):
+        arrival = getattr(trace.stats, key) - trace.stats.starttime - t0
+        artists.append(
+            ax.vlines(arrival, ymin, ymax, color=color, linewidth=0.8))
+    return artists
+
+
+def _style_bottom_panel(ax, t0, t1):
+    """
+    Style the bottom panel and add its labels.
+
+    :param ax: bottom axes
+    :type ax: matplotlib.axes.Axes
+    :param t0: start of the time window, in seconds relative to trace start
+    :type t0: float
+    :param t1: end of the time window, in seconds relative to trace start
+    :type t1: float
+    """
+    ax.set_ylim(
+        -STACKED_AMPLITUDE - PANEL_MARGIN,
+        STACKED_AMPLITUDE + PANEL_MARGIN)
+    ax.set_yticks([])
+    ax.set_xlim(0, t1 - t0)
+    ax.set_xlabel('Time (s)')
+    ax.minorticks_on()
+    ax.tick_params(which='both', top=True, labeltop=False)
+    ax.tick_params(axis='x', which='both', direction='in')
+    trans = ax.get_yaxis_transform()
+    ax.text(
+        -0.01, 0, 'stacked', transform=trans, ha='right', va='center',
+        fontsize=LABEL_FONTSIZE)
+
+
+def _plot_average_stacked_panel(ax, events, tr_average, t0, t1):
+    """
+    Plot the traces stacked one over each other, the average on top.
+
+    :param ax: axes to draw in
+    :type ax: matplotlib.axes.Axes
+    :param events: traces of the family events
+    :type events: list of obspy.Trace
+    :param tr_average: average (template) trace, or None
+    :type tr_average: obspy.Trace or None
+    :param t0: start of the time window, in seconds relative to trace start
+    :type t0: float
+    :param t1: end of the time window, in seconds relative to trace start
+    :type t1: float
+    :return: average line (or None), stacked lines and arrival artists
+    :rtype: matplotlib.lines.Line2D or None, list, list
+    """
+    alpha = _unlabeled_alpha(len(events), 0)
+    stacked_lines = []
+    for tr in events:
+        times, data = _normalized_trace_data(tr, t0, t1)
+        line, = ax.plot(
+            times - t0, STACKED_AMPLITUDE * data, color=STACKED_COLOR,
+            linewidth=STACKED_LINEWIDTH, alpha=alpha, zorder=1)
+        stacked_lines.append(line)
+    average_line = None
+    arrival_artists = []
+    if tr_average is not None:
+        times, data = _normalized_trace_data(tr_average, t0, t1)
+        average_line, = ax.plot(
+            times - t0, STACKED_AMPLITUDE * data,
+            color=AVERAGE_COLOR, linewidth=AVERAGE_LINEWIDTH, zorder=3)
+        txt = ax.text(
+            0.01, 0.97, f'average  {_coordinates_text(tr_average)}',
+            transform=ax.transAxes, va='top', color=AVERAGE_COLOR,
+            fontsize=LABEL_FONTSIZE)
+        txt.set_path_effects(
+            [PathEffects.withStroke(linewidth=3, foreground='w')])
+        arrival_artists = _arrival_lines(ax, tr_average, t0)
+        for artist in arrival_artists:
+            artist.set_visible(False)
+    _style_bottom_panel(ax, t0, t1)
+    return average_line, stacked_lines, arrival_artists
+
+
+def _set_family_titles(fig, ax, family, ntraces, tr0, extra='',
+                       fontsize=None):
+    """
+    Set the titles of a family plot.
+
+    :param fig: figure containing the plot
+    :type fig: matplotlib.figure.Figure
+    :param ax: main axes
+    :type ax: matplotlib.axes.Axes
+    :param family: family being plotted
+    :type family: Family
+    :param ntraces: number of traces in the plot
+    :type ntraces: int
+    :param tr0: first trace of the family
+    :type tr0: obspy.Trace
+    :param extra: text appended to the left title
+    :type extra: str
+    :param fontsize: title font size, or None for the default
+    :type fontsize: float or None
+    """
+    title_kwargs = {} if fontsize is None else {'fontsize': fontsize}
+    title = f'Family {family.number} | {ntraces} events{extra}'
+    ax.set_title(title, loc='left', **title_kwargs)
+    fig.canvas.manager.set_window_title(title)
+    title = (
+        f'{tr0.id} | {tr0.stats.distance:.1f} km | '
+        f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f} Hz'
+    )
+    ax.set_title(title, loc='right', **title_kwargs)
+
+
+def _scale_lines(lines, zoom_level, center=None):
+    """
+    Scale the vertical amplitude of a set of lines.
+
+    :param lines: lines to scale
+    :type lines: list of matplotlib.lines.Line2D
+    :param zoom_level: factor by which the amplitude is multiplied
+    :type zoom_level: float
+    :param center: y value that is kept fixed; None means the line mean
+    :type center: float or None
+    """
+    for line in lines:
+        ydata = line.get_ydata()
+        ycenter = ydata.mean() if center is None else center
+        line.set_ydata((ydata - ycenter) * zoom_level + ycenter)
+
+
+def _labeled_every_text(ntraces, nlabeled):
+    """
+    Return the title hint on the label interval, or an empty string.
+
+    :param ntraces: number of traces in the plot
+    :type ntraces: int
+    :param nlabeled: number of labeled traces
+    :type nlabeled: int
+    :return: title hint
+    :rtype: str
+    """
+    if nlabeled >= ntraces or nlabeled < 2:
+        return ''
+    step = round((ntraces - 1) / (nlabeled - 1))
+    return f' | labeled every {_ordinal(step)}'
+
+
 def _plot_family(family):
     """Plot the traces of a family, using the selected plot mode."""
     try:
@@ -433,7 +663,8 @@ def _plot_family(family):
 def _plot_family_wiggle(family, st, tr0, t0, t1):
     """Plot the traces of a family as wiggles, one per event."""
     st.sort()
-    ntraces = len(st)
+    events, tr_average = _events_and_average(st)
+    ntraces = len(events)
     labeled_rows = set(_labeled_rows(ntraces, _max_labels()))
     _warn_if_max_labels_ignored(family, len(labeled_rows))
     if len(labeled_rows) < ntraces:
@@ -445,14 +676,18 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
         unlabeled_alpha = UNLABELED_ALPHA
         labeled_linewidth = DEFAULT_LINEWIDTH
 
-    fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+    fig, ax, ax_bottom, _ = _family_figure()
+    average_line, stacked_lines, arrival_artists = (
+        _plot_average_stacked_panel(
+            ax_bottom, events, tr_average, t0, t1))
+    bottom_lines = stacked_lines
+    if average_line is not None:
+        bottom_lines = stacked_lines + [average_line]
     tracelines = []
     p_bars = []
     s_bars = []
-    for n, tr in enumerate(st):
-        average_trace = _is_average(tr)
-        # when every trace is labeled, labeled_rows covers them all
-        labeled = average_trace or n in labeled_rows
+    for n, tr in enumerate(events):
+        labeled = n in labeled_rows
         # Normalize trace between t0 and t1
         tt0 = tr.stats.starttime + t0
         tt1 = tr.stats.starttime + t1
@@ -467,7 +702,7 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
             alpha = unlabeled_alpha
             zorder = 1
         else:
-            color = AVERAGE_COLOR if average_trace else 'black'
+            color = 'black'
             linewidth = labeled_linewidth
             alpha = 1
             zorder = 2
@@ -492,30 +727,27 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
         if not labeled:
             continue
         trans = ax.get_yaxis_transform()
-        if average_trace:
-            y_label = 'average'
-            info_text = _coordinates_text(tr)
-        else:
-            y_label = tr.stats.orig_time.strftime('%Y-%m-%d\n%H:%M:%S')
-            info_text = _event_info_text(tr)
+        y_label = tr.stats.orig_time.strftime('%Y-%m-%d\n%H:%M:%S')
         ax.text(
             -0.01, n, y_label, transform=trans, ha='right', va='center',
             color=color, fontsize=LABEL_FONTSIZE, linespacing=1.5)
         txt = ax.text(
-            0.01, n + 0.2, info_text, transform=trans,
+            0.01, n + 0.2, _event_info_text(tr), transform=trans,
             color=color, fontsize=LABEL_FONTSIZE, linespacing=1.5)
         txt.set_path_effects(
             [PathEffects.withStroke(linewidth=3, foreground='w')])
-        if not average_trace:
-            text = f'CC mean {tr.stats.cc_mean:.2f}'
-            txt = ax.text(
-                0.98, n + 0.2, text, ha='right',
-                color=color, transform=trans, fontsize=LABEL_FONTSIZE)
-            txt.set_path_effects(
-                [PathEffects.withStroke(linewidth=3, foreground='w')])
-    legend = ax.legend(
-        [p_bars[-1], s_bars[-1]], ['P theo', 'S theo'], loc='lower right')
-    legend.set_visible(False)
+        txt = ax.text(
+            0.98, n + 0.2, f'CC mean {tr.stats.cc_mean:.2f}', ha='right',
+            color=color, transform=trans, fontsize=LABEL_FONTSIZE)
+        txt.set_path_effects(
+            [PathEffects.withStroke(linewidth=3, foreground='w')])
+    if p_bars:
+        legend = ax.legend(
+            [p_bars[-1], s_bars[-1]], ['P theo', 'S theo'],
+            loc='lower right')
+        legend.set_visible(False)
+    else:
+        legend = None
     for ps_bar in p_bars + s_bars:
         ps_bar.set_visible(False)
     ax.axes.yaxis.set_visible(False)
@@ -523,49 +755,36 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
     ax.tick_params(which='both', top=True, labeltop=False)
     ax.tick_params(axis='x', which='both', direction='in')
     ax.set_xlim(0, t1 - t0)
-    ax.set_xlabel('Time (s)')
-    title = f'Family {family.number} | {len(st) - 1} events'
-    # a smaller font is needed when the labeling hint makes the title longer
-    title_kwargs = {}
-    if len(labeled_rows) < ntraces:
-        step = round((ntraces - 1) / (len(labeled_rows) - 1))
-        title += f' | labeled every {_ordinal(step)}'
-        title_kwargs['fontsize'] = 10
-    ax.set_title(title, loc='left', **title_kwargs)
-    fig.canvas.manager.set_window_title(title)
-    title = (
-        f'{tr0.id} | {tr0.stats.distance:.1f} km | '
-        f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f} Hz'
-    )
-    ax.set_title(title, loc='right', **title_kwargs)
+    ax.tick_params(labelbottom=False)
+    extra = _labeled_every_text(ntraces, len(labeled_rows))
+    _set_family_titles(
+        fig, ax, family, ntraces, tr0, extra=extra,
+        fontsize=10 if extra else None)
     figure_name = (
         f'family_{family.number}_{tr0.id}_'
         f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f}Hz'
     )
 
     def _zoom_lines(zoom_level):
-        for line in tracelines:
-            ydata = line.get_ydata()
-            ymean = ydata.mean()
-            ydata = (ydata - ymean) * zoom_level + ymean
-            line.set_ydata(ydata)
+        _scale_lines(tracelines, zoom_level)
+        _scale_lines(bottom_lines, zoom_level, center=0)
         fig.canvas.draw_idle()
 
     def _toggle_arrivals():
         _toggle_arrivals.visible = not _toggle_arrivals.visible
-        for ps_bar in p_bars + s_bars:
+        for ps_bar in p_bars + s_bars + arrival_artists:
             ps_bar.set_visible(_toggle_arrivals.visible)
-        legend.set_visible(_toggle_arrivals.visible)
+        if legend is not None:
+            legend.set_visible(_toggle_arrivals.visible)
         fig.canvas.draw_idle()
 
     _toggle_arrivals.visible = False
 
     def _keypress(event):
-        ax = event.canvas.figure.axes[0]
         if event.key == 'up':
             _keypress.zoom_level *= 2
             _zoom_lines(2)
-        if event.key == 'down':
+        elif event.key == 'down':
             _keypress.zoom_level /= 2
             _zoom_lines(0.5)
         elif event.key == 'right':
@@ -600,22 +819,20 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
 def _plot_family_heatmap(family, st, tr0, t0, t1):
     """Plot the traces of a family as a heatmap, one row per event."""
     st.sort()
-    events = [tr for tr in st if not _is_average(tr)]
-    average = [tr for tr in st if _is_average(tr)]
+    events, tr_average = _events_and_average(st)
     ntraces = len(events)
     matrix, _ = _build_amplitude_matrix(events, t0, t1)
     # fixed margins leave a constant room for the tick and colorbar
     # labels, so that the layout does not change when the color range is
     # changed; the colorbar gets its own column, so that the heatmap and
-    # the average trace panel have the same width
-    fig = plt.figure(figsize=(8, 8))
-    gs = fig.add_gridspec(
-        2, 2, width_ratios=(1, 0.03), height_ratios=(8, 1),
-        left=0.17, right=0.87, bottom=0.07, top=0.93, hspace=0.10,
-        wspace=0.03)
-    ax = fig.add_subplot(gs[0, 0])
-    ax_template = fig.add_subplot(gs[1, 0], sharex=ax)
-    colorbar_ax = fig.add_subplot(gs[0, 1])
+    # the bottom panel have the same width
+    fig, ax, ax_bottom, colorbar_ax = _family_figure(with_colorbar=True)
+    average_line, stacked_lines, bottom_arrivals = (
+        _plot_average_stacked_panel(
+            ax_bottom, events, tr_average, t0, t1))
+    bottom_lines = stacked_lines
+    if average_line is not None:
+        bottom_lines = stacked_lines + [average_line]
     image = ax.imshow(
         matrix, aspect='auto', origin='upper', cmap=AMPLITUDE_CMAP,
         vmin=-1, vmax=1, extent=(0, t1 - t0, ntraces - 0.5, -0.5),
@@ -649,20 +866,10 @@ def _plot_family_heatmap(family, st, tr0, t0, t1):
     ax.minorticks_on()
     ax.tick_params(
         which='both', top=True, labeltop=False, labelbottom=False)
-    title = f'Family {family.number} | {ntraces} events'
-    # a smaller font is needed when the labeling hint makes the title longer
-    title_kwargs = {}
-    if len(positions) < ntraces:
-        step = round((ntraces - 1) / (len(positions) - 1))
-        title += f' | labeled every {_ordinal(step)}'
-        title_kwargs['fontsize'] = 9
-    ax.set_title(title, loc='left', **title_kwargs)
-    fig.canvas.manager.set_window_title(title)
-    title = (
-        f'{tr0.id} | {tr0.stats.distance:.1f} km | '
-        f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f} Hz'
-    )
-    ax.set_title(title, loc='right', **title_kwargs)
+    extra = _labeled_every_text(ntraces, len(positions))
+    _set_family_titles(
+        fig, ax, family, ntraces, tr0, extra=extra,
+        fontsize=9 if extra else None)
     figure_name = (
         f'family_{family.number}_{tr0.id}_'
         f'{tr0.stats.freq_min:.1f}-{tr0.stats.freq_max:.1f}Hz_heatmap'
@@ -680,43 +887,8 @@ def _plot_family_heatmap(family, st, tr0, t0, t1):
             s_arrivals, rows, linestyle='', marker='|', color='r',
             markersize=4, zorder=3)[0],
     ]
-    if average:
-        tr_average = average[0]
-        data = tr_average.data.astype(float)
-        times = tr_average.times() - t0
-        in_window = (times >= 0) & (times <= t1 - t0)
-        data = data - data[in_window].mean()
-        amplitude = np.abs(data[in_window]).max()
-        if amplitude:
-            data = data / amplitude
-        ax_template.plot(
-            times, data, color=AVERAGE_COLOR, linewidth=0.8)
-        ax_template.set_ylim(-1.1, 1.1)
-        ax_template.set_yticks([])
-        ax_template.set_ylabel(
-            'average', rotation=0, ha='right', va='center',
-            color=AVERAGE_COLOR, fontsize=LABEL_FONTSIZE)
-        txt = ax_template.text(
-            0.01, 0.9, _coordinates_text(tr_average),
-            transform=ax_template.transAxes, va='top',
-            color=AVERAGE_COLOR, fontsize=LABEL_FONTSIZE)
-        txt.set_path_effects(
-            [PathEffects.withStroke(linewidth=3, foreground='w')])
-        for key in ('P_arrival_time', 'S_arrival_time'):
-            arrival = (
-                getattr(tr_average.stats, key)
-                - tr_average.stats.starttime
-            )
-            color = 'g' if key.startswith('P') else 'r'
-            arrival_artists.append(
-                ax_template.axvline(
-                    arrival - t0, color=color, linewidth=0.8))
-    else:
-        ax_template.set_visible(False)
-    ax_template.set_xlim(0, t1 - t0)
-    ax_template.set_xlabel('Time (s)')
-    ax_template.minorticks_on()
-    ax_template.tick_params(axis='x', which='both', direction='in')
+    # the arrivals of the average trace are drawn in the bottom panel
+    arrival_artists.extend(bottom_arrivals)
     for artist in arrival_artists:
         artist.set_visible(False)
 
@@ -728,6 +900,10 @@ def _plot_family_heatmap(family, st, tr0, t0, t1):
         _update_colorbar_labels(colorbar, image)
         fig.canvas.draw_idle()
 
+    def _zoom_lines(zoom_level):
+        _scale_lines(bottom_lines, zoom_level, center=0)
+        fig.canvas.draw_idle()
+
     def _toggle_arrivals():
         visible = not arrival_artists[0].get_visible()
         for artist in arrival_artists:
@@ -736,9 +912,15 @@ def _plot_family_heatmap(family, st, tr0, t0, t1):
 
     def _keypress(event):
         if event.key == 'up':
+            _keypress.zoom_level *= 2
+            _zoom_lines(2)
+        elif event.key == 'down':
+            _keypress.zoom_level /= 2
+            _zoom_lines(0.5)
+        elif event.key == 'shift+up':
             _keypress.contrast_level /= 2
             _contrast_zoom(0.5)
-        elif event.key == 'down':
+        elif event.key == 'shift+down':
             _keypress.contrast_level *= 2
             _contrast_zoom(2)
         elif event.key == 'right':
@@ -754,15 +936,18 @@ def _plot_family_heatmap(family, st, tr0, t0, t1):
             _keypress.time_zoom_level *= 2
             _time_zoom(fig, ax, 2)
         elif event.key == '0':
+            _zoom_lines(1.0 / _keypress.zoom_level)
             _contrast_zoom(1.0 / _keypress.contrast_level)
             _time_zoom(fig, ax, 1.0 / _keypress.time_zoom_level)
             _pan_plot(fig, ax, -_keypress.pan_amount)
+            _keypress.zoom_level = 1
             _keypress.contrast_level = 1
             _keypress.time_zoom_level = 1
             _keypress.pan_amount = 0
         elif event.key == 'a':
             _toggle_arrivals()
 
+    _keypress.zoom_level = 1
     _keypress.contrast_level = 1
     _keypress.time_zoom_level = 1
     _keypress.pan_amount = 0
@@ -792,20 +977,20 @@ def plot_families():
         fig, figure_name = result
         save_or_show_plot(fig, figure_name, show=False)
     if config.args.output == 'NO_OUTPUT':
+        help_lines = [
+            'Use left/right arrow keys to scroll backwards/forward in time.',
+            'Use shift+left/shift+right to increase/decrease the time '
+            'window.',
+            'Use up/down arrow keys to increase/decrease trace amplitude.',
+        ]
         if getattr(config.args, 'mode', 'wiggle') == 'heatmap':
-            amplitude_help = (
-                'Use up/down arrow keys to increase/decrease the color scale.'
-            )
-        else:
-            amplitude_help = (
-                'Use up/down arrow keys to increase/decrease trace amplitude.'
-            )
-        print(f'''
-        Use left/right arrow keys to scroll backwards/forward in time.
-        Use shift+left/shift+right to increase/decrease the time window.
-        {amplitude_help}
-        Press '0' to reset the view.
-        Press 'a' to show/hide theoretical arrivals.
-        Press 'q' to close a plot.
-        ''')
+            help_lines.append(
+                'Use shift+up/shift+down to increase/decrease the color '
+                'scale.')
+        help_lines += [
+            "Press '0' to reset the view.",
+            "Press 'a' to show/hide theoretical arrivals.",
+            "Press 'q' to close a plot.",
+        ]
+        print('\n'.join(f'        {line}' for line in help_lines))
         plt.show()

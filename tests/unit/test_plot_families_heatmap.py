@@ -311,11 +311,14 @@ class TestPlotFamilyHeatmap(unittest.TestCase):
         st = _make_traces()
         fig, _ = plot_families_module._plot_family_heatmap(
             family, st, st[0], 1.0, 3.0)
-        template_ax = fig.axes[1]
-        label = template_ax.yaxis.label
+        bottom_ax = fig.axes[1]
+        labels = [
+            text for text in bottom_ax.texts
+            if text.get_text().startswith('average')]
+        self.assertEqual(len(labels), 1)
         self.assertEqual(
-            label.get_color(), plot_families_module.AVERAGE_COLOR)
-        self.assertEqual(label.get_fontsize(), 8)
+            labels[0].get_color(), plot_families_module.AVERAGE_COLOR)
+        self.assertEqual(labels[0].get_fontsize(), 8)
 
     def test_layout_is_stable_when_the_contrast_changes(self):
         """Changing the color range must not move the panels."""
@@ -359,17 +362,19 @@ class TestPlotFamilyHeatmap(unittest.TestCase):
             heatmap_pos.width, template_pos.width, places=6)
 
     def test_average_trace_is_drawn_as_wiggle(self):
-        """The average trace must be drawn as a line in the bottom axes."""
+        """The average trace must be a line in the bottom axes."""
         family = Namespace(number=1)
         st = _make_traces()
         fig, _ = plot_families_module._plot_family_heatmap(
             family, st, st[0], 1.0, 3.0)
-        template_ax = fig.axes[1]
-        lines = template_ax.get_lines()
-        # the wiggle, plus the (hidden) P and S arrival lines
-        self.assertEqual(len(lines), 3)
-        self.assertEqual(lines[0].get_color(), '#cc8800')
-        self.assertEqual(template_ax.get_ylabel(), 'average')
+        bottom_ax = fig.axes[1]
+        average_lines = [
+            line for line in bottom_ax.get_lines()
+            if line.get_color() == plot_families_module.AVERAGE_COLOR]
+        self.assertEqual(len(average_lines), 1)
+        self.assertEqual(
+            average_lines[0].get_linewidth(),
+            plot_families_module.AVERAGE_LINEWIDTH)
 
 
 if __name__ == '__main__':
