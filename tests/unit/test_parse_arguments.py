@@ -132,24 +132,22 @@ class TestPrintFamiliesOptions(unittest.TestCase):
 class TestPlotFamiliesOptions(unittest.TestCase):
     """Test the ``plot_families`` command line options."""
 
-    def test_default_compact_above(self):
-        """The compact mode threshold must default to 15 events."""
-        self.assertEqual(_parse_args('plot_families').compact_above, 15)
+    def test_default_max_labels(self):
+        """``--max-labels`` must be unset by default."""
+        self.assertIsNone(_parse_args('plot_families').max_labels)
 
-    def test_compact_above_option(self):
-        """``--compact-above`` must set the compact mode threshold."""
+    def test_max_labels_option(self):
+        """``--max-labels`` must set the maximum number of labels."""
         self.assertEqual(
-            _parse_args(
-                'plot_families', '--compact-above', '40').compact_above, 40)
+            _parse_args('plot_families', '--max-labels', '40').max_labels, 40)
         self.assertEqual(
-            _parse_args(
-                'plot_families', '--compact-above', '0').compact_above, 0)
+            _parse_args('plot_families', '--max-labels', '0').max_labels, 0)
 
-    def test_invalid_compact_above(self):
-        """A non-integer threshold must be rejected by argparse."""
+    def test_invalid_max_labels(self):
+        """A non-integer label limit must be rejected by argparse."""
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit) as cm:
-                _parse_args('plot_families', '--compact-above', 'many')
+                _parse_args('plot_families', '--max-labels', 'many')
         self.assertEqual(cm.exception.code, 2)
 
 

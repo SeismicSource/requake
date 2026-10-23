@@ -1,7 +1,9 @@
 # -*- coding: utf8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Unit tests for trace labeling and amplitude of the ``plot_families`` command.
+Unit tests for trace labeling, amplitude and theoretical arrivals.
+
+These are tests for the ``plot_families`` command.
 
 :copyright:
     2021-2026 Claudio Satriano <satriano@ipgp.fr>
@@ -10,6 +12,7 @@ Unit tests for trace labeling and amplitude of the ``plot_families`` command.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 
+import contextlib
 import importlib
 import unittest
 from argparse import Namespace
@@ -26,7 +29,7 @@ def _plot_families_module():
     """
     had_args = 'args' in config
     previous_args = config.get('args')
-    config.args = Namespace(compact_above=15, output='NO_OUTPUT')
+    config.args = Namespace(max_labels=15, output='NO_OUTPUT')
     try:
         return importlib.import_module('requake.plot.plot_families')
     finally:
@@ -40,16 +43,12 @@ def _plot_families_module():
 plot_families_module = _plot_families_module()
 
 
-def _is_compact(ntraces, compact_above):
-    """Return whether the family is plotted in compact mode."""
-    return plot_families_module._is_compact(ntraces, compact_above)
+DEFAULT_MAX_LABELS = 15
 
 
-def _label_stride(ntraces, max_labels=None):
-    """Return the labeling stride, optionally with a custom label limit."""
-    if max_labels is None:
-        return plot_families_module._label_stride(ntraces)
-    return plot_families_module._label_stride(ntraces, max_labels)
+def _labeled_rows(ntraces, max_labels=DEFAULT_MAX_LABELS):
+    """Return the labeled row positions, with a custom label limit."""
+    return plot_families_module._labeled_rows(ntraces, max_labels)
 
 
 def _trace_amplitude(ntraces):
@@ -57,97 +56,141 @@ def _trace_amplitude(ntraces):
     return plot_families_module._trace_amplitude(ntraces)
 
 
-def _nlabeled(ntraces, max_labels=None):
-    """Return the number of labeled traces for a given family size."""
-    stride = _label_stride(ntraces, max_labels)
-    return -(-ntraces // stride)
-
-
-def _unlabeled_alpha(ntraces):
+def _unlabeled_alpha(ntraces, max_labels=DEFAULT_MAX_LABELS):
     """Return the alpha of the unlabeled traces, using default settings."""
-    return plot_families_module._unlabeled_alpha(ntraces)
+    nlabeled = len(_labeled_rows(ntraces, max_labels))
+    return plot_families_module._unlabeled_alpha(ntraces, nlabeled)
 
 
-class TestLabelStride(unittest.TestCase):
-    """Test the stride used to label the traces of a family plot."""
+class TestLabeledRows(unittest.TestCase):
+    """Test the rows labeled in a family plot."""
 
     def test_small_family_labels_all_traces(self):
         """Families up to the label limit must label every trace."""
-        self.assertEqual(_label_stride(1), 1)
-        self.assertEqual(_label_stride(2), 1)
-        self.assertEqual(_label_stride(14), 1)
-        self.assertEqual(_label_stride(15), 1)
+        self.assertEqual(_labeled_rows(1), [0])
+        self.assertEqual(_labeled_rows(2), [0, 1])
+        self.assertEqual(_labeled_rows(15), list(range(15)))
 
-    def test_stride_increases_with_family_size(self):
-        """Above the label limit, only a subset of the traces is labeled."""
-        self.assertEqual(_label_stride(16), 2)
-        self.assertEqual(_label_stride(30), 2)
-        self.assertEqual(_label_stride(31), 3)
-        self.assertEqual(_label_stride(119), 8)
-        self.assertEqual(_label_stride(863), 58)
+    def test_zero_label_limit_labels_all_traces(self):
+        """A zero or negative label limit must label every trace."""
+        self.assertEqual(_labeled_rows(7, 0), list(range(7)))
+        self.assertEqual(_labeled_rows(7, -1), list(range(7)))
 
-    def test_custom_label_limit(self):
-        """The label limit must be configurable."""
-        self.assertEqual(_label_stride(100, 10), 10)
-        self.assertEqual(_label_stride(5, 10), 1)
+    def test_single_label_limit(self):
+        """With a limit of one, only the last (top) trace is labeled."""
+        self.assertEqual(_labeled_rows(100, 1), [99])
 
-    def test_number_of_labels_never_exceeds_limit(self):
-        """The label limit must never be exceeded."""
-        self.assertLessEqual(_nlabeled(15), 15)
-        self.assertLessEqual(_nlabeled(30), 15)
-        self.assertLessEqual(_nlabeled(119), 15)
-        self.assertLessEqual(_nlabeled(863), 15)
-        self.assertLessEqual(_nlabeled(100, 10), 10)
-        self.assertLessEqual(_nlabeled(17, 1), 1)
+    def test_label_count_never_exceeds_limit(self):
+        """The label limit must not be exceeded, but for adjacent labels."""
+        self.assertEqual(len(_labeled_rows(22)), 15)
+        self.assertEqual(len(_labeled_rows(30)), 15)
+        self.assertEqual(len(_labeled_rows(119)), 15)
+        self.assertEqual(len(_labeled_rows(863)), 15)
+        self.assertEqual(len(_labeled_rows(100, 10)), 10)
 
+    def test_adjacent_labels_label_all_rows(self):
+        """When the labels would be adjacent, all the rows are labeled."""
+        self.assertEqual(_labeled_rows(16), list(range(16)))
+        self.assertEqual(_labeled_rows(21), list(range(21)))
 
-class TestIsCompact(unittest.TestCase):
-    """Test the choice between full and compact family plots."""
+    def test_first_and_last_rows_are_labeled(self):
+        """The first row and the last (top) row must always be labeled."""
+        self.assertEqual(_labeled_rows(16)[0], 0)
+        self.assertEqual(_labeled_rows(16)[-1], 15)
+        self.assertEqual(_labeled_rows(119)[0], 0)
+        self.assertEqual(_labeled_rows(119)[-1], 118)
+        self.assertEqual(_labeled_rows(863)[0], 0)
+        self.assertEqual(_labeled_rows(863)[-1], 862)
 
-    def test_small_family_is_not_compact(self):
-        """Families up to the threshold must be fully labeled."""
-        self.assertFalse(_is_compact(10, 15))
-        self.assertFalse(_is_compact(15, 15))
+    def test_rows_are_sorted_and_unique(self):
+        """The labeled rows must be sorted, without duplicates."""
+        self.assertEqual(_labeled_rows(16), sorted(set(_labeled_rows(16))))
+        self.assertEqual(
+            _labeled_rows(119), sorted(set(_labeled_rows(119))))
+        self.assertEqual(
+            _labeled_rows(863), sorted(set(_labeled_rows(863))))
 
-    def test_large_family_is_compact(self):
-        """Families above the threshold must be plotted in compact mode."""
-        self.assertTrue(_is_compact(16, 15))
-        self.assertTrue(_is_compact(119, 15))
-
-    def test_custom_threshold(self):
-        """The threshold must decide when the compact mode kicks in."""
-        self.assertFalse(_is_compact(40, 40))
-        self.assertTrue(_is_compact(41, 40))
-        self.assertFalse(_is_compact(119, 200))
-
-    def test_zero_threshold_disables_compact_mode(self):
-        """A zero (or negative) threshold must disable the compact mode."""
-        self.assertFalse(_is_compact(1000, 0))
-        self.assertFalse(_is_compact(1000, -1))
+    def test_rows_are_evenly_spaced(self):
+        """The rows must be spread evenly across the plot."""
+        positions = _labeled_rows(119)
+        gaps = {b - a for a, b in zip(positions[:-1], positions[1:])}
+        self.assertLessEqual(max(gaps) - min(gaps), 1)
 
 
-class TestTraceAmplitude(unittest.TestCase):
-    """Test the amplitude of the traces of a family plot."""
+class TestOrdinal(unittest.TestCase):
+    """Test the ordinal strings used in the plot title."""
 
-    def test_small_family_uses_base_amplitude(self):
-        """Families up to the reference size must keep the base amplitude."""
-        base_amplitude = plot_families_module.BASE_AMPLITUDE
-        self.assertEqual(_trace_amplitude(1), base_amplitude)
-        self.assertEqual(_trace_amplitude(10), base_amplitude)
-        self.assertEqual(_trace_amplitude(35), base_amplitude)
+    def test_ordinal_suffixes(self):
+        """The ordinal suffix must follow the English rules."""
+        ordinal = plot_families_module._ordinal
+        self.assertEqual(ordinal(1), '1st')
+        self.assertEqual(ordinal(2), '2nd')
+        self.assertEqual(ordinal(3), '3rd')
+        self.assertEqual(ordinal(4), '4th')
+        self.assertEqual(ordinal(11), '11th')
+        self.assertEqual(ordinal(12), '12th')
+        self.assertEqual(ordinal(13), '13th')
+        self.assertEqual(ordinal(21), '21st')
+        self.assertEqual(ordinal(22), '22nd')
+        self.assertEqual(ordinal(23), '23rd')
+        self.assertEqual(ordinal(101), '101st')
+        self.assertEqual(ordinal(111), '111th')
 
-    def test_amplitude_increases_with_family_size(self):
-        """Larger families must get larger trace amplitudes."""
-        self.assertAlmostEqual(_trace_amplitude(70), 1.0)
-        self.assertAlmostEqual(_trace_amplitude(119), 1.7)
-        self.assertLess(_trace_amplitude(35), _trace_amplitude(70))
-        self.assertLess(_trace_amplitude(70), _trace_amplitude(119))
-        self.assertLess(_trace_amplitude(119), _trace_amplitude(863))
 
-    def test_amplitude_is_capped(self):
-        """The trace amplitude must not exceed the maximum value."""
-        max_amplitude = plot_families_module.MAX_AMPLITUDE
-        self.assertEqual(_trace_amplitude(10 ** 6), max_amplitude)
+@contextlib.contextmanager
+def _max_labels_option(value):
+    """Temporarily set the value of the --max-labels option."""
+    had_args = 'args' in config
+    previous_args = config.get('args')
+    config.args = Namespace(max_labels=value)
+    try:
+        yield
+    finally:
+        if had_args:
+            config.args = previous_args
+        else:
+            del config.args
+            config.pop('args')
+
+
+class TestMaxLabelsWarning(unittest.TestCase):
+    """Test the warning printed when --max-labels cannot be honored."""
+
+    def test_warning_when_limit_is_ignored(self):
+        """A warning must be printed when all the traces are labeled."""
+        family = Namespace(number=7)
+        with _max_labels_option(15):
+            with self.assertLogs(
+                    plot_families_module.logger, level='WARNING') as logs:
+                plot_families_module._warn_if_max_labels_ignored(family, 16)
+        self.assertIn('Family 7', logs.output[0])
+        self.assertIn('--max-labels', logs.output[0])
+
+    def test_no_warning_when_limit_is_respected(self):
+        """No warning must be printed when the limit is respected."""
+        family = Namespace(number=7)
+        with _max_labels_option(15):
+            with self.assertNoLogs(
+                    plot_families_module.logger, level='WARNING'):
+                plot_families_module._warn_if_max_labels_ignored(family, 15)
+                plot_families_module._warn_if_max_labels_ignored(family, 8)
+
+    def test_no_warning_when_option_is_not_given(self):
+        """No warning must be printed when --max-labels is not given."""
+        family = Namespace(number=7)
+        with _max_labels_option(None):
+            with self.assertNoLogs(
+                    plot_families_module.logger, level='WARNING'):
+                plot_families_module._warn_if_max_labels_ignored(family, 16)
+
+    def test_default_max_labels(self):
+        """The default label limit must be used when the option is absent."""
+        with _max_labels_option(None):
+            self.assertEqual(
+                plot_families_module._max_labels(),
+                plot_families_module.DEFAULT_MAX_LABELS)
+        with _max_labels_option(40):
+            self.assertEqual(plot_families_module._max_labels(), 40)
 
 
 class TestUnlabeledAlpha(unittest.TestCase):

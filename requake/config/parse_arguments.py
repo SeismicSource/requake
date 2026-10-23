@@ -623,13 +623,13 @@ def parse_arguments(progname='requake'):
         help='plot family members found with template scan'
     )
     plot_families.add_argument(
-        '--compact-above', type=int, default=15, metavar='NEVENTS',
-        help='families with more than NEVENTS events are drawn in compact '
-             'mode: only a subset of the traces is labeled and '
-             'highlighted, the other traces are drawn lighter, and the '
-             'trace amplitude is scaled with the number of events. The '
-             'number of labeled traces is chosen automatically. Use 0 to '
-             'always label all the traces (default: %(default)s)'
+        '--max-labels', type=int, default=None, metavar='NLABELS',
+        help='maximum number of traces carrying a label; when a family has '
+             'more traces than this, only a subset of them is labeled, at '
+             'a regular interval. In "wiggle" mode, the labeled traces are '
+             'also highlighted, the other traces are drawn lighter, and '
+             'the trace amplitude is scaled with the number of events. '
+             'Use 0 to label every trace (default: 15)'
     )
     # ---
     # --- plot_timespans
