@@ -480,8 +480,6 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
             zorder=zorder,
         )
         tracelines.append(l)
-        if not labeled:
-            continue
         p_arrival = tr.stats.P_arrival_time - tr.stats.starttime - t0
         s_arrival = tr.stats.S_arrival_time - tr.stats.starttime - t0
         hh = 0.3 * amplitude  # pick line half-height
@@ -491,6 +489,8 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
             (s_arrival, s_arrival), (n - hh, n + hh), color='r', zorder=2)
         p_bars.append(p_bar)
         s_bars.append(s_bar)
+        if not labeled:
+            continue
         trans = ax.get_yaxis_transform()
         if average_trace:
             y_label = 'average'

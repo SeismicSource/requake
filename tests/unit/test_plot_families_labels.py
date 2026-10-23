@@ -16,7 +16,17 @@ import contextlib
 import importlib
 import unittest
 from argparse import Namespace
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+from obspy import Stream, Trace, UTCDateTime
+from matplotlib.backend_bases import KeyEvent
 from requake.config import config
+
+
+def setUpModule():
+    """Render the test figures with a non-interactive backend."""
+    matplotlib.use('Agg')
 
 
 def _plot_families_module():
@@ -191,6 +201,88 @@ class TestMaxLabelsWarning(unittest.TestCase):
                 plot_families_module.DEFAULT_MAX_LABELS)
         with _max_labels_option(40):
             self.assertEqual(plot_families_module._max_labels(), 40)
+
+
+def _make_trace(evid, data, starttime='2020-01-01T00:00:00'):
+    """Build a trace with the stats needed by the family plots."""
+    tr = Trace(data=np.asarray(data, dtype=float))
+    tr.stats.sampling_rate = 100.
+    tr.stats.starttime = UTCDateTime(starttime)
+    tr.stats.evid = evid
+    tr.stats.orig_time = UTCDateTime(starttime)
+    tr.stats.P_arrival_time = tr.stats.starttime + 2.0
+    tr.stats.S_arrival_time = tr.stats.starttime + 3.0
+    tr.stats.freq_min = 5.0
+    tr.stats.freq_max = 10.0
+    tr.stats.distance = 2.0
+    tr.stats.cc_mean = 0.95
+    tr.stats.mag = 1.0
+    tr.stats.mag_type = 'Ml'
+    tr.stats.ev_lon = 12.5
+    tr.stats.ev_lat = 43.3
+    tr.stats.ev_depth = 5.0
+    return tr
+
+
+def _make_stream(ntraces=30):
+    """Build a small stream of synthetic traces, plus a template."""
+    time = np.arange(500) * 0.01
+    traces = [
+        _make_trace(f'ev{n:02d}', np.sin(2 * np.pi * (5 + n) * time))
+        for n in range(ntraces)
+    ]
+    traces.append(_make_trace(
+        'average01', np.sin(2 * np.pi * 5 * time),
+        starttime='1900-01-01T00:00:00'))
+    return Stream(traces)
+
+
+class TestTheoreticalArrivals(unittest.TestCase):
+    """Test the theoretical arrivals plotted with the wiggle traces."""
+
+    def setUp(self):
+        """Install a config with the options read by the plot function."""
+        self.had_args = 'args' in config
+        self.previous_args = config.get('args')
+        config.args = Namespace(
+            mode='wiggle', max_labels=15, output='NO_OUTPUT',
+            starttime=None, endtime=None)
+
+    def tearDown(self):
+        """Close the figures and restore the config."""
+        plt.close('all')
+        if self.had_args:
+            config.args = self.previous_args
+        else:
+            del config.args
+            config.pop('args')
+
+    def _plot(self):
+        """Plot the synthetic stream as wiggles and return the axes."""
+        st = _make_stream()
+        fig, _ = plot_families_module._plot_family_wiggle(
+            Namespace(number=1), st, st[0], 1.0, 4.0)
+        return fig, fig.axes[0], len(st)
+
+    def test_arrivals_on_all_traces(self):
+        """A P and an S bar must be drawn for every trace."""
+        _, ax, ntraces = self._plot()
+        # one line per trace, plus a P and an S bar per trace
+        self.assertEqual(len(ax.get_lines()), 3 * ntraces)
+
+    def test_arrivals_are_hidden_by_default(self):
+        """The arrival bars must be hidden until the 'a' key is pressed."""
+        _, ax, ntraces = self._plot()
+        visible = [line for line in ax.get_lines() if line.get_visible()]
+        self.assertEqual(len(visible), ntraces)
+
+    def test_arrivals_toggle_shows_all_them(self):
+        """The 'a' key must show the arrivals of all the traces."""
+        fig, ax, ntraces = self._plot()
+        fig.canvas.callbacks.process(
+            'key_press_event', KeyEvent('key_press_event', fig.canvas, 'a'))
+        visible = [line for line in ax.get_lines() if line.get_visible()]
+        self.assertEqual(len(visible), 3 * ntraces)
 
 
 class TestUnlabeledAlpha(unittest.TestCase):
