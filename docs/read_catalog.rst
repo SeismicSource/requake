@@ -81,6 +81,11 @@ configuration parameters:
 Duplicate events (same event ID) are automatically removed, and the
 catalog is sorted by origin time before being written to the database.
 
+Duplicates with different event IDs (e.g. the same event reported by
+different agencies or with slightly different origin times) are not removed
+at this stage.  They can be detected and flagged once the event pairs have
+been created, with ``requake dedup_events`` (see :doc:`pairs`).
+
 
 Appending to an existing catalog
 --------------------------------

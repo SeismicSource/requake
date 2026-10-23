@@ -60,6 +60,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   Folium map backends.
 - Clickable URLs in terminal output for compatible terminals, e.g. in the
   help messages and in the bug report.
+- New documentation page on event pairs, covering `print_pairs`,
+  `plot_pair` and `dedup_events`.
 
 ## [0.8.3] - 2026-06-19
 

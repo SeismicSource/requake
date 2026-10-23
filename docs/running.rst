@@ -46,6 +46,10 @@ Different commands are available:
 Certain commands (e.g., ``plot_pair``\ ) require further arguments
 (use, e.g., ``requake plot_pair -h`` to get help).
 
+The commands that operate on the event pairs
+(``print_pairs``, ``plot_pair``, ``dedup_events``) are described in
+detail in :doc:`pairs`.
+
 Requake supports command line tab completion for commands and arguments, thanks
 to `argcomplete <https://kislyuk.github.io/argcomplete/>`_.
 To enable command line tab completion run:
@@ -163,50 +167,21 @@ families, they can be flagged before building families:
 
 The command looks for event pairs with a high cross-correlation
 coefficient which are also close in time and space: these are very
-likely to be the same earthquake.  The thresholds can be changed from
-the command line:
-
-* ``-c``/``--cc_min``: minimum cross-correlation coefficient
-  (default: ``0.98``);
-* ``-t``/``--max-time-diff``: maximum origin-time difference, in
-  seconds (default: ``60``);
-* ``-d``/``--max-distance``: maximum horizontal distance, in km
-  (default: ``2``).
-
-Within each group of duplicate events, one event is kept and the others
-are flagged as duplicated in the :doc:`catalog <database_schemas>`
-(the ``duplicate`` column).  All the event pairs involving a duplicated
-event are flagged as invalid (the ``invalid`` column of the
-``event_pairs`` table), so that they are ignored by
-``requake build_families``.
+likely to be the same earthquake.  Within each group of duplicate
+events, one event is kept and the others are flagged as duplicated in
+the :doc:`catalog <database_schemas>` (the ``duplicate`` column).  All
+the event pairs involving a duplicated event are flagged as invalid (the
+``invalid`` column of the ``event_pairs`` table), so that they are
+ignored by ``requake build_families``.
 
 A report of the duplicate pairs and groups found is printed at the end.
-The report is intentionally compact for large catalogs: it lists at most
-the first 20 duplicate pairs and the first 20 duplicate groups, while the
-counts always refer to the whole dataset.  Use ``-n``/``--dry-run`` to
-print the report without modifying the database.
+Use ``-n``/``--dry-run`` to print the report without modifying the
+database, and ``--reset`` to clear the flags.  The invalid pairs are
+hidden by ``requake print_pairs`` (use ``--include-invalid`` to list
+them, see below).
 
-Each step of the command (reading the catalog and the event pairs,
-looking for duplicate events, flagging them) can take a while on large
-catalogs: a progress indicator is shown on the terminal while it runs.
-
-The flags can be cleared with ``--reset``, which resets the ``duplicate``
-column of the catalog and the ``invalid`` column of the event pairs, and
-exits without performing duplicate detection (combine with ``-n`` to only
-report what would be cleared).  Since it scans the whole event-pairs
-table, it can take a while on large catalogs; a progress indicator is
-shown while it runs.  Long database operations like this one can be
-interrupted with ``Ctrl+C`` (press it twice within 2 seconds to
-confirm): the running query is stopped and the database is closed
-cleanly.  For example:
-
-.. code-block::
-
-   requake dedup_events --reset
-
-The invalid pairs are hidden by ``requake print_pairs`` (use
-``--include-invalid`` to list them, see below) and ignored by
-``requake build_families``.
+See :doc:`pairs` for the detection criteria, the command-line options
+and the report format.
 
 Note that a full re-scan of the catalog (``requake scan_catalog`` with
 overwrite) recreates the event pairs, so ``requake dedup_events``
@@ -300,6 +275,8 @@ The same formats (``simple``, ``markdown``, ``csv``) apply to the family
 list, while ``-f stats`` prints summary statistics on the selected
 families, instead of a table.
 
+
+.. _pager:
 
 Interactive pager
 ^^^^^^^^^^^^^^^^^

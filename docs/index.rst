@@ -30,6 +30,7 @@ Requake is written in Python and uses `ObsPy <https://obspy.org>`_ as backend.
    running
    read_catalog
    scan_catalog
+   pairs
    wfcache
    performances
    slip_models

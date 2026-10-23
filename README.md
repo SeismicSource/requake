@@ -128,6 +128,8 @@ Different commands are available:
     print_catalog       print the event catalog to screen
     scan_catalog        scan an existing catalog for earthquake pairs
     print_pairs         print pairs to screen
+    dedup_events        detect and flag duplicate events in the catalog from
+                        close event pairs
     plot_pair           plot traces for a given event pair
     build_families      build families of repeating earthquakes from a catalog
                         of pairs
