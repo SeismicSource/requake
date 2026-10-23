@@ -22,7 +22,10 @@ from requake.config.parse_arguments import (
 DARK_ORANGE = '\x1b[38;5;208m'
 GRAY = '\x1b[38;5;244m'
 CYAN = '\x1b[36m'
+LINK_ACCENT = '\x1b[38;5;31m\x1b[4m\x1b[4:5m'
 RESET = '\x1b[0m'
+OSC8_END = '\x1b]8;;\x1b\\'
+DOCS_URL = 'https://requake.readthedocs.io'
 
 
 class _StringStream(io.StringIO):
@@ -52,6 +55,22 @@ def _build_parser():
     )
     parser.add_argument('catalog_file', nargs='?', help='catalog file')
     subparser.add_parser('read_catalog', help='read an event catalog')
+    return parser
+
+
+def _build_parser_with_urls():
+    """Build a parser whose help text contains URLs."""
+    parser = ColoredHelpArgumentParser(
+        prog='requake',
+        description='Test parser.',
+        epilog=f'Full documentation at {DOCS_URL}',
+        formatter_class=SubcommandHelpFormatter,
+    )
+    parser.add_argument(
+        '-k', '--apikey', type=str, default=None,
+        help='API key. You can get a free one at '
+             'https://stadiamaps.com/.',
+    )
     return parser
 
 
@@ -137,6 +156,68 @@ class TestColoredHelp(unittest.TestCase):
         """The NO_COLOR environment variable disables help colors."""
         with patch.dict('os.environ', {'NO_COLOR': '1'}):
             self.assertNotIn('\x1b[', self._help_text(True))
+
+
+class TestHelpHyperlinks(unittest.TestCase):
+    """Test clickable URLs in help and usage output."""
+
+    def setUp(self):
+        """Reset color- and hyperlink-related environment variables."""
+        env = {
+            'NO_COLOR': '', 'FORCE_COLOR': '', 'TERM': 'xterm-kitty',
+            'NO_HYPERLINK': '', 'FORCE_HYPERLINK': '', 'WT_SESSION': '',
+            'TERM_PROGRAM': '', 'LC_TERMINAL': '', 'VTE_VERSION': '',
+            'KONSOLE_VERSION': '', 'COLORTERM': '',
+        }
+        patcher = patch.dict('os.environ', env, clear=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _help_text(self, isatty):
+        """Return the help text as written to a fake terminal or pipe."""
+        stream = _StringStream(isatty)
+        _build_parser_with_urls().print_help(file=stream)
+        return stream.getvalue()
+
+    def test_help_links_urls_on_a_terminal(self):
+        """Links in the epilog and in the help text become clickable."""
+        text = self._help_text(True)
+        self.assertIn(
+            f'\x1b]8;;{DOCS_URL}\x1b\\'
+            f'{LINK_ACCENT}requake.readthedocs.io{RESET}{OSC8_END}',
+            text,
+        )
+        self.assertIn(
+            '\x1b]8;;https://stadiamaps.com/\x1b\\'
+            f'{LINK_ACCENT}stadiamaps.com/{RESET}{OSC8_END}',
+            text,
+        )
+
+    def test_help_urls_are_plain_when_piped(self):
+        """No escape sequences are emitted for redirected help output."""
+        text = self._help_text(False)
+        self.assertNotIn('\x1b]8;;', text)
+        self.assertIn(f'Full documentation at {DOCS_URL}', text)
+
+    def test_help_url_trailing_punctuation_is_kept_out(self):
+        """A sentence period after a URL is not part of the link."""
+        text = self._help_text(True)
+        self.assertIn(
+            f'stadiamaps.com/{RESET}{OSC8_END}.', text
+        )
+
+    def test_no_color_env_disables_help_hyperlinks(self):
+        """The NO_COLOR environment variable disables help hyperlinks."""
+        with patch.dict('os.environ', {'NO_COLOR': '1'}):
+            self.assertNotIn('\x1b]8;;', self._help_text(True))
+
+    def test_plain_url_on_terminals_without_osc8(self):
+        """A color terminal without OSC 8 support shows the full URL."""
+        with patch.dict('os.environ', {'TERM': 'xterm-256color'}):
+            text = self._help_text(True)
+        self.assertNotIn('\x1b]8;;', text)
+        self.assertIn(f'Full documentation at {DOCS_URL}', text)
+        self.assertIn('https://stadiamaps.com/', text)
 
 
 if __name__ == '__main__':

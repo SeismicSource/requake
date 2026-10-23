@@ -17,7 +17,7 @@ import hashlib
 import threading
 import multiprocessing
 from datetime import datetime
-from ..terminal import error, style
+from ..terminal import error, frame, hyperlink, style
 from .configobj import ConfigObj, ParseError
 from .configobj.validate import Validator
 locale.setlocale(locale.LC_ALL, '')
@@ -261,13 +261,21 @@ def manage_uncaught_exception(exception):
     report_header = style(
         'Include the following information in your report:', 'bold'
     )
+    issues_url = 'https://github.com/SeismicSource/requake/issues'
+    email = 'satriano@ipgp.fr'
+    issues_link = hyperlink(issues_url, stream=sys.stderr)
+    email_link = hyperlink(f'mailto:{email}', email, stream=sys.stderr)
+    bug_message = frame(
+        f'{bug_header} 🐞\n\n'
+        f'Please report it on {issues_link}\n'
+        f'or by email to {email_link}.',
+        stream=sys.stderr,
+    )
     sys.stderr.write(
         f'\n# BEGIN TRACEBACK {"#" * 62}\n'
         f'\n{colored_tb}'
         f'\n# END TRACEBACK {"#" * 62}\n\n'
-        f'{bug_header} 🐞\n\n'
-        'Please report it on https://github.com/SeismicSource/requake/issues\n'
-        'or by email to satriano@ipgp.fr.\n\n'
+        f'{bug_message}\n\n'
         f'{report_header}\n\n'
         f'  Requake version: {__version__}\n'
         f'  Python version: {sys.version}\n'

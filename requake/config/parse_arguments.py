@@ -17,7 +17,7 @@ import argparse
 import argcomplete
 from .._version import get_versions
 from ..logo import REQUAKE_LOGO
-from ..terminal import color_enabled, style
+from ..terminal import color_enabled, hyperlink, style
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +41,10 @@ _USAGE_TOKEN_PATTERN = (
     r'|\.\.\.'
 )
 
+# URLs in help text, excluding common trailing punctuation so that it is
+# not swallowed by the hyperlink.
+_URL_PATTERN = re.compile(r'https?://[^\s<>"\']*[^\s<>"\'\.,;:]')
+
 
 def _set_help_stream(stream):
     """Set the stream help output is being written to."""
@@ -56,6 +60,16 @@ def _help_colors_enabled():
 def _style_help(text, *styles):
     """Style a piece of help output."""
     return style(text, *styles, stream=_help_stream)
+
+
+def _linkify_url(match):
+    """Turn a URL found in help output into a clickable hyperlink."""
+    return hyperlink(match.group(), stream=_help_stream)
+
+
+def _linkify_urls(text):
+    """Make the URLs in a piece of help output clickable."""
+    return _URL_PATTERN.sub(_linkify_url, text)
 
 
 def _colorize_usage_token(match):
@@ -109,7 +123,15 @@ def _colorize_action(text, invocation):
 
 
 class ColoredHelpMixin:
-    """Add colors to argparse help and usage output."""
+    """Add colors and clickable URLs to argparse help and usage output."""
+
+    def format_help(self):
+        """Make the URLs in the help output clickable."""
+        return _linkify_urls(super().format_help())
+
+    def format_usage(self):
+        """Make the URLs in the usage output clickable."""
+        return _linkify_urls(super().format_usage())
 
     def start_section(self, heading):
         """Capitalize and colorize section headings."""

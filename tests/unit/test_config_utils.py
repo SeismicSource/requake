@@ -25,6 +25,7 @@ from requake.config.utils import (
     request_abort,
     run_with_spinner,
 )
+from requake.terminal import _display_width
 
 
 class TestAbortFlag(unittest.TestCase):
@@ -135,6 +136,109 @@ class TestRunWithSpinner(unittest.TestCase):
         self.assertEqual(observed, [True])
         self.assertEqual(released, ['resources released'])
         self.assertFalse(abort_requested())
+
+
+class _FakeTerminalStream(io.StringIO):
+    """String stream that can report itself as a terminal."""
+
+    def __init__(self, isatty):
+        super().__init__()
+        self._isatty = isatty
+
+    def isatty(self):
+        """Return the configured ``isatty`` value."""
+        return self._isatty
+
+
+class TestUncaughtExceptionReport(unittest.TestCase):
+    """Test the bug report printed for uncaught exceptions."""
+
+    issues_url = 'https://github.com/SeismicSource/requake/issues'
+    email = 'satriano@ipgp.fr'
+
+    def setUp(self):
+        """Reset color- and hyperlink-related environment variables."""
+        env = {
+            'NO_COLOR': '', 'FORCE_COLOR': '', 'TERM': 'xterm-kitty',
+            'NO_HYPERLINK': '', 'FORCE_HYPERLINK': '', 'WT_SESSION': '',
+            'TERM_PROGRAM': '', 'LC_TERMINAL': '', 'VTE_VERSION': '',
+            'KONSOLE_VERSION': '', 'COLORTERM': '',
+        }
+        patcher = patch.dict('os.environ', env, clear=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _report(self, stream):
+        """Run the handler and return what it wrote to ``stream``."""
+        exception = ValueError('boom')
+        with patch.object(utils.sys, 'stderr', stream):
+            with self.assertRaises(SystemExit):
+                utils.manage_uncaught_exception(exception)
+        return stream.getvalue()
+
+    def test_report_contains_clickable_links(self):
+        """Issue URL and email are accented OSC 8 hyperlinks on a terminal."""
+        out = self._report(_FakeTerminalStream(True))
+        self.assertIn(
+            f'\x1b]8;;{self.issues_url}\x1b\\'
+            '\x1b[38;5;31m\x1b[4m\x1b[4:5m'
+            f'github.com/SeismicSource/requake/issues\x1b[0m\x1b]8;;\x1b\\',
+            out,
+        )
+        self.assertIn(
+            f'\x1b]8;;mailto:{self.email}\x1b\\'
+            '\x1b[38;5;31m\x1b[4m\x1b[4:5m'
+            f'{self.email}\x1b[0m\x1b]8;;\x1b\\',
+            out,
+        )
+
+    def test_report_plain_text_when_redirected(self):
+        """Redirected output gets plain URLs, without escape sequences."""
+        out = self._report(_FakeTerminalStream(False))
+        self.assertNotIn('\x1b]8;;', out)
+        self.assertIn(f'Please report it on {self.issues_url}', out)
+        self.assertIn(f'or by email to {self.email}.', out)
+
+    def test_report_plain_url_on_terminals_without_osc8(self):
+        """A color terminal without OSC 8 support shows the full URL."""
+        with patch.dict('os.environ', {'TERM': 'xterm-256color'}):
+            out = self._report(_FakeTerminalStream(True))
+        self.assertNotIn('\x1b]8;;', out)
+        self.assertIn(f'Please report it on {self.issues_url}', out)
+
+    def test_report_keeps_traceback_info(self):
+        """The report still lists versions and the error message."""
+        out = self._report(_FakeTerminalStream(False))
+        self.assertIn('# BEGIN TRACEBACK', out)
+        self.assertIn('# END TRACEBACK', out)
+        self.assertIn('Error message: boom', out)
+        self.assertIn('Requake version:', out)
+
+    def test_report_is_framed(self):
+        """The bug report message is surrounded by a frame."""
+        lines = self._report(_FakeTerminalStream(False)).splitlines()
+        top = next(
+            i for i, line in enumerate(lines) if line.startswith('┌')
+        )
+        bottom = next(
+            i for i, line in enumerate(lines) if line.startswith('└')
+        )
+        framed = lines[top:bottom + 1]
+        self.assertGreater(len(framed), 4)
+        self.assertEqual(len({_display_width(line) for line in framed}), 1)
+        self.assertIn(
+            "Congratulations, you've found a bug in Requake! 🐞",
+            framed[1],
+        )
+        self.assertTrue(
+            any('Please report it on https://' in line for line in framed)
+        )
+        self.assertTrue(
+            any('or by email to satriano@ipgp.fr.' in line for line in framed)
+        )
+        self.assertFalse(
+            any(line.startswith('│') for line in lines[bottom + 1:])
+        )
 
 
 if __name__ == '__main__':

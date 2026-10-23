@@ -64,18 +64,37 @@ Or, alternatively, add the following line to your ``.bashrc`` or ``.zshrc``:
     eval "$(register-python-argcomplete requake)"
 
 
-Colored output
-^^^^^^^^^^^^^^
+Colored output and hyperlinks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Terminal output (help and usage messages, log messages, tables and
 waveform-cache diagnostics) is colored when writing to an interactive
 terminal. Colors are automatically removed when the output is
 redirected to a file or piped to another command.
 
+URLs printed in the terminal (e.g. the GitHub issue page in the bug
+report) are clickable, using `OSC 8 hyperlinks
+<https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda>`_.
+The link text is highlighted in a mid-tone blue, chosen to stay readable
+on both dark and light terminals, dashed-underlined (a plain underline on
+terminals without support for dashed underlines) and shown without its
+``http(s)://`` scheme, so that it stands out from the surrounding text.
+
+Hyperlinks are only emitted for terminals known to support OSC 8, e.g.
+iTerm2, WezTerm, VS Code, Hyper, Rio, Ghostty, Kitty, Alacritty, foot,
+GNOME Terminal (VTE), Konsole and Windows Terminal. In every other
+terminal -- including ``xterm``, which supports colors but silently
+ignores OSC 8 -- the complete URL is printed as plain text, so that it
+can still be read and copied.
+
 The standard `NO_COLOR <https://no-color.org/>`_ environment variable
-can be used to disable colors (e.g. when colors are not desired in a
-terminal), while setting the ``FORCE_COLOR`` environment variable
-forces colors on even when the output is piped.
+can be used to disable colors and hyperlinks (e.g. when escape
+sequences are not desired in a terminal), while setting the
+``FORCE_COLOR`` environment variable forces colors on even when the
+output is piped. Hyperlinks can be disabled with the ``NO_HYPERLINK``
+environment variable, or forced with ``FORCE_HYPERLINK``, e.g. when
+using a terminal that supports OSC 8 but is not recognized (such as a
+terminal multiplexer passing the sequences through).
 
 
 Typical workflow

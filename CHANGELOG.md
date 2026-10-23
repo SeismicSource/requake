@@ -58,6 +58,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   ``-s/--sizeby`` option (default: number of events), and a legend on the
   map explains the marker size. This applies to both the Cartopy and the
   Folium map backends.
+- Clickable URLs in terminal output for compatible terminals, e.g. in the
+  help messages and in the bug report.
 
 ## [0.8.3] - 2026-06-19
 
