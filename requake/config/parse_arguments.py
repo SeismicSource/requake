@@ -630,7 +630,7 @@ def parse_arguments(progname='requake'):
             longerthan, shorterthan, minevents, family_numbers,
             traceid, freq_band, output
         ],
-        help='plot traces for one ore more event families'
+        help='plot traces for one or more event families'
     )
     plot_families.add_argument(
         '-s', '--starttime', type=float, default=None,
