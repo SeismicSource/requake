@@ -36,6 +36,7 @@ dependencies = [
     "tqdm",
     "tabulate",
     "pygments",
+    "windows-curses; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]

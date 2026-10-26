@@ -4,6 +4,9 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- On Windows, the ``windows-curses`` package is now installed
+  automatically, so the interactive pager works out of the box.
+
 ## [0.8.4] - 2026-10-23
 
 - ``plot_families``: new ``--mode`` option, to draw the families as a

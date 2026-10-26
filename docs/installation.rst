@@ -76,26 +76,6 @@ the other commands, including the default (Cartopy) map backend, work
 without it.
 
 
-Interactive pager support
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The interactive pager of the ``print_`` commands (see :doc:`pager`)
-uses the `curses
-<https://en.wikipedia.org/wiki/Curses_(programming_library)>`_ module,
-which is part of the Python standard library on Linux and macOS.  On
-Windows, ``curses`` is not available by default and must be installed
-separately:
-
-.. code-block:: text
-
-   pip install windows-curses
-
-
-Without ``curses``, the pager cannot start: run the ``print_`` commands
-with ``--no-pager`` (or with a specific ``-f``/``--format``) to get
-plain-text output.
-
-
 Installing a development snapshot
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
