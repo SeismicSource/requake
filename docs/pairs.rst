@@ -44,7 +44,7 @@ not be analysed are stored in the database but not listed:
 `dedup_events`_ are hidden unless ``--include-invalid`` is used, which
 adds an ``invalid`` column to the table.
 
-In the interactive pager (see :ref:`the pager section <pager>`) the
+In the interactive pager (see :doc:`the interactive pager <pager>`) the
 table can be sorted on any column, and pressing ``c`` copies the event
 IDs of the selected pair.  Use ``--no-pager`` for plain-text output, or
 ``-f``/``--format`` to select ``simple`` (default), ``markdown`` or

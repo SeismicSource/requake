@@ -76,10 +76,10 @@ the other commands, including the default (Cartopy) map backend, work
 without it.
 
 
-Interactive pager
-^^^^^^^^^^^^^^^^^
+Interactive pager support
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The interactive pager of the ``print_`` commands (see :doc:`running`)
+The interactive pager of the ``print_`` commands (see :doc:`pager`)
 uses the `curses
 <https://en.wikipedia.org/wiki/Curses_(programming_library)>`_ module,
 which is part of the Python standard library on Linux and macOS.  On
