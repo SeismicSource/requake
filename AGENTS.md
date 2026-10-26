@@ -16,6 +16,39 @@
   the user, not how. Flags, environment variables and other details
   belong in `docs/`. Follow the style of the shorter existing entries.
 
+## Documentation
+
+The guide is RST in `docs/`, built with Sphinx: add new pages to the
+`.. toctree::` in `docs/index.rst`. `docs/configuration_file.rst` is
+generated from `requake/config/configspec.conf`. Read the existing
+pages before writing: the newest ones (`pairs`, `read_catalog`,
+`scan_catalog`, `wfcache`) show the style to maintain.
+
+- Start a page with a `.. _page_name:` label and a Title Case title
+  framed with `#`; use `-` for sentence-case sections, `^` and `~`
+  below, with two blank lines before a section. Older pages still title
+  with `-`: convert them only when already restructuring the page.
+- Wrap at 72 columns and put two spaces after a sentence period. Use a
+  spaced em dash, not `--`. Put commands, options, config keys and
+  database objects in double backticks, options as `-c`/`--cc_min`.
+- Link pages with `:doc:`, anchors with `:ref:`, math with `:math:` and
+  references with `:cite:t:`; write external links as
+  `` `text <URL>`_ ``. Show commands in `.. code-block::` blocks
+  indented by three spaces, options in definition lists.
+- Describe what the user does and sees: terminal quirks and other
+  implementation rationale stay in code comments, the full option list
+  in `requake <command> -h`. Link a page instead of restating it, and
+  drop sentences that only announce a cross-reference.
+- Tell the programmer which documentation pages you changed and what
+  changed in them.
+
+Check the build from `docs/`, which needs `docs/requirements.txt` and
+generates pages relative to the working directory:
+
+```bash
+python3 -m sphinx -b html . /tmp/requake-docs
+```
+
 ## Before Finalizing
 
 For any non-trivial change:
