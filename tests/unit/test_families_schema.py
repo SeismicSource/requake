@@ -19,7 +19,10 @@ from obspy import UTCDateTime
 from requake.catalog import RequakeEvent
 from requake.config import config
 from requake.database.catalog import write_catalog
+from requake.database.catalogs import create_catalog
 from requake.database.families import write_families
+from requake.database.family_builds import create_family_build
+from requake.database.scans import create_scan
 from requake.families.families import Family, _read_families_from_catalog_scan
 
 
@@ -92,19 +95,26 @@ class TestFamiliesSchema(unittest.TestCase):
         self.assertIsInstance(ev.mag, float)
 
     @staticmethod
-    def _seed_catalog_for_families(families_data):
-        """Write catalog rows required by family foreign-key constraints."""
-        write_catalog(
-            [event for family in families_data for event in family],
+    def _seed_registries(families_data):
+        """Write catalog, scan and build rows; return their ids."""
+        events = [event for family in families_data for event in family]
+        catalog_id = create_catalog(
+            'test-catalog-hash', '{}', source='test', nevents=len(events)
         )
+        write_catalog(events, catalog_id)
+        scan_id = create_scan(catalog_id, 'test-scan-hash', '{}')
+        build_id = create_family_build(
+            scan_id, 'shared', None, 'test-build-hash', '{}'
+        )
+        return catalog_id, build_id
 
     def test_families_roundtrip_preserves_fields(self):
         """Stored families should preserve values when read back."""
         with self._patch_runtime_config():
             families_data = self._get_synthetic_families_data(2, 2)
-            self._seed_catalog_for_families(families_data)
-            write_families(families_data)
-            families = _read_families_from_catalog_scan()
+            catalog_id, build_id = self._seed_registries(families_data)
+            write_families(build_id, catalog_id, families_data)
+            families = _read_families_from_catalog_scan(build_id=build_id)
 
         self.assertEqual(len(families), 2)
         self.assertEqual(families[0].number, families_data[0].number)
@@ -125,9 +135,9 @@ class TestFamiliesSchema(unittest.TestCase):
         """
         with self._patch_runtime_config():
             families_data = self._get_synthetic_families_data(2, 2)
-            self._seed_catalog_for_families(families_data)
-            write_families(families_data)
-            families = _read_families_from_catalog_scan()
+            catalog_id, build_id = self._seed_registries(families_data)
+            write_families(build_id, catalog_id, families_data)
+            families = _read_families_from_catalog_scan(build_id=build_id)
 
         self.assertEqual(len(families), 2, 'Should have 2 families')
 
@@ -150,9 +160,9 @@ class TestFamiliesSchema(unittest.TestCase):
     def test_families_empty_write_read(self):
         """Test that empty families round-trip produces empty list."""
         with self._patch_runtime_config():
-            write_catalog([])
-            write_families([])
-            families = _read_families_from_catalog_scan()
+            catalog_id, build_id = self._seed_registries([])
+            write_families(build_id, catalog_id, [])
+            families = _read_families_from_catalog_scan(build_id=build_id)
 
         # Assert empty
         self.assertEqual(

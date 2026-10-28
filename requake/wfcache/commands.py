@@ -141,7 +141,9 @@ def _load_prefetch_dependencies():
 def _read_prefetch_catalog(read_catalog_func, fix_catalog_func):
     """Read stored catalog and sanitize non-locatable events."""
     try:
-        catalog = read_catalog_func()
+        catalog = read_catalog_func(
+            catalog_id=getattr(config.args, 'catalog_id', None)
+        )
     except (ValueError, FileNotFoundError) as err:
         logger.error(err)
         rq_exit(1)

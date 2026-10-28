@@ -23,6 +23,8 @@ from ..database.pairs import (
     count_pairs_up_to,
     read_pairs,
 )
+from ..database.catalogs import CatalogNotFoundError
+from ..database.scans import ScanNotFoundError, resolve_scan_id
 from ..pager import DatabaseDataSource
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -113,7 +115,7 @@ def _row_from_pair(pair, include_invalid=False):
     return row
 
 
-def _build_pairs_db_source(cc_min, cc_max, include_invalid=False,
+def _build_pairs_db_source(scan_id, cc_min, cc_max, include_invalid=False,
                            total_count=None):
     """Build a DatabaseDataSource for pairs.
 
@@ -125,7 +127,7 @@ def _build_pairs_db_source(cc_min, cc_max, include_invalid=False,
         if sort_col is not None and sort_col < len(_PAIRS_SORT_COLUMNS):
             order_by = (_PAIRS_SORT_COLUMNS[sort_col], sort_asc)
         pairs = read_pairs(
-            cc_min=cc_min, cc_max=cc_max,
+            scan_id=scan_id, cc_min=cc_min, cc_max=cc_max,
             offset=offset, limit=limit, order_by=order_by,
             include_invalid=include_invalid
         )
@@ -135,7 +137,7 @@ def _build_pairs_db_source(cc_min, cc_max, include_invalid=False,
         if total_count is not None:
             return total_count
         return read_pairs(
-            cc_min=cc_min, cc_max=cc_max, count_only=True,
+            scan_id=scan_id, cc_min=cc_min, cc_max=cc_max, count_only=True,
             include_invalid=include_invalid
         )
 
@@ -150,10 +152,11 @@ def print_pairs():
     cc_max = config.args.cc_max
     include_invalid = getattr(config.args, 'include_invalid', False)
     try:
+        scan_id = resolve_scan_id(getattr(config.args, 'scan_id', None))
         count = run_with_spinner(
             'Counting matching pairs...',
             lambda: count_pairs_up_to(
-                cc_min, cc_max, _PAIRS_WARNING_THRESHOLD,
+                scan_id, cc_min, cc_max, _PAIRS_WARNING_THRESHOLD,
                 include_invalid=include_invalid
             ),
         )
@@ -162,25 +165,30 @@ def print_pairs():
             and not getattr(config.args, 'force', False)
         ):
             _ask_large_dataset_confirmation()
-        _print_pairs_table(cc_min, cc_max, count, include_invalid)
+        _print_pairs_table(
+            scan_id, cc_min, cc_max, count, include_invalid
+        )
     except (
         DatabaseCorruptError,
         FileNotFoundError,
         PairsMetadataError,
         PairsSchemaError,
         PairsTableNotFoundError,
+        ScanNotFoundError,
+        CatalogNotFoundError,
     ) as msg:
         logger.error(msg)
         rq_exit(1)
 
 
-def _print_pairs_table(cc_min, cc_max, count, include_invalid=False):
+def _print_pairs_table(scan_id, cc_min, cc_max, count,
+                       include_invalid=False):
     """Display pairs, using in-memory mode for small result sets."""
     if count <= _PAIRS_WARNING_THRESHOLD:
         pairs = run_with_spinner(
             f'Loading {count} pairs...',
             lambda: read_pairs(
-                cc_min=cc_min, cc_max=cc_max,
+                scan_id=scan_id, cc_min=cc_min, cc_max=cc_max,
                 include_invalid=include_invalid
             ),
         )
@@ -196,7 +204,7 @@ def _print_pairs_table(cc_min, cc_max, count, include_invalid=False):
     else:
         # Use database-backed pager for large result sets.
         db_source = _build_pairs_db_source(
-            cc_min, cc_max, include_invalid=include_invalid,
+            scan_id, cc_min, cc_max, include_invalid=include_invalid,
             total_count=count
         )
         _display_table(

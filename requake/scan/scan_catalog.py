@@ -12,17 +12,31 @@ Catalog-based repeater scan for Requake.
 import sys
 import time
 import logging
+import contextlib
 from concurrent.futures.process import BrokenProcessPool
 from ..config import (
     config,
     rq_exit,
 )
-from ..database.db import get_db_path
-from ..catalog import fix_non_locatable_events, read_stored_catalog
-from ..database.pairs import (
-    count_pairs,
-    write_pair_records,
+from ..config.run_params import (
+    parameters_digest,
+    parameters_json,
+    scan_parameters,
 )
+from ..database.catalogs import CatalogNotFoundError, resolve_catalog_id
+from ..database.db import get_db_path
+from ..database.scans import (
+    SCAN_STATUS_COMPLETE,
+    SCAN_STATUS_FAILED,
+    ScanNotFoundError,
+    create_scan,
+    find_scan_by_hash,
+    finish_scan,
+    read_scan,
+    reset_scan,
+)
+from ..catalog import fix_non_locatable_events, read_stored_catalog
+from ..database.pairs import write_pair_records
 from ..database.trace_metadata import store_trace_metadata_from_inventory
 from ..waveforms import (
     load_inventory,
@@ -46,40 +60,42 @@ from .scan_catalog_workers import (
 logger = logging.getLogger('scan_catalog')
 
 
-def _ask_existing_pairs_action():
-    """Ask the user whether to overwrite or continue an existing scan."""
+def _ask_scan_action(scan_row):
+    """Ask the user what to do with an existing identical scan."""
     args = config.args
+    scan_id = int(scan_row['scan_id'])
     if args.force:
-        return 'overwrite'
+        return 'replace'
     if args.force_continue:
         return 'continue'
+    message = (
+        f'[rq:scan] A scan with the same parameters already exists '
+        f'as scan {scan_id} on catalog {int(scan_row["catalog_id"])}.'
+    )
+    choice_help = (
+        '[rq:scan] You can replace it, continue it, or add a new scan.'
+    )
     if not sys.stdin.isatty():
-        logger.error(
-            f'[rq:scan] Found existing event pairs '
-            f'in db file {get_db_path()}.'
-        )
+        logger.error(message)
         logger.error(
             '[rq:scan] Cannot prompt in non-interactive mode. '
-            'Use --force to overwrite or --force-continue to resume.'
+            'Use --force to replace it, --force-continue to resume it, '
+            'or --scan-id with a new scan id to add a new scan.'
         )
         rq_exit(1)
-    logger.warning(
-        f'[rq:scan] Found existing event pairs '
-        f'in db file {get_db_path()}.'
-    )
-    logger.warning(
-        '[rq:scan] You can overwrite them and restart, or continue '
-        'from where the previous scan stopped.'
-    )
+    logger.warning(message)
+    logger.warning(choice_help)
     prompt = (
-        'Choose action: [o]verwrite, [c]ontinue, [a]bort '
+        'Choose action: [r]eplace, [c]ontinue, [n]ew, [a]bort '
         '(default: abort): '
     )
     choices = {
-        'o': 'overwrite',
-        'overwrite': 'overwrite',
+        'r': 'replace',
+        'replace': 'replace',
         'c': 'continue',
         'continue': 'continue',
+        'n': 'new',
+        'new': 'new',
         'a': 'abort',
         'abort': 'abort',
     }
@@ -90,13 +106,17 @@ def _ask_existing_pairs_action():
         action = choices.get(answer)
         if action is not None:
             return action
-        print('Invalid choice. Please type o, c, or a.')
+        print('Invalid choice. Please type r, c, n, or a.')
 
 
-def _process_pairs(catalog, continue_scan=False, slurm_context=None):
-    """Process event pairs."""
+def _process_pairs(catalog, scan_id, continue_scan=False, slurm_context=None):
+    """Process event pairs.
+
+    :return: number of analyzed pairs and number of skipped pairs
+    :rtype: tuple
+    """
     if not continue_scan:
-        write_pair_records([], append=False)
+        write_pair_records([], scan_id, append=False)
     # Ensure inventory is loaded in the parent process before parent-side
     # writes, so trace_metadata rows keep full interval metadata in
     # parallel mode as in serial mode.
@@ -113,7 +133,7 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
         if getattr(config.args, 'traceid', None) is not None
         else list(config.catalog_trace_id)
     )
-    store_trace_metadata_from_inventory(trace_ids)
+    store_trace_metadata_from_inventory(trace_ids, scan_id)
     nevents = len(catalog)
     initial_npairs = nevents * (nevents - 1) // 2
     logger.info('[rq:scan] Building valid event pairs...')
@@ -132,7 +152,7 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
             'for pre-processing mask'
         )
         t_resume_filter_start = time.monotonic()
-        existing_pair_ids = load_existing_pair_ids(catalog)
+        existing_pair_ids = load_existing_pair_ids(catalog, scan_id)
         valid_pair_idx, skipped_npairs = mask_existing_pair_indices(
             valid_pair_idx,
             existing_pair_ids,
@@ -169,6 +189,7 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
         total_pairs=total_valid_pairs,
         nprocs=nprocs,
         slurm_context=slurm_context,
+        scan_id=scan_id,
     )
     if continue_scan:
         logger.info(
@@ -176,7 +197,25 @@ def _process_pairs(catalog, continue_scan=False, slurm_context=None):
             f'already present in the database'
         )
     log_memory_usage(prefix='[parent after processing]')
-    return analyzed_npairs
+    return analyzed_npairs, skipped_npairs
+
+
+def _select_scan_action(catalog_id, params_hash):
+    """Return the scan id to use and whether to continue an existing scan."""
+    args = config.args
+    requested = getattr(args, 'scan_id', None)
+    if requested is not None:
+        try:
+            read_scan(requested)
+        except ScanNotFoundError as msg:
+            logger.error(f'[rq:scan] {msg}')
+            rq_exit(1)
+        action = 'replace' if args.force else 'continue'
+        return int(requested), action
+    existing = find_scan_by_hash(params_hash, catalog_id=catalog_id)
+    if existing is None:
+        return None, 'new'
+    return int(existing['scan_id']), _ask_scan_action(existing)
 
 
 def scan_catalog():
@@ -184,7 +223,14 @@ def scan_catalog():
     slurm_context = slurm_get_context()
     slurm_log_runtime_context(slurm_context)
     try:
-        catalog = read_stored_catalog()
+        catalog_id = resolve_catalog_id(
+            getattr(config.args, 'catalog_id', None)
+        )
+    except CatalogNotFoundError as msg:
+        logger.error(f'[rq:scan] {msg}')
+        rq_exit(1)
+    try:
+        catalog = read_stored_catalog(catalog_id=catalog_id)
     except (ValueError, FileNotFoundError) as msg:
         logger.error(f'[rq:scan] {msg}')
         rq_exit(1)
@@ -206,22 +252,47 @@ def scan_catalog():
             'You need at least 2 events to run the scan.')
         rq_exit(1)
     logger.info(
-        f'[rq:scan] {nevents:n} events read from db file '
-        f'{get_db_path()}'
+        f'[rq:scan] {nevents:n} events read from catalog {catalog_id} '
+        f'in db file {get_db_path()}'
     )
-    continue_scan = False
-    if count_pairs() > 0:
-        action = _ask_existing_pairs_action()
-        if action == 'abort':
-            logger.info('[rq:scan] Scan aborted by user')
-            rq_exit(0)
-        continue_scan = action == 'continue'
+    params = scan_parameters()
+    params_hash = parameters_digest(params)
+    scan_id, action = _select_scan_action(catalog_id, params_hash)
+    if action == 'abort':
+        logger.info('[rq:scan] Scan aborted by user')
+        rq_exit(0)
+    continue_scan = action == 'continue'
+    if action == 'replace':
+        reset_scan(
+            scan_id,
+            params_hash,
+            parameters_json(params),
+            nevents=nevents,
+            label=getattr(config.args, 'label', None),
+        )
+        logger.info(f'[rq:scan] Replacing scan {scan_id}')
+    elif continue_scan:
+        logger.info(f'[rq:scan] Continuing scan {scan_id}')
+    else:
+        scan_id = create_scan(
+            catalog_id,
+            params_hash,
+            parameters_json(params),
+            label=getattr(config.args, 'label', None),
+            nevents=nevents,
+        )
+        logger.info(f'[rq:scan] Scan stored as scan {scan_id}')
+    npairs = None
+    skipped_npairs = None
+    status = SCAN_STATUS_FAILED
     try:
-        npairs = _process_pairs(
+        npairs, skipped_npairs = _process_pairs(
             catalog,
+            scan_id,
             continue_scan=continue_scan,
             slurm_context=slurm_context,
         )
+        status = SCAN_STATUS_COMPLETE
     except BrokenProcessPool as err:
         logger.error(
             '[rq:scan] Parallel scan stopped because a worker process '
@@ -229,5 +300,16 @@ def scan_catalog():
         )
         logger.debug(f'Broken process pool details: {err}')
         rq_exit(1, abort=True)
+    finally:
+        with contextlib.suppress(Exception):
+            stored = None if npairs is None else npairs + skipped_npairs
+            finish_scan(
+                scan_id,
+                npairs_stored=stored,
+                npairs_analyzed=npairs,
+                status=status,
+            )
     logger.info(f'[rq:scan] Processed {npairs:n} event pairs')
-    logger.info(f'[rq:scan] Done! Output written to {get_db_path()}')
+    logger.info(
+        f'[rq:scan] Done! Scan {scan_id} written to {get_db_path()}'
+    )

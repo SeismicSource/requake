@@ -219,10 +219,12 @@ def _out_of_range(value, minimum, maximum):
     )
 
 
-def read_stored_catalog():
+def read_stored_catalog(catalog_id=None):
     """
     Read the catalog stored in the output database.
 
+    :param catalog_id: catalog to read; defaults to the latest one
+    :type catalog_id: int or None
     :return: Catalog object.
     :rtype: RequakeCatalog
 
@@ -230,8 +232,12 @@ def read_stored_catalog():
     :raises FileNotFoundError: if the output database is not found
     """
     from ..database.catalog import read_catalog as read_catalog_from_db
+    from ..database.catalogs import CatalogNotFoundError
 
-    cat = read_catalog_from_db()
+    try:
+        cat = read_catalog_from_db(catalog_id)
+    except CatalogNotFoundError as err:
+        raise FileNotFoundError(str(err)) from err
     cat.sort()
     if not cat:
         raise ValueError('Empty catalog')

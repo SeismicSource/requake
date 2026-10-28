@@ -38,6 +38,12 @@ from ..database.pairs import (
     read_pairs,
     reset_invalid_pair_flags,
 )
+from ..database.catalogs import CatalogNotFoundError
+from ..database.scans import (
+    ScanNotFoundError,
+    resolve_scan_id,
+    scan_catalog_id,
+)
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
@@ -302,7 +308,7 @@ def _print_report(report):
         _print_groups_table(report['groups_info'])
 
 
-def _reset_flags(dry_run):
+def _reset_flags(dry_run, scan_id, catalog_id):
     """
     Reset the duplicate and invalid flags.
 
@@ -311,17 +317,27 @@ def _reset_flags(dry_run):
 
     :param dry_run: when True, only count the flagged rows
     :type dry_run: bool
+    :param scan_id: scan whose pairs are considered
+    :type scan_id: int
+    :param catalog_id: catalog whose events are considered
+    :type catalog_id: int
     :return: a ``(n_events, n_pairs)`` tuple
     :rtype: tuple
     """
     if dry_run:
         return run_with_spinner(
             'Counting flagged events and invalid event pairs...',
-            lambda: (count_duplicate_events(), count_invalid_pairs()),
+            lambda: (
+                count_duplicate_events(catalog_id),
+                count_invalid_pairs(scan_id),
+            ),
         )
     return run_with_spinner(
         'Resetting duplicate and invalid flags...',
-        lambda: (reset_duplicate_flags(), reset_invalid_pair_flags()),
+        lambda: (
+            reset_duplicate_flags(catalog_id),
+            reset_invalid_pair_flags(scan_id),
+        ),
     )
 
 
@@ -347,8 +363,14 @@ def _print_reset_report(n_events, n_pairs, dry_run):
 def dedup_events():
     """Find duplicate events from close pairs and flag them."""
     dry_run = config.args.dry_run
+    try:
+        scan_id = resolve_scan_id(getattr(config.args, 'scan_id', None))
+        catalog_id = scan_catalog_id(scan_id)
+    except (ScanNotFoundError, CatalogNotFoundError) as msg:
+        logger.error(msg)
+        rq_exit(1)
     if config.args.reset:
-        n_events, n_pairs = _reset_flags(dry_run)
+        n_events, n_pairs = _reset_flags(dry_run, scan_id, catalog_id)
         _print_reset_report(n_events, n_pairs, dry_run)
         if dry_run:
             logger.info(
@@ -363,19 +385,19 @@ def dedup_events():
     try:
         catalog = run_with_spinner(
             'Reading event catalog...',
-            read_stored_catalog,
+            lambda: read_stored_catalog(catalog_id=catalog_id),
         )
     except (ValueError, FileNotFoundError) as msg:
         logger.error(msg)
         rq_exit(1)
     pairs_message = (
-        f'Reading event pairs with cc >= {cc_min:.2f} from '
-        f'db file {get_db_path()}...'
+        f'Reading event pairs of scan {scan_id} with cc >= {cc_min:.2f} '
+        f'from db file {get_db_path()}...'
     )
     try:
         pairs = run_with_spinner(
             pairs_message,
-            lambda: read_pairs(cc_min=cc_min),
+            lambda: read_pairs(scan_id=scan_id, cc_min=cc_min),
         )
     except (
         DatabaseCorruptError,
@@ -406,8 +428,8 @@ def dedup_events():
         n_flagged, n_invalid = run_with_spinner(
             flag_message,
             lambda: (
-                update_events_duplicate(duplicate_evids),
-                mark_duplicate_pairs_invalid(),
+                update_events_duplicate(duplicate_evids, catalog_id),
+                mark_duplicate_pairs_invalid(scan_id),
             ),
         )
     report = {

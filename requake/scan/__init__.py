@@ -11,3 +11,5 @@ Functions for catalog and template scanning.
 """
 from .scan_catalog import scan_catalog  # noqa
 from .scan_templates import scan_templates  # noqa
+from .print_scans import print_scans  # noqa
+from .delete_scan import delete_scan  # noqa

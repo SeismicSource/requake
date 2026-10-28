@@ -190,7 +190,7 @@ class TestScanCatalogResume(unittest.TestCase):
             'read_packed_pair_ids',
             return_value=packed,
         ):
-            existing_ids = load_existing_pair_ids(catalog)
+            existing_ids = load_existing_pair_ids(catalog, 1)
         self.assertEqual(existing_ids, packed)
 
     def test_noninteractive_progress_uses_total_pair_count(self):
@@ -366,7 +366,7 @@ class TestScanCatalogResume(unittest.TestCase):
         def _mark_load_inventory():
             call_order.append('load_inventory')
 
-        def _mark_store_trace_metadata(_trace_ids):
+        def _mark_store_trace_metadata(_trace_ids, _scan_id):
             call_order.append('store_trace_metadata')
 
         with (
@@ -401,7 +401,7 @@ class TestScanCatalogResume(unittest.TestCase):
                 return_value=0,
             ),
         ):
-            _process_pairs(catalog, continue_scan=False, slurm_context={})
+            _process_pairs(catalog, 1, continue_scan=False, slurm_context={})
 
         self.assertGreaterEqual(len(call_order), 2)
         self.assertEqual(call_order[0], 'load_inventory')
@@ -462,6 +462,7 @@ class TestScanCatalogResume(unittest.TestCase):
         valid_pair_idx = np.array([[idx, idx + 1] for idx in range(40)])
         catalog = [_DummyEvent(f'ev_{idx}') for idx in range(41)]
         state = {
+            'scan_id': 1,
             'nprocs': 2,
             'initial_processed': 0,
             'total_pairs': len(valid_pair_idx),
@@ -530,6 +531,7 @@ class TestScanCatalogResume(unittest.TestCase):
         valid_pair_idx = np.array([[idx, idx + 1] for idx in range(105)])
         catalog = [_DummyEvent(f'ev_{idx}') for idx in range(106)]
         state = {
+            'scan_id': 1,
             'nprocs': 2,
             'initial_processed': 0,
             'total_pairs': len(valid_pair_idx),
@@ -552,8 +554,8 @@ class TestScanCatalogResume(unittest.TestCase):
             future._executor.pending.remove(future)
             return {future}, pending
 
-        def _record_write_pair_records(pairs, append=True):
-            del append
+        def _record_write_pair_records(pairs, scan_id, append=True):
+            del scan_id, append
             flush_lengths.append(len(pairs))
 
         def _record_finalize(batch_of_pairs, pbar, npairs, state_arg, cache):

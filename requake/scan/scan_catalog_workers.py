@@ -378,11 +378,11 @@ def _result_to_pair_record(catalog, result):
     return pair_record, fetch_dt, crosscorr_dt
 
 
-def _flush_pair_batch_if_needed(batch_of_pairs):
+def _flush_pair_batch_if_needed(batch_of_pairs, scan_id):
     """Flush pair batch when it reaches the configured chunk size."""
     if len(batch_of_pairs) >= 100:
         t_start = time.monotonic()
-        write_pair_records(batch_of_pairs, append=True)
+        write_pair_records(batch_of_pairs, scan_id, append=True)
         dt = time.monotonic() - t_start
         if dt > 1.0:
             logger.warning(
@@ -401,7 +401,7 @@ def _finalize_pair_processing(
 ):
     """Flush pending rows and emit final processing logs."""
     if batch_of_pairs:
-        write_pair_records(batch_of_pairs, append=True)
+        write_pair_records(batch_of_pairs, state['scan_id'], append=True)
     if pbar is not None:
         pbar.close()
     elif npairs > 0:
@@ -433,7 +433,7 @@ def _process_and_store_pair(pair, waveform_pair, batch_of_pairs, state):
     state['window_fetch_time'] += fetch_dt
     state['window_crosscorr_time'] += crosscorr_dt
     batch_of_pairs.append(pair_out)
-    _flush_pair_batch_if_needed(batch_of_pairs)
+    _flush_pair_batch_if_needed(batch_of_pairs, state['scan_id'])
 
 
 def _process_candidate_pair(pair, waveform_pair, batch_of_pairs, state):
@@ -453,7 +453,7 @@ def _process_candidate_pair(pair, waveform_pair, batch_of_pairs, state):
         batch_of_pairs.append(
             PairRecord(pair[0], pair[1], pair[0].trace_id, None, None)
         )
-        _flush_pair_batch_if_needed(batch_of_pairs)
+        _flush_pair_batch_if_needed(batch_of_pairs, state['scan_id'])
 
 
 def _handle_future_result(
@@ -480,7 +480,7 @@ def _handle_future_result(
     state['window_fetch_time'] += fetch_dt
     state['window_crosscorr_time'] += crosscorr_dt
     batch_of_pairs.append(pair_record)
-    _flush_pair_batch_if_needed(batch_of_pairs)
+    _flush_pair_batch_if_needed(batch_of_pairs, state['scan_id'])
     update_noninteractive_progress(
         state, cache_stats, show_pbar, total_analyzed[0],
     )
@@ -766,6 +766,7 @@ def process_valid_pair_indices(
     total_pairs=None,
     nprocs=1,
     slurm_context=None,
+    scan_id=None,
 ):
     """Process valid pairs from index pairs."""
     logger.info('[rq:scan] Computing waveform cross-correlation...')
@@ -773,6 +774,7 @@ def process_valid_pair_indices(
         npairs,
         initial_processed,
         total_pairs,
+        scan_id=scan_id,
     )
     state['nprocs'] = nprocs
     state['slurm_context'] = slurm_context or {}

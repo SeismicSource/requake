@@ -75,7 +75,7 @@ class RequakeEventPair:
         )
 
 
-def read_events_from_pairs(cc_min=None, cc_max=None):
+def read_events_from_pairs(cc_min=None, cc_max=None, scan_id=None):
     """
     Read events from stored event pairs.
 
@@ -83,6 +83,8 @@ def read_events_from_pairs(cc_min=None, cc_max=None):
     :type cc_min: float or None
     :param cc_max: If given, only use pairs with cc_max <= cc_max.
     :type cc_max: float or None
+    :param scan_id: scan to read; defaults to the latest one
+    :type scan_id: int or None
     :return: dictionary of events
     :rtype: dict
 
@@ -90,7 +92,7 @@ def read_events_from_pairs(cc_min=None, cc_max=None):
     """
     from ..database.pairs import read_pairs
     events = {}
-    for pair in read_pairs(cc_min=cc_min, cc_max=cc_max):
+    for pair in read_pairs(scan_id=scan_id, cc_min=cc_min, cc_max=cc_max):
         evid1 = pair.event1.evid
         try:
             ev1 = events[evid1]

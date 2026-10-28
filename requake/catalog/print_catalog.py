@@ -10,7 +10,7 @@ Print the event catalog to screen.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
-from ..config import rq_exit
+from ..config import config, rq_exit
 from ..config.generic_printer import _display_table
 from .catalog import read_stored_catalog
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -19,7 +19,9 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 def print_catalog():
     """Print the event catalog to screen."""
     try:
-        catalog = read_stored_catalog()
+        catalog = read_stored_catalog(
+            catalog_id=getattr(config.args, 'catalog_id', None)
+        )
     except (ValueError, FileNotFoundError) as msg:
         logger.error(msg)
         rq_exit(1)

@@ -22,8 +22,10 @@ from requake.config import config
 from requake.database.pairs import PairRecord, read_pairs as read_pairs_from_db
 from requake.catalog import RequakeEvent
 from requake.database.catalog import write_catalog
+from requake.database.catalogs import create_catalog
 from requake.database.db import get_db_path
 from requake.database.pairs import write_pair_records as write_pairs
+from requake.database.scans import create_scan
 
 
 class TestPairsSchema(unittest.TestCase):
@@ -107,21 +109,29 @@ class TestPairsSchema(unittest.TestCase):
         )
 
     @staticmethod
-    def _seed_catalog_for_pairs(pairs_data):
-        """Write catalog rows required by pair foreign-key constraints."""
+    def _seed_scan_for_pairs(pairs_data):
+        """Write catalog and scan rows required by pair constraints."""
         catalog_rows = {}
         for pair in pairs_data:
             catalog_rows[pair.event1.evid] = pair.event1
             catalog_rows[pair.event2.evid] = pair.event2
-        write_catalog(list(catalog_rows.values()))
+        catalog_id = create_catalog(
+            'test-catalog-hash', '{}', source='test',
+            nevents=len(catalog_rows),
+        )
+        write_catalog(list(catalog_rows.values()), catalog_id)
+        return create_scan(
+            catalog_id, 'test-scan-hash', '{}',
+            nevents=len(catalog_rows),
+        )
 
     def test_pairs_roundtrip_preserves_fields(self):
         """Stored pairs should preserve the same values when read back."""
         pairs_data = self._get_synthetic_pairs_data(2)
 
         with self._patch_runtime_config():
-            self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, append=False)
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            write_pairs(pairs_data, scan_id, append=False)
             pairs = list(read_pairs_from_db())
 
         self.assertEqual(len(pairs), 2)
@@ -148,8 +158,8 @@ class TestPairsSchema(unittest.TestCase):
         pairs_data = self._get_synthetic_pairs_data(2)
 
         with self._patch_runtime_config():
-            self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, append=False)
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            write_pairs(pairs_data, scan_id, append=False)
             pairs = list(read_pairs_from_db())
 
         self.assertEqual(len(pairs), 2, 'Should have 2 pairs')
@@ -204,8 +214,8 @@ class TestPairsSchema(unittest.TestCase):
         ]
 
         with self._patch_runtime_config():
-            self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, append=False)
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            write_pairs(pairs_data, scan_id, append=False)
             pairs = list(read_pairs_from_db())
 
         self.assertEqual(len(pairs), 1)
@@ -218,8 +228,8 @@ class TestPairsSchema(unittest.TestCase):
         pairs_data = self._get_synthetic_pairs_data(1)
 
         with self._patch_runtime_config():
-            self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, append=False)
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            write_pairs(pairs_data, scan_id, append=False)
             db_path = get_db_path()
 
         conn = sqlite3.connect(db_path)
@@ -245,6 +255,7 @@ class TestPairsSchema(unittest.TestCase):
 
         self.assertIn('lag_samples', pair_columns)
         self.assertIn('cc_x100', pair_columns)
+        self.assertIn('scan_id', pair_columns)
         self.assertNotIn('lag_sec', pair_columns)
         self.assertNotIn('orig_time1', pair_columns)
         self.assertIn('elevation', metadata_columns)
@@ -282,8 +293,8 @@ class TestPairsSchema(unittest.TestCase):
         with self._patch_runtime_config(), patch.dict(
             config, {'inventory': inventory}, clear=False
         ):
-            self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, append=False)
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            write_pairs(pairs_data, scan_id, append=False)
             db_path = get_db_path()
 
         conn = sqlite3.connect(db_path)
@@ -307,8 +318,8 @@ class TestPairsSchema(unittest.TestCase):
         ]
 
         with self._patch_runtime_config():
-            self._seed_catalog_for_pairs(pairs_data)
-            write_pairs(pairs_data, append=False)
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            write_pairs(pairs_data, scan_id, append=False)
             pairs = list(
                 read_pairs_from_db(cc_min=0.851, cc_max=0.861)
             )
@@ -353,9 +364,9 @@ class TestPairsSchema(unittest.TestCase):
             {'inventory': None},
             clear=False,
         ):
-            self._seed_catalog_for_pairs([pair])
+            scan_id = self._seed_scan_for_pairs([pair])
             # Should not raise PairsMetadataError.
-            write_pairs([pair], append=False)
+            write_pairs([pair], scan_id, append=False)
             db_path = get_db_path()
 
         conn = sqlite3.connect(db_path)

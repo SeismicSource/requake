@@ -26,9 +26,21 @@ def run():
     if args.action == 'print_catalog':
         from .catalog import print_catalog
         print_catalog()
+    if args.action == 'print_catalogs':
+        from .catalog import print_catalogs
+        print_catalogs()
+    if args.action == 'delete_catalog':
+        from .catalog import delete_catalog
+        delete_catalog()
     if args.action == 'scan_catalog':
         from .scan import scan_catalog
         scan_catalog()
+    if args.action == 'print_scans':
+        from .scan import print_scans
+        print_scans()
+    if args.action == 'delete_scan':
+        from .scan import delete_scan
+        delete_scan()
     if args.action == 'print_pairs':
         from .families import print_pairs
         print_pairs()
@@ -47,6 +59,12 @@ def run():
     if args.action == 'print_families':
         from .families import print_families
         print_families()
+    if args.action == 'print_family_builds':
+        from .families import print_family_builds
+        print_family_builds()
+    if args.action == 'delete_build':
+        from .families import delete_family_build
+        delete_family_build()
     if args.action == 'plot_families':
         from .plot import plot_families
         plot_families()

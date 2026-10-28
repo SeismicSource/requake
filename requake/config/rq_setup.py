@@ -19,12 +19,11 @@ import signal
 import time
 import tqdm
 from .._version import get_versions
-from ..database.db import get_db_path
 from ..terminal import color_enabled, style
 from .config import config
 from .utils import (
     parse_configspec, read_config, validate_config, write_sample_config,
-    update_config_file, write_ok, request_abort
+    update_config_file, request_abort
 )
 # Note: modules are lazily imported to speed up the startup time.
 # pylint: disable=relative-beyond-top-level,import-outside-toplevel
@@ -283,14 +282,6 @@ def configure(args):
     config.template_dir = os.path.join(
         config.args.outdir, 'templates'
     )
-    should_write_catalog = (
-        args.action == 'read_catalog'
-        and not args.append
-        and not write_ok(get_db_path(), args.force)
-    )
-    if should_write_catalog:
-        print(style('Exiting now.', 'dim'))
-        sys.exit(0)
     # config.inventory needs to exist
     config.inventory = None
     # Check library versions

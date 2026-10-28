@@ -118,14 +118,14 @@ def log_pair_grouping_stats(valid_pair_idx):
         )
 
 
-def load_existing_pair_ids(catalog):
-    """Return packed pair IDs already present in the database."""
+def load_existing_pair_ids(catalog, scan_id):
+    """Return packed pair IDs already present for a scan."""
     t_read_keys_start = time.monotonic()
     message = '[rq:pairs] Loading existing pair key IDs from db file...'
     logger.debug(message)
     existing_ids = run_with_spinner(
         message,
-        lambda: _read_existing_pair_ids(catalog),
+        lambda: _read_existing_pair_ids(catalog, scan_id),
     )
     read_keys_dt = time.monotonic() - t_read_keys_start
     logger.info(
@@ -135,8 +135,8 @@ def load_existing_pair_ids(catalog):
     return existing_ids
 
 
-def _read_existing_pair_ids(catalog):
-    """Read and pack the pair IDs already stored in the database."""
+def _read_existing_pair_ids(catalog, scan_id):
+    """Read and pack the pair IDs already stored for a scan."""
     event_key_rows = read_event_key_rows()
     # Map event string IDs to their position in the catalog.
     _evid_to_idx = {
@@ -150,7 +150,7 @@ def _read_existing_pair_ids(catalog):
         if evid in _evid_to_idx
     }
     nevents = len(catalog)
-    return read_packed_pair_ids(_db_id_to_idx, nevents)
+    return read_packed_pair_ids(scan_id, _db_id_to_idx, nevents)
 
 
 def mask_existing_pair_indices(valid_pair_idx, existing_pair_ids, nevents):

@@ -19,6 +19,9 @@ from obspy import UTCDateTime
 from requake.catalog import RequakeEvent
 from requake.config import config
 from requake.database.db import get_db_path
+from requake.database.catalogs import create_catalog
+from requake.database.family_builds import create_family_build
+from requake.database.scans import create_scan
 from requake.database.templates import (
     read_template_families,
     write_template_detections,
@@ -44,6 +47,17 @@ class TestTemplateCatalogSchema(unittest.TestCase):
             clear=False,
         )
 
+    @staticmethod
+    def _seed_build():
+        """Create catalog, scan and build rows; return the build id."""
+        catalog_id = create_catalog(
+            'test-catalog-hash', '{}', source='test', nevents=0
+        )
+        scan_id = create_scan(catalog_id, 'test-scan-hash', '{}')
+        return create_family_build(
+            scan_id, 'shared', None, 'test-build-hash', '{}'
+        )
+
     def _synthetic_detection(self, family_number, trace_id, evid, cc_max):
         """Build one synthetic template detection tuple."""
         event = RequakeEvent(
@@ -65,8 +79,9 @@ class TestTemplateCatalogSchema(unittest.TestCase):
         ]
 
         with self._patch_runtime_config():
-            write_template_detections(detections, append=False)
-            families = read_template_families()
+            build_id = self._seed_build()
+            write_template_detections(build_id, detections, append=False)
+            families = read_template_families(build_id=build_id)
 
         self.assertEqual(len(families), 2)
         self.assertEqual(families[0].number, 0)
@@ -83,7 +98,8 @@ class TestTemplateCatalogSchema(unittest.TestCase):
         ]
 
         with self._patch_runtime_config():
-            write_template_detections(detections, append=False)
+            build_id = self._seed_build()
+            write_template_detections(build_id, detections, append=False)
             conn = sqlite3.connect(get_db_path())
             try:
                 rows = conn.execute(

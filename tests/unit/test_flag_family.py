@@ -20,7 +20,10 @@ from obspy import UTCDateTime
 from requake.catalog import RequakeEvent
 from requake.config import config
 from requake.database.catalog import write_catalog
+from requake.database.catalogs import create_catalog
 from requake.database.families import read_families, write_families
+from requake.database.family_builds import create_family_build
+from requake.database.scans import create_scan
 from requake.families.families import Family
 from requake.families.flag_family import flag_family
 
@@ -59,8 +62,16 @@ class TestFlagFamily(unittest.TestCase):
                 family.append(event)
                 catalog_rows.append(event)
             families.append(family)
-        write_catalog(catalog_rows)
-        write_families(families)
+        catalog_id = create_catalog(
+            'test-catalog-hash', '{}', source='test',
+            nevents=len(catalog_rows),
+        )
+        write_catalog(catalog_rows, catalog_id)
+        scan_id = create_scan(catalog_id, 'test-scan-hash', '{}')
+        build_id = create_family_build(
+            scan_id, 'shared', None, 'test-build-hash', '{}'
+        )
+        write_families(build_id, catalog_id, families)
 
     def _patch_runtime_config(self):
         """Return a patch that points the global config to a temp database."""

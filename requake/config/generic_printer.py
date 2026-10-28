@@ -23,6 +23,48 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 _TABLE_SEPARATOR_CHARS = frozenset('-|=+: ')
 
 
+def format_timestamp(value):
+    """
+    Format a stored ISO timestamp for table output.
+
+    :param value: stored timestamp
+    :type value: str or None
+    :return: formatted timestamp, or ``n/a``
+    :rtype: str
+    """
+    return 'n/a' if value is None else str(value).replace('T', ' ')[:19]
+
+
+def format_count(value):
+    """
+    Format a stored row counter for table output.
+
+    :param value: stored counter
+    :type value: int or None
+    :return: formatted counter, or ``n/a``
+    :rtype: str
+    """
+    return 'n/a' if value is None else f'{int(value):n}'
+
+
+def print_key_value_table(rows, detail_title='Details'):
+    """
+    Print a two-column attribute/value table.
+
+    :param rows: ``(attribute, value)`` pairs
+    :type rows: list
+    :param detail_title: title shown in the pager detail view
+    :type detail_title: str
+    """
+    headers_fmt = [('attribute', None), ('value', None)]
+    _display_table(
+        headers_fmt, rows,
+        row_label='Rows',
+        copy_label='attribute',
+        detail_title=detail_title,
+    )
+
+
 def _is_separator_line(line):
     """Return True if ``line`` is a table separator (or divider) line."""
     stripped = line.strip()

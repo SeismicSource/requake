@@ -16,6 +16,7 @@ from .db import (
     execute_with_retry,
     get_db_connection,
 )
+from .scans import SCANS_SCHEMA_STATEMENTS
 
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -37,8 +38,10 @@ class PairsMetadataError(RuntimeError):
 
 
 TRACE_METADATA_SCHEMA_STATEMENTS = [
+    *SCANS_SCHEMA_STATEMENTS,
     f'''
     CREATE TABLE IF NOT EXISTS {TRACE_METADATA_TABLE} (
+      scan_id           INTEGER NOT NULL,
       trace_id          TEXT NOT NULL,
       valid_from_utc    TEXT NOT NULL,
       valid_to_utc      TEXT,
@@ -48,13 +51,16 @@ TRACE_METADATA_SCHEMA_STATEMENTS = [
       elevation         REAL,
       local_depth       REAL,
       updated_at        TEXT,
-      PRIMARY KEY (trace_id, valid_from_utc)
+      PRIMARY KEY (scan_id, trace_id, valid_from_utc),
+      FOREIGN KEY (scan_id)
+        REFERENCES scans(scan_id)
+        ON UPDATE CASCADE ON DELETE CASCADE
     )
     ''',
     (
         'CREATE INDEX IF NOT EXISTS idx_trace_metadata_lookup '
         f'ON {TRACE_METADATA_TABLE}('
-        'trace_id, valid_from_utc, valid_to_utc)'
+        'scan_id, trace_id, valid_from_utc, valid_to_utc)'
     ),
 ]
 
@@ -262,15 +268,15 @@ def _warn_trace_metadata_change(existing, candidate):
         )
 
 
-def _insert_trace_metadata_row(cursor, row):
+def _insert_trace_metadata_row(cursor, scan_id, row):
     """Insert one trace metadata row, respecting interval invariants."""
     existing_rows = cursor.execute(
         f'''
         SELECT * FROM {TRACE_METADATA_TABLE}
-        WHERE trace_id = ?
+        WHERE scan_id = ? AND trace_id = ?
         ORDER BY valid_from_utc
         ''',
-        (row['trace_id'],),
+        (int(scan_id), row['trace_id']),
     ).fetchall()
     matched_existing = None
     for existing in existing_rows:
@@ -291,12 +297,13 @@ def _insert_trace_metadata_row(cursor, row):
         lambda row=row: cursor.execute(
             f'''
             INSERT INTO {TRACE_METADATA_TABLE} (
-              trace_id, valid_from_utc, valid_to_utc,
+              scan_id, trace_id, valid_from_utc, valid_to_utc,
               sampling_rate_hz, trace_lon, trace_lat,
               elevation, local_depth, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''',
             (
+                int(scan_id),
                 row['trace_id'],
                 row['valid_from_utc'],
                 row['valid_to_utc'],
@@ -312,13 +319,13 @@ def _insert_trace_metadata_row(cursor, row):
     )
 
 
-def _store_trace_metadata(cursor, pairs):
+def _store_trace_metadata(cursor, pairs, scan_id):
     """Insert trace metadata rows for a batch of pairs."""
     for row in _trace_metadata_rows(pairs):
-        _insert_trace_metadata_row(cursor, row)
+        _insert_trace_metadata_row(cursor, scan_id, row)
 
 
-def store_trace_metadata_from_inventory(trace_ids):
+def store_trace_metadata_from_inventory(trace_ids, scan_id):
     """
     Persist trace metadata rows for the given trace IDs.
 
@@ -327,6 +334,8 @@ def store_trace_metadata_from_inventory(trace_ids):
     (e.g. all waveform fetches fail).
 
     :param trace_ids: iterable of trace IDs to store metadata for
+    :param scan_id: scan the metadata belongs to
+    :type scan_id: int
     """
     conn = get_db_connection(initdb=False)
     try:
@@ -337,7 +346,7 @@ def store_trace_metadata_from_inventory(trace_ids):
                 # inventory absent or trace_id not found; skip silently
                 continue
             for row in rows:
-                _insert_trace_metadata_row(cursor, row)
+                _insert_trace_metadata_row(cursor, scan_id, row)
         conn.commit()
     finally:
         conn.close()

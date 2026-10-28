@@ -151,57 +151,82 @@ class Family(list):
         return distance / 1e3
 
 
-def _read_families_from_catalog_scan(family_numbers=None):
+def _read_families_from_catalog_scan(family_numbers=None, build_id=None):
     """
     Read a list of families from the catalog scan output.
 
     :param family_numbers: If given, only read families with these numbers.
     :type family_numbers: iterable of int or None
+    :param build_id: family build to read; defaults to the latest one
+    :type build_id: int or None
     :return: List of families.
     :rtype: list of Family
     """
     from ..database.families import read_families as read_families_from_db
-    return read_families_from_db(family_numbers=family_numbers)
+    return read_families_from_db(
+        build_id=build_id, family_numbers=family_numbers
+    )
 
 
-def _read_families_from_template_scan():
+def _read_families_from_template_scan(build_id=None):
     """
     Read a list of families from the template scan output.
 
+    :param build_id: family build to read; defaults to the latest one
+    :type build_id: int or None
     :return: List of families.
     :rtype: list of Family
     """
     from ..database.templates import (
         read_template_families as read_template_families_from_db,
     )
-    return read_template_families_from_db()
+    return read_template_families_from_db(build_id=build_id)
 
 
-def read_families(family_numbers=None):
+def read_families(family_numbers=None, build_id=None):
     """
     Read families from the catalog scan output or template scan output.
 
     :param family_numbers: If given, only read families with these numbers.
     :type family_numbers: iterable of int or None
+    :param build_id: family build to read; defaults to the latest one
+    :type build_id: int or None
     :return: List of families.
     :rtype: list of Family
     """
     if getattr(config.args, 'template', False):
-        return _read_families_from_template_scan()
-    return _read_families_from_catalog_scan(family_numbers=family_numbers)
+        return _read_families_from_template_scan(build_id=build_id)
+    return _read_families_from_catalog_scan(
+        family_numbers=family_numbers, build_id=build_id
+    )
 
 
-def read_selected_families():
+def read_selected_families(build_id=None):
     """
     Read and select families by number, validity, length, and size.
 
+    :param build_id: family build to read; defaults to the latest one
+    :type build_id: int or None
     :return: List of families.
     :rtype: list of Family
 
     :raises FamilyNotFoundError: if no family is found
     """
-    family_numbers = _build_family_number_list()
-    families = read_families(family_numbers=family_numbers)
+    from ..database.family_builds import (
+        FamilyBuildNotFoundError,
+        resolve_build_id,
+    )
+
+    if build_id is None:
+        build_id = getattr(config.args, 'build_id', None)
+    try:
+        build_id = resolve_build_id(build_id)
+    except FamilyBuildNotFoundError as err:
+        raise FamilyNotFoundError(str(err)) from err
+    family_numbers = _build_family_number_list(build_id=build_id)
+    families = read_families(
+        family_numbers=family_numbers, build_id=build_id
+    )
     families_selected = []
     for family in families:
         if family.number not in family_numbers:
@@ -310,11 +335,11 @@ def get_family_aligned_waveforms_and_template(family):
     return st
 
 
-def _build_family_number_list():
+def _build_family_number_list(build_id=None):
     """Build a list of family numbers from config option."""
     family_numbers = config.args.family_numbers
     if family_numbers == 'all':
-        families = read_families()
+        families = read_families(build_id=build_id)
         return sorted({family.number for family in families})
     try:
         if ',' in family_numbers:

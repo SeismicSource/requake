@@ -20,6 +20,11 @@ from .db import (
     get_db_connection,
     get_db_path,
 )
+from .scans import (
+    SCANS_SCHEMA_STATEMENTS,
+    resolve_scan_id,
+    scan_catalog_id,
+)
 from .trace_metadata import (
     PairsMetadataError,  # noqa: F401 (re-exported for callers)
     TRACE_METADATA_TABLE,
@@ -56,7 +61,7 @@ class PairRecord(NamedTuple):
     cc_max: object
     sampling_rate_hz: object = None
 
-    def db_values(self, cursor, event_cache, trace_cache):
+    def db_values(self, cursor, scan_id, event_cache, trace_cache):
         """Return an event_pairs row tuple for SQLite insertion."""
         event1_id = _lookup_id(
             cursor, EVENT_KEYS_TABLE, 'event_id', 'evid',
@@ -76,7 +81,10 @@ class PairRecord(NamedTuple):
         cc_x100 = (
             _encode_cc_max(self.cc_max) if self.cc_max is not None else None
         )
-        return (event1_id, event2_id, trace_key_id, lag_samples, cc_x100)
+        return (
+            int(scan_id), event1_id, event2_id, trace_key_id,
+            lag_samples, cc_x100,
+        )
 
 
 class PairsSchemaError(RuntimeError):
@@ -86,6 +94,7 @@ class PairsSchemaError(RuntimeError):
 # Combined schema for event_pairs, lookup tables, and trace_metadata.
 # Used by _ensure_pairs_table and the local migration helper.
 PAIRS_SCHEMA_STATEMENTS = [
+    *SCANS_SCHEMA_STATEMENTS,
     f'''
     CREATE TABLE IF NOT EXISTS {EVENT_KEYS_TABLE} (
       event_id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,12 +110,16 @@ PAIRS_SCHEMA_STATEMENTS = [
     f'''
     CREATE TABLE IF NOT EXISTS {EVENT_PAIRS_TABLE} (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      scan_id         INTEGER NOT NULL,
       event1_id       INTEGER NOT NULL,
       event2_id       INTEGER NOT NULL,
       trace_key_id    INTEGER NOT NULL,
       lag_samples     INTEGER,
       cc_x100         INTEGER,
       invalid         INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (scan_id)
+        REFERENCES scans(scan_id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
       FOREIGN KEY (event1_id)
         REFERENCES {EVENT_KEYS_TABLE}(event_id)
         ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -116,7 +129,7 @@ PAIRS_SCHEMA_STATEMENTS = [
       FOREIGN KEY (trace_key_id)
         REFERENCES {TRACE_KEYS_TABLE}(trace_key_id)
         ON UPDATE CASCADE ON DELETE RESTRICT,
-      UNIQUE (event1_id, event2_id, trace_key_id)
+      UNIQUE (scan_id, event1_id, event2_id, trace_key_id)
     )
     ''',
     *TRACE_METADATA_SCHEMA_STATEMENTS,
@@ -142,6 +155,9 @@ def _is_incompatible_pairs_schema_error(err):
         or 'no such column: cc_x100' in message
         or 'no such column: p.invalid' in message
         or 'has no column named invalid' in message
+        or 'no such column: p.scan_id' in message
+        or 'no such column: scan_id' in message
+        or 'has no column named scan_id' in message
         or 'no such column: p.event1_id' in message
         or 'no such column: p.event2_id' in message
         or 'no such column: p.trace_key_id' in message
@@ -150,8 +166,44 @@ def _is_incompatible_pairs_schema_error(err):
         or 'has no column named trace_key_id' in message
         or f'no such table: {EVENT_KEYS_TABLE}' in message
         or f'no such table: {TRACE_KEYS_TABLE}' in message
+        or 'no such table: scans' in message
         or _is_missing_trace_metadata_table_error(err)
     )
+
+
+def _incompatible_schema_message():
+    """Return the error message for an outdated pairs schema."""
+    return (
+        'Stored event pairs schema is outdated or incompatible with this '
+        f'Requake version in db file {get_db_path()}. Databases written by '
+        'Requake < 0.8.5 must be migrated: see the database schemas '
+        'section of the documentation.'
+    )
+
+
+def _cc_filter_clause(scan_id, cc_min, cc_max, include_invalid=False):
+    """Build SQL filter clause and params for readable pair rows.
+
+    Pairs flagged as invalid (e.g. because one of their events was
+    marked as a duplicate) are excluded, unless *include_invalid* is
+    true.
+    """
+    conditions = [
+        'p.scan_id = ?',
+        'p.cc_x100 IS NOT NULL',
+        'p.lag_samples IS NOT NULL',
+    ]
+    if not include_invalid:
+        conditions.append('p.invalid = 0')
+    params = [int(scan_id)]
+    if cc_min is not None:
+        conditions.append('p.cc_x100 >= ?')
+        params.append(int(math.ceil(cc_min * 100)))
+    if cc_max is not None:
+        conditions.append('p.cc_x100 <= ?')
+        params.append(int(math.floor(cc_max * 100)))
+    where = f'WHERE {" AND ".join(conditions)}'
+    return where, params
 
 
 def _encode_cc_max(cc_max):
@@ -164,31 +216,14 @@ def _decode_cc_max(cc_x100):
     return cc_x100 / 100.0
 
 
-def _cc_filter_clause(cc_min, cc_max, include_invalid=False):
-    """Build SQL filter clause and params for readable pair rows.
-
-    Pairs flagged as invalid (e.g. because one of their events was
-    marked as a duplicate) are excluded, unless *include_invalid* is
-    true.
-    """
-    conditions = [
-        'p.cc_x100 IS NOT NULL',
-        'p.lag_samples IS NOT NULL',
-    ]
-    if not include_invalid:
-        conditions.append('p.invalid = 0')
-    params = []
-    if cc_min is not None:
-        conditions.append('p.cc_x100 >= ?')
-        params.append(int(math.ceil(cc_min * 100)))
-    if cc_max is not None:
-        conditions.append('p.cc_x100 <= ?')
-        params.append(int(math.floor(cc_max * 100)))
-    where = f'WHERE {" AND ".join(conditions)}'
-    return where, params
+def _resolve_scan_and_catalog(scan_id):
+    """Return the scan id to use and the catalog it was performed on."""
+    scan_id = resolve_scan_id(scan_id)
+    return scan_id, scan_catalog_id(scan_id)
 
 
-def count_pairs_upper_bound(cc_min, cc_max, limit, include_invalid=False):
+def count_pairs_upper_bound(scan_id, cc_min, cc_max, limit,
+                            include_invalid=False):
     """Return a fast upper-bound count, capped at *limit* + 1.
 
     Queries only the ``event_pairs`` table (no JOINs), so the result
@@ -197,7 +232,7 @@ def count_pairs_upper_bound(cc_min, cc_max, limit, include_invalid=False):
     where a conservative over-estimate is acceptable.
     """
     where, params = _cc_filter_clause(
-        cc_min, cc_max, include_invalid=include_invalid
+        scan_id, cc_min, cc_max, include_invalid=include_invalid
     )
     conn = get_db_connection(initdb=False)
     try:
@@ -212,7 +247,8 @@ def count_pairs_upper_bound(cc_min, cc_max, limit, include_invalid=False):
         conn.close()
 
 
-def count_pairs_up_to(cc_min, cc_max, limit, include_invalid=False):
+def count_pairs_up_to(scan_id, cc_min, cc_max, limit,
+                      include_invalid=False):
     """Return the number of matching pairs, capped at *limit* + 1.
 
     Uses the same FROM / JOIN / WHERE clauses as :func:`read_pairs`
@@ -220,8 +256,9 @@ def count_pairs_up_to(cc_min, cc_max, limit, include_invalid=False):
     is accurate (orphan rows are excluded).  The ``LIMIT`` stops
     scanning early.
     """
-    where, params = _cc_filter_clause(
-        cc_min, cc_max, include_invalid=include_invalid
+    scan_id, catalog_id = _resolve_scan_and_catalog(scan_id)
+    where, where_params = _cc_filter_clause(
+        scan_id, cc_min, cc_max, include_invalid=include_invalid
     )
     conn = get_db_connection(initdb=False)
     try:
@@ -237,10 +274,13 @@ def count_pairs_up_to(cc_min, cc_max, limit, include_invalid=False):
                   ON e2.event_id = p.event2_id
                 JOIN {TRACE_KEYS_TABLE} AS tk
                   ON tk.trace_key_id = p.trace_key_id
-                JOIN catalog AS c1 ON c1.evid = e1.evid
-                JOIN catalog AS c2 ON c2.evid = e2.evid
+                JOIN catalog AS c1
+                  ON c1.evid = e1.evid AND c1.catalog_id = ?
+                JOIN catalog AS c2
+                  ON c2.evid = e2.evid AND c2.catalog_id = ?
                 LEFT JOIN {TRACE_METADATA_TABLE} AS tm
-                  ON tm.trace_id = tk.trace_id
+                  ON tm.scan_id = p.scan_id
+                 AND tm.trace_id = tk.trace_id
                  AND tm.valid_from_utc <= c1.orig_time
                  AND (
                    tm.valid_to_utc IS NULL
@@ -249,7 +289,7 @@ def count_pairs_up_to(cc_min, cc_max, limit, include_invalid=False):
                 {where}
                 LIMIT ?
                 ''',
-                list(params) + [limit + 1],
+                [catalog_id, catalog_id] + where_params + [limit + 1],
             ).fetchall()
             return len(rows)
         except sqlite3.OperationalError as err:
@@ -260,9 +300,7 @@ def count_pairs_up_to(cc_min, cc_max, limit, include_invalid=False):
                 ) from err
             if _is_incompatible_pairs_schema_error(err):
                 raise PairsSchemaError(
-                    'Stored event pairs schema is incompatible '
-                    f'with this Requake version in db file '
-                    f'{get_db_path()}'
+                    _incompatible_schema_message()
                 ) from err
             raise
         except sqlite3.DatabaseError as err:
@@ -348,54 +386,54 @@ def _pair_from_row(row):
     )
 
 
-def write_pair_records(pairs, append=True):
+def write_pair_records(pairs, scan_id, append=True):
     """
     Write a list of PairRecord objects into SQLite.
 
     :param pairs: pair records to write; each item must be a PairRecord.
         Unanalyzable pairs have ``lag_samples=None`` and ``cc_max=None``.
-    :param append: if False, clear existing pairs before writing.
+    :param scan_id: scan the pairs belong to
+    :type scan_id: int
+    :param append: if False, clear the existing pairs of this scan
+    :type append: bool
     """
     pairs = list(pairs)
+    scan_id = int(scan_id)
     conn = get_db_connection(initdb=True)
     try:
         cursor = conn.cursor()
         _ensure_pairs_table(cursor)
         if not append:
-            execute_with_retry(
-                lambda: cursor.execute(f'DELETE FROM {EVENT_PAIRS_TABLE}'),
-                'clear event pairs table',
-            )
-            execute_with_retry(
-                lambda: cursor.execute(f'DELETE FROM {EVENT_KEYS_TABLE}'),
-                'clear event keys table',
-            )
-            execute_with_retry(
-                lambda: cursor.execute(f'DELETE FROM {TRACE_KEYS_TABLE}'),
-                'clear trace keys table',
-            )
-            execute_with_retry(
-                lambda: cursor.execute(f'DELETE FROM {TRACE_METADATA_TABLE}'),
-                'clear trace metadata table',
-            )
+            for table, label in (
+                (EVENT_PAIRS_TABLE, 'event pairs'),
+                (TRACE_METADATA_TABLE, 'trace metadata'),
+            ):
+                execute_with_retry(
+                    lambda table=table: cursor.execute(
+                        f'DELETE FROM {table} WHERE scan_id = ?',
+                        (scan_id,),
+                    ),
+                    f'clear {label} of scan {scan_id}',
+                )
         if pairs:
-            _store_trace_metadata(cursor, pairs)
+            _store_trace_metadata(cursor, pairs, scan_id)
             event_cache = {}
             trace_cache = {}
             pair_rows = [
-                pair.db_values(cursor, event_cache, trace_cache)
+                pair.db_values(cursor, scan_id, event_cache, trace_cache)
                 for pair in pairs
             ]
             execute_with_retry(
                 lambda: cursor.executemany(
                     f'''
                     INSERT OR REPLACE INTO {EVENT_PAIRS_TABLE} (
+                      scan_id,
                       event1_id,
                       event2_id,
                       trace_key_id,
                       lag_samples,
                       cc_x100
-                    ) VALUES (?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                     ''',
                     pair_rows,
                 ),
@@ -404,29 +442,29 @@ def write_pair_records(pairs, append=True):
         conn.commit()
     except sqlite3.OperationalError as err:
         if _is_incompatible_pairs_schema_error(err):
-            raise PairsSchemaError(
-                'Stored event pairs schema is incompatible with this '
-                f'Requake version in db file {get_db_path()}'
-            ) from err
+            raise PairsSchemaError(_incompatible_schema_message()) from err
         raise
     finally:
         conn.close()
 
 
-def mark_duplicate_pairs_invalid():
+def mark_duplicate_pairs_invalid(scan_id):
     """
     Mark all pairs involving a duplicated catalog event as invalid.
 
     Duplicated events are those with ``duplicate = 1`` in the catalog
-    table.
+    table of the catalog the scan was performed on.
 
+    :param scan_id: scan whose pairs are updated
+    :type scan_id: int
     :return: number of pairs newly flagged as invalid
     :rtype: int
     """
+    scan_id, catalog_id = _resolve_scan_and_catalog(scan_id)
     duplicated_events = (
         f'SELECT k.event_id FROM {EVENT_KEYS_TABLE} AS k '
         'JOIN catalog AS c ON c.evid = k.evid '
-        'WHERE c.duplicate = 1'
+        'WHERE c.duplicate = 1 AND c.catalog_id = ?'
     )
     conn = get_db_connection(initdb=False)
     try:
@@ -435,10 +473,11 @@ def mark_duplicate_pairs_invalid():
             execute_with_retry(
                 lambda: cursor.execute(
                     f'UPDATE {EVENT_PAIRS_TABLE} SET invalid = 1 '
-                    'WHERE invalid = 0 AND ('
+                    'WHERE invalid = 0 AND scan_id = ? AND ('
                     f'event1_id IN ({duplicated_events}) '
                     f'OR event2_id IN ({duplicated_events})'
-                    ')'
+                    ')',
+                    (int(scan_id), catalog_id, catalog_id),
                 ),
                 'mark duplicate pairs as invalid',
             )
@@ -446,8 +485,7 @@ def mark_duplicate_pairs_invalid():
         except sqlite3.OperationalError as err:
             if _is_incompatible_pairs_schema_error(err):
                 raise PairsSchemaError(
-                    'Stored event pairs schema is incompatible with this '
-                    f'Requake version in db file {get_db_path()}'
+                    _incompatible_schema_message()
                 ) from err
             raise
         conn.commit()
@@ -456,20 +494,28 @@ def mark_duplicate_pairs_invalid():
         conn.close()
 
 
-def count_pairs():
-    """Return the number of stored event pairs.
+def count_pairs(scan_id=None):
+    """Return whether a scan has stored event pairs.
 
     Uses ``SELECT 1 ... LIMIT 1`` instead of ``COUNT(*)`` because
     the latter performs a full table scan, which is prohibitively
     slow (20+ minutes for 300M rows) on network filesystems such
     as GPFS.
+
+    :param scan_id: scan to inspect; defaults to the latest one
+    :type scan_id: int or None
+    :return: 1 when the scan has pairs, 0 otherwise
+    :rtype: int
     """
+    scan_id, _ = _resolve_scan_and_catalog(scan_id)
     conn = get_db_connection(initdb=False)
     try:
         cursor = conn.cursor()
         try:
             row = cursor.execute(
-                f'SELECT 1 FROM {EVENT_PAIRS_TABLE} LIMIT 1'
+                f'SELECT 1 FROM {EVENT_PAIRS_TABLE} WHERE scan_id = ? '
+                'LIMIT 1',
+                (int(scan_id),),
             ).fetchone()
         except sqlite3.OperationalError as err:
             if _is_missing_pairs_table_error(err):
@@ -506,13 +552,15 @@ def read_event_key_rows():
     return [(int(row['event_id']), row['evid']) for row in rows]
 
 
-def read_packed_pair_ids(event_id_to_idx, nevents):
+def read_packed_pair_ids(scan_id, event_id_to_idx, nevents):
     """Stream pair keys from DB and return packed ``uint64`` IDs.
 
     Reads ``(event1_id, event2_id)`` rows from the database and
     packs them into a set of canonical ``uint64`` values in a
     single pass, avoiding the intermediate tuple set.
 
+    :param scan_id: scan whose pairs are read
+    :type scan_id: int
     :param event_id_to_idx: mapping from ``event_id`` to catalog index
     :param nevents: number of events in the catalog
     :return: set of packed IDs, each computed as
@@ -523,15 +571,16 @@ def read_packed_pair_ids(event_id_to_idx, nevents):
         cursor = conn.cursor()
         try:
             rows = cursor.execute(
-                f'SELECT event1_id, event2_id FROM {EVENT_PAIRS_TABLE}'
+                f'SELECT event1_id, event2_id FROM {EVENT_PAIRS_TABLE} '
+                'WHERE scan_id = ?',
+                (int(scan_id),),
             )
         except sqlite3.OperationalError as err:
             if _is_missing_pairs_table_error(err):
                 return set()
             if _is_incompatible_pairs_schema_error(err):
                 raise PairsSchemaError(
-                    'Stored event pairs schema is incompatible with this '
-                    f'Requake version in db file {get_db_path()}'
+                    _incompatible_schema_message()
                 ) from err
             raise
         get_idx = event_id_to_idx.get
@@ -551,11 +600,14 @@ def read_packed_pair_ids(event_id_to_idx, nevents):
         conn.close()
 
 
-def read_pairs(cc_min=None, cc_max=None, offset=None, limit=None,
-               count_only=False, order_by=None, include_invalid=False):
+def read_pairs(scan_id=None, cc_min=None, cc_max=None, offset=None,
+               limit=None, count_only=False, order_by=None,
+               include_invalid=False):
     """
     Read event pairs from SQLite, optionally filtering by cc_max.
 
+    :param scan_id: scan to read; defaults to the latest one
+    :type scan_id: int or None
     :param cc_min: If given, only return pairs with cc_max >= cc_min.
     :type cc_min: float or None
     :param cc_max: If given, only return pairs with cc_max <= cc_max.
@@ -579,9 +631,11 @@ def read_pairs(cc_min=None, cc_max=None, offset=None, limit=None,
 
     :raise PairsTableNotFoundError: if the stored pairs table is missing
     """
-    where, params = _cc_filter_clause(
-        cc_min, cc_max, include_invalid=include_invalid
+    scan_id, catalog_id = _resolve_scan_and_catalog(scan_id)
+    where, where_params = _cc_filter_clause(
+        scan_id, cc_min, cc_max, include_invalid=include_invalid
     )
+    params = [catalog_id, catalog_id] + where_params
     if order_by is None:
         order_clause = (
             'ORDER BY c1.orig_time, c2.orig_time, '
@@ -613,10 +667,13 @@ def read_pairs(cc_min=None, cc_max=None, offset=None, limit=None,
                       ON e2.event_id = p.event2_id
                     JOIN {TRACE_KEYS_TABLE} AS tk
                       ON tk.trace_key_id = p.trace_key_id
-                    JOIN catalog AS c1 ON c1.evid = e1.evid
-                    JOIN catalog AS c2 ON c2.evid = e2.evid
+                    JOIN catalog AS c1
+                      ON c1.evid = e1.evid AND c1.catalog_id = ?
+                    JOIN catalog AS c2
+                      ON c2.evid = e2.evid AND c2.catalog_id = ?
                     LEFT JOIN {TRACE_METADATA_TABLE} AS tm
-                      ON tm.trace_id = tk.trace_id
+                      ON tm.scan_id = p.scan_id
+                     AND tm.trace_id = tk.trace_id
                      AND tm.valid_from_utc <= c1.orig_time
                      AND (
                        tm.valid_to_utc IS NULL
@@ -657,10 +714,13 @@ def read_pairs(cc_min=None, cc_max=None, offset=None, limit=None,
                   ON e2.event_id = p.event2_id
                 JOIN {TRACE_KEYS_TABLE} AS tk
                   ON tk.trace_key_id = p.trace_key_id
-                JOIN catalog AS c1 ON c1.evid = e1.evid
-                JOIN catalog AS c2 ON c2.evid = e2.evid
+                JOIN catalog AS c1
+                  ON c1.evid = e1.evid AND c1.catalog_id = ?
+                JOIN catalog AS c2
+                  ON c2.evid = e2.evid AND c2.catalog_id = ?
                 LEFT JOIN {TRACE_METADATA_TABLE} AS tm
-                  ON tm.trace_id = tk.trace_id
+                  ON tm.scan_id = p.scan_id
+                 AND tm.trace_id = tk.trace_id
                  AND tm.valid_from_utc <= c1.orig_time
                  AND (
                    tm.valid_to_utc IS NULL OR c1.orig_time < tm.valid_to_utc
@@ -703,10 +763,12 @@ def read_pairs(cc_min=None, cc_max=None, offset=None, limit=None,
     return [_pair_from_row(row) for row in rows]
 
 
-def reset_invalid_pair_flags():
+def reset_invalid_pair_flags(scan_id):
     """
-    Clear the invalid flag for all the stored event pairs.
+    Clear the invalid flag for all the stored event pairs of a scan.
 
+    :param scan_id: scan whose pairs are updated
+    :type scan_id: int
     :return: number of pair rows changed
     :rtype: int
     """
@@ -717,7 +779,8 @@ def reset_invalid_pair_flags():
             execute_with_retry(
                 lambda: cursor.execute(
                     f'UPDATE {EVENT_PAIRS_TABLE} SET invalid = 0 '
-                    'WHERE invalid != 0'
+                    'WHERE invalid != 0 AND scan_id = ?',
+                    (int(scan_id),),
                 ),
                 'reset event pair invalid flags',
             )
@@ -732,10 +795,12 @@ def reset_invalid_pair_flags():
     return changed
 
 
-def count_invalid_pairs():
+def count_invalid_pairs(scan_id):
     """
-    Return the number of pairs flagged as invalid.
+    Return the number of pairs flagged as invalid in a scan.
 
+    :param scan_id: scan to inspect
+    :type scan_id: int
     :return: number of invalid pairs
     :rtype: int
     """
@@ -745,7 +810,8 @@ def count_invalid_pairs():
         try:
             row = cursor.execute(
                 f'SELECT COUNT(*) FROM {EVENT_PAIRS_TABLE} '
-                'WHERE invalid != 0'
+                'WHERE invalid != 0 AND scan_id = ?',
+                (int(scan_id),),
             ).fetchone()
         except sqlite3.OperationalError as err:
             if _is_missing_pairs_table_error(err):

@@ -10,7 +10,11 @@ Flag a family of repeating earthquakes as valid or not valid.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
-from ..config import config
+from ..config import config, rq_exit
+from ..database.family_builds import (
+    FamilyBuildNotFoundError,
+    resolve_build_id,
+)
 from ..database.families import update_family_valid
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -26,6 +30,14 @@ def flag_family():
         )
         return
     is_valid = is_valid in {'true', 't'}
-    update_family_valid(family_number, is_valid)
+    try:
+        build_id = resolve_build_id(getattr(config.args, 'build_id', None))
+    except FamilyBuildNotFoundError as msg:
+        logger.error(msg)
+        rq_exit(1)
+    update_family_valid(build_id, family_number, is_valid)
     text = {True: 'valid', False: 'not valid'}
-    logger.info(f'Family "{family_number}" flagged as {text[is_valid]}')
+    logger.info(
+        f'Family "{family_number}" of build {build_id} flagged as '
+        f'{text[is_valid]}'
+    )

@@ -23,8 +23,10 @@ from requake.config import config
 from requake.catalog import RequakeEvent
 from requake.database.catalog import read_catalog as read_catalog_from_db
 from requake.database.catalog import write_catalog
+from requake.database.catalogs import create_catalog
 from requake.database.db import get_db_path
 from requake.database.families import read_families
+from requake.database.scans import create_scan
 from requake.database.pairs import (
     PairRecord, read_pairs as read_pairs_from_db,
     write_pair_records as write_pairs,
@@ -70,8 +72,14 @@ class TestDedupEvents(unittest.TestCase):
         }
 
     def _seed_db(self, events):
-        """Write catalog and event pairs into the temporary database."""
-        write_catalog(list(events.values()))
+        """Write catalog, scan and event pairs into the database."""
+        catalog_id = create_catalog(
+            'test-catalog-hash', '{}', source='test', nevents=len(events)
+        )
+        write_catalog(list(events.values()), catalog_id)
+        scan_id = create_scan(
+            catalog_id, 'test-scan-hash', '{}', nevents=len(events)
+        )
         trace_id = 'XX.TEST.00.BHZ'
         other_trace_id = 'YY.TEST.00.BHZ'
         write_pairs(
@@ -96,6 +104,7 @@ class TestDedupEvents(unittest.TestCase):
                     100, 0.99, sampling_rate_hz=40.0,
                 ),
             ],
+            scan_id,
             append=False,
         )
 

@@ -15,3 +15,5 @@ from .catalog import (  # noqa
 )
 from .read_catalog import read_catalog  # noqa
 from .print_catalog import print_catalog  # noqa
+from .print_catalogs import print_catalogs  # noqa
+from .delete_catalog import delete_catalog  # noqa

@@ -13,10 +13,21 @@ import os
 import logging
 import contextlib
 from ..config import config, rq_exit
+from ..config.run_params import (
+    catalog_parameters,
+    parameters_digest,
+    parameters_json,
+)
 from ..config.utils import run_with_spinner
-from ..database.db import get_db_path
 from ..database.catalog import write_catalog as write_stored_catalog
-from .catalog import RequakeEvent, RequakeCatalog
+from ..database.catalogs import (
+    CatalogNotFoundError,
+    create_catalog,
+    find_catalog_by_hash,
+    resolve_catalog_id,
+)
+from ..database.db import get_db_path
+from .catalog import RequakeEvent, RequakeCatalog, read_stored_catalog
 from .read_catalog_from_fdsnws import read_catalog_from_fdsnws
 from .read_catalog_from_quakeml import read_catalog_from_quakeml
 from .read_catalog_from_csv import read_catalog_from_csv
@@ -100,26 +111,61 @@ def _filter_catalog(catalog):
     return outcat
 
 
+def _source_description(params):
+    """Return a short description of the catalog source."""
+    source = params.get('catalog_source', {})
+    if source.get('type') == 'file':
+        return source.get('path')
+    urls = source.get('urls') or []
+    return ', '.join(str(url) for url in urls) or 'FDSN webservice'
+
+
+def _create_catalog(nevents):
+    """Store a new catalog and return its id."""
+    params = catalog_parameters()
+    params_hash = parameters_digest(params)
+    existing = find_catalog_by_hash(params_hash)
+    if existing is not None and not config.args.force:
+        logger.warning(
+            'A catalog read with the same parameters already exists as '
+            f'catalog {int(existing["catalog_id"])}. A new catalog will be '
+            'created; the existing one is left untouched. Use -f/--force '
+            'to silence this warning.'
+        )
+    catalog_id = create_catalog(
+        params_hash=params_hash,
+        params_json=parameters_json(params),
+        source=_source_description(params),
+        label=getattr(config.args, 'label', None),
+        nevents=nevents,
+    )
+    logger.info(f'Catalog stored as catalog {catalog_id}')
+    return catalog_id
+
+
 def read_catalog():
     """
     Read an event catalog from web services or from a file.
 
-    Write the catalog to the output directory.
-
-    :return: Event catalog.
-    :rtype: requake.catalog.RequakeCatalog
+    The catalog is always stored under a new catalog id, so that
+    previously read catalogs are never replaced.
     """
     catalog = RequakeCatalog()
     nevs_read = 0
+    append_to = None
     if config.args.append:
-        with contextlib.suppress(FileNotFoundError):
-            from .catalog import read_stored_catalog
-
-            catalog = read_stored_catalog()
+        try:
+            append_to = resolve_catalog_id(
+                getattr(config.args, 'catalog_id', None)
+            )
+        except CatalogNotFoundError:
+            append_to = None
+        if append_to is not None:
+            catalog = read_stored_catalog(catalog_id=append_to)
             nevs_read = len(catalog)
             logger.info(
-                f'{nevs_read:n} events read from db file '
-                f'{get_db_path()}'
+                f'{nevs_read:n} events read from catalog {append_to} '
+                f'in db file {get_db_path()}'
             )
     logger.debug('Reading catalog...')
     input_cat_file = config.args.catalog_file
@@ -154,9 +200,14 @@ def read_catalog():
     # Sort catalog in increasing time order
     catalog.sort()
     # Write catalog to the output database
-    write_stored_catalog(catalog)
+    if append_to is None:
+        catalog_id = _create_catalog(len(catalog))
+        write_stored_catalog(catalog, catalog_id, append=False)
+    else:
+        catalog_id = append_to
+        write_stored_catalog(catalog, catalog_id, append=True)
     nevs_written = len(catalog) - nevs_read
     logger.info(
-        f'{nevs_written:n} events written to db file '
-        f'{get_db_path()}'
+        f'{nevs_written:n} events written to catalog {catalog_id} '
+        f'in db file {get_db_path()}'
     )

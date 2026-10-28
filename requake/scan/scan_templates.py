@@ -15,6 +15,10 @@ import sys
 from obspy import read
 from ..config import config, rq_exit
 from ..config.utils import confirm_action
+from ..database.family_builds import (
+    FamilyBuildNotFoundError,
+    resolve_build_id,
+)
 from ..database.templates import (
     clear_template_detections,
     has_template_detections,
@@ -108,9 +112,9 @@ def _scan_family_template(template, t0, t1):
     return None
 
 
-def _read_template_from_file():
+def _read_template_from_file(build_id):
     """Read a template from a file provided by the user."""
-    families = read_families()
+    families = read_families(build_id=build_id)
     try:
         family_number = sorted(f.number for f in families)[-1] + 1
     except IndexError:
@@ -125,7 +129,7 @@ def _read_template_from_file():
     return templates
 
 
-def _read_templates():
+def _read_templates(build_id):
     """
     Read templates from the template directory or a user-provided file.
 
@@ -133,8 +137,8 @@ def _read_templates():
     provided by the user.
     """
     if config.args.template_file is not None:
-        return _read_template_from_file()
-    families = read_selected_families()
+        return _read_template_from_file(build_id)
+    families = read_selected_families(build_id=build_id)
     templates = []
     for family in families:
         trace_id = family[0].trace_id
@@ -152,11 +156,16 @@ def _read_templates():
 def scan_templates():
     """Scan a continuous waveform stream using one or more templates."""
     try:
-        templates = _read_templates()
+        build_id = resolve_build_id(getattr(config.args, 'build_id', None))
+    except FamilyBuildNotFoundError as msg:
+        logger.error(msg)
+        rq_exit(1)
+    try:
+        templates = _read_templates(build_id)
     except (FileNotFoundError, FamilyNotFoundError) as msg:
         logger.error(msg)
         rq_exit(1)
-    if has_template_detections():
+    if has_template_detections(build_id):
         logger.warning(
             'Existing template detections from previous scans will be '
             'removed before starting a new scan'
@@ -164,7 +173,7 @@ def scan_templates():
         if not confirm_action('Continue and clear previous detections?'):
             logger.info('Scan aborted by user; previous detections kept')
             rq_exit(0)
-    clear_template_detections()
+    clear_template_detections(build_id)
     time = config.template_start_time
     time_chunk = config.time_chunk
     overlap = config.time_chunk_overlap
@@ -181,6 +190,6 @@ def scan_templates():
                 logger.warning(msg)
                 continue
         if detections:
-            write_template_detections(detections, append=True)
+            write_template_detections(build_id, detections, append=True)
         trace_cache.clear()
         time += time_chunk

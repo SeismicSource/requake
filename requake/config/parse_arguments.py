@@ -297,6 +297,46 @@ def parse_arguments(progname='requake'):
         '-f', '--force', action='store_true',
         help='force overwriting of existing files'
     )
+    # --- dry_run
+    #     a parent parser for the "dry-run" option,
+    #     used by the destructive subparsers
+    dry_run = argparse.ArgumentParser(add_help=False)
+    dry_run.add_argument(
+        '-n', '--dry-run', action='store_true',
+        help='only report what would be done, without changing the database'
+    )
+    # --- catalog_id
+    #     a parent parser for the "catalog_id" option,
+    #     used by several subparsers
+    catalog_id = argparse.ArgumentParser(add_help=False)
+    catalog_id.add_argument(
+        '--catalog-id', type=int, default=None, metavar='CATALOG_ID',
+        help='use this catalog id instead of the latest one'
+    )
+    # --- scan_id
+    #     a parent parser for the "scan_id" option,
+    #     used by several subparsers
+    scan_id = argparse.ArgumentParser(add_help=False)
+    scan_id.add_argument(
+        '--scan-id', type=int, default=None, metavar='SCAN_ID',
+        help='use this catalog scan instead of the latest one'
+    )
+    # --- build_id
+    #     a parent parser for the "build_id" option,
+    #     used by several subparsers
+    build_id = argparse.ArgumentParser(add_help=False)
+    build_id.add_argument(
+        '--build-id', type=int, default=None, metavar='BUILD_ID',
+        help='use this family build instead of the latest one'
+    )
+    # --- label
+    #     a parent parser for the "label" option,
+    #     used by the subparsers that create new entries
+    label = argparse.ArgumentParser(add_help=False)
+    label.add_argument(
+        '-l', '--label', type=str, default=None, metavar='LABEL',
+        help='a short label to help identifying this entry'
+    )
     # --- sample_config
     subparser.add_parser(
         'sample_config',
@@ -316,7 +356,7 @@ def parse_arguments(progname='requake'):
     # --- read_catalog
     read_catalog = subparser.add_parser(
         'read_catalog',
-        parents=[force],
+        parents=[force, catalog_id, label],
         help='read an event catalog from web services or from a file',
         formatter_class=NewlineHelpFormatter
     )
@@ -368,13 +408,26 @@ def parse_arguments(progname='requake'):
     # --- print_catalog
     subparser.add_parser(
         'print_catalog',
-        parents=[print_format, print_pager],
+        parents=[print_format, print_pager, catalog_id],
         help='print the event catalog to screen'
+    )
+    # ---
+    # --- print_catalogs
+    print_catalogs = subparser.add_parser(
+        'print_catalogs',
+        parents=[print_format, print_pager],
+        help='list the catalogs stored in the database'
+    )
+    print_catalogs.add_argument(
+        'catalog_id', type=int, default=None, nargs='?',
+        metavar='CATALOG_ID',
+        help='show the details of this catalog id'
     )
     # ---
     # --- scan_catalog
     scan_catalog = subparser.add_parser(
         'scan_catalog',
+        parents=[scan_id, label],
         help='scan an existing catalog for earthquake pairs'
     )
     scan_catalog_mode = scan_catalog.add_mutually_exclusive_group()
@@ -398,10 +451,21 @@ def parse_arguments(progname='requake'):
              '(0: auto, 1: disable parallelism)'
     )
     # ---
+    # --- print_scans
+    print_scans = subparser.add_parser(
+        'print_scans',
+        parents=[print_format, print_pager],
+        help='list the catalog scans stored in the database'
+    )
+    print_scans.add_argument(
+        'scan_id', type=int, default=None, nargs='?', metavar='SCAN_ID',
+        help='show the details of this scan id'
+    )
+    # ---
     # --- print_pairs
     print_pairs = subparser.add_parser(
         'print_pairs',
-        parents=[print_format, print_pager],
+        parents=[print_format, print_pager, scan_id],
         help='print pairs to screen'
     )
     print_pairs.add_argument(
@@ -427,6 +491,7 @@ def parse_arguments(progname='requake'):
     # --- dedup_events
     dedup_events = subparser.add_parser(
         'dedup_events',
+        parents=[scan_id],
         help='detect and flag duplicate events in the catalog from close '
              'event pairs'
     )
@@ -494,7 +559,7 @@ def parse_arguments(progname='requake'):
     # --- plot_pair
     plot_pair = subparser.add_parser(
         'plot_pair',
-        parents=[traceid, freq_band, output],
+        parents=[traceid, freq_band, output, catalog_id],
         help='plot traces for a given event pair'
     )
     plot_pair.add_argument('evid1')
@@ -503,7 +568,7 @@ def parse_arguments(progname='requake'):
     # --- build_families
     subparser.add_parser(
         'build_families',
-        parents=[force],
+        parents=[force, scan_id, build_id, label],
         help='build families of repeating earthquakes from a catalog of pairs'
     )
     # ---
@@ -599,7 +664,8 @@ def parse_arguments(progname='requake'):
     print_families = subparser.add_parser(
         'print_families',
         parents=[
-            longerthan, shorterthan, minevents, family_numbers, print_pager
+            longerthan, shorterthan, minevents, family_numbers, print_pager,
+            build_id
         ],
         help='print families to screen'
     )
@@ -623,12 +689,23 @@ def parse_arguments(progname='requake'):
              'export the event list (e.g., "-f csv")'
     )
     # ---
+    # --- print_family_builds
+    print_family_builds = subparser.add_parser(
+        'print_family_builds',
+        parents=[print_format, print_pager],
+        help='list the family builds stored in the database'
+    )
+    print_family_builds.add_argument(
+        'build_id', type=int, default=None, nargs='?', metavar='BUILD_ID',
+        help='show the details of this family build id'
+    )
+    # ---
     # --- plot_families
     plot_families = subparser.add_parser(
         'plot_families',
         parents=[
             longerthan, shorterthan, minevents, family_numbers,
-            traceid, freq_band, output
+            traceid, freq_band, output, build_id
         ],
         help='plot traces for one or more event families'
     )
@@ -667,7 +744,7 @@ def parse_arguments(progname='requake'):
         'plot_timespans',
         parents=[
             longerthan, shorterthan, minevents, family_numbers, colorby,
-            colormap, color_range, output
+            colormap, color_range, output, build_id
         ],
         help='plot family timespans'
     )
@@ -687,7 +764,7 @@ def parse_arguments(progname='requake'):
         'plot_cumulative',
         parents=[
             longerthan, shorterthan, minevents, family_numbers, colorby,
-            colormap, color_range, output
+            colormap, color_range, output, build_id
         ],
         help='cumulative plot for one or more families'
     )
@@ -708,7 +785,7 @@ def parse_arguments(progname='requake'):
         'map_families',
         parents=[
             longerthan, shorterthan, minevents, family_numbers, colorby,
-            colormap, color_range, output
+            colormap, color_range, output, build_id
         ],
         help='plot families on a map'
     )
@@ -757,6 +834,7 @@ def parse_arguments(progname='requake'):
     # --- flag_family
     flag_family = subparser.add_parser(
         'flag_family',
+        parents=[build_id],
         help='flag a family of repeating earthquakes as valid or not valid'
     )
     flag_family.add_argument('family_number')
@@ -769,14 +847,20 @@ def parse_arguments(progname='requake'):
     # --- build_templates
     subparser.add_parser(
         'build_templates',
-        parents=[longerthan, shorterthan, minevents, family_numbers, traceid],
+        parents=[
+            longerthan, shorterthan, minevents, family_numbers, traceid,
+            build_id
+        ],
         help='build waveform templates for one or more event families'
     )
     # ---
     # --- scan_templates
     scan_templates = subparser.add_parser(
         'scan_templates',
-        parents=[longerthan, shorterthan, minevents, family_numbers, traceid],
+        parents=[
+            longerthan, shorterthan, minevents, family_numbers, traceid,
+            build_id
+        ],
         help='scan a continuous waveform stream using one or more templates'
     )
     scan_templates.add_argument(
@@ -834,6 +918,7 @@ def parse_arguments(progname='requake'):
 
     wfcache_prefetch = wfcache_sub.add_parser(
         'prefetch',
+        parents=[catalog_id],
         help='prefetch waveform windows into the persistent cache'
     )
     wfcache_prefetch.add_argument(
@@ -959,6 +1044,44 @@ def parse_arguments(progname='requake'):
     )
     wfcache_reset.set_defaults(action='wfcache_reset_failures')
     # ---
+    # --- delete
+    delete = subparser.add_parser(
+        'delete',
+        help='delete a catalog, a catalog scan or a family build'
+    )
+    delete_sub = delete.add_subparsers(dest='delete_action')
+    delete_sub.required = True
+    delete_catalog = delete_sub.add_parser(
+        'catalog',
+        parents=[force, dry_run],
+        help='delete a catalog and everything built from it'
+    )
+    delete_catalog.add_argument(
+        'catalog_id', type=int, metavar='CATALOG_ID',
+        help='catalog id to delete'
+    )
+    delete_catalog.set_defaults(action='delete_catalog')
+    delete_scan = delete_sub.add_parser(
+        'scan',
+        parents=[force, dry_run],
+        help='delete a catalog scan and everything built from it'
+    )
+    delete_scan.add_argument(
+        'scan_id', type=int, metavar='SCAN_ID',
+        help='scan id to delete'
+    )
+    delete_scan.set_defaults(action='delete_scan')
+    delete_build = delete_sub.add_parser(
+        'build',
+        parents=[force, dry_run],
+        help='delete a family build and its families and template detections'
+    )
+    delete_build.add_argument(
+        'build_id', type=int, metavar='BUILD_ID',
+        help='family build id to delete'
+    )
+    delete_build.set_defaults(action='delete_build')
+    # ---
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
     if args.action is None:
@@ -990,6 +1113,10 @@ def parse_arguments(progname='requake'):
     # args.traceid need to exist
     if not hasattr(args, 'traceid'):
         args.traceid = None
+    # the entry-selection options need to exist
+    for name in ('catalog_id', 'scan_id', 'build_id'):
+        if not hasattr(args, name):
+            setattr(args, name, None)
     # --events is not meaningful together with a statistics output
     if (
         getattr(args, 'events', False)

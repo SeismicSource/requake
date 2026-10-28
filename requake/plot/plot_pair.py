@@ -41,7 +41,9 @@ def _get_pair():
     :raises FileNotFoundError: If the catalog file is not found.
     """
     try:
-        catalog = read_stored_catalog()
+        catalog = read_stored_catalog(
+            catalog_id=getattr(config.args, 'catalog_id', None)
+        )
     except FileNotFoundError as msg:
         logger.error(msg)
         rq_exit(1)

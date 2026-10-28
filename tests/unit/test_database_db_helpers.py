@@ -23,6 +23,7 @@ from requake.catalog import RequakeEvent
 from requake.config.config import config
 from requake.config.utils import request_abort
 from requake.database.catalog import read_catalog, write_catalog
+from requake.database.catalogs import create_catalog
 from requake.database.db import (
     check_db_exists,
     check_db_version,
@@ -176,8 +177,11 @@ class TestDatabaseDbHelpers(unittest.TestCase):
         )
 
         with self._patch_runtime_config():
-            write_catalog([event])
-            catalog = read_catalog()
+            catalog_id = create_catalog(
+                'test-hash', '{}', source="ev_1'; DROP TABLE catalog; --"
+            )
+            write_catalog([event], catalog_id)
+            catalog = read_catalog(catalog_id)
             self.assertEqual(catalog[0].evid, event.evid)
 
     def test_read_pairs_raises_corruption_error(self):
@@ -198,6 +202,9 @@ class TestDatabaseDbHelpers(unittest.TestCase):
 
         with self._patch_runtime_config():
             with patch(
+                'requake.database.pairs._resolve_scan_and_catalog',
+                return_value=(1, 1),
+            ), patch(
                 'requake.database.pairs.get_db_connection',
                 return_value=_FakeConnection(),
             ):

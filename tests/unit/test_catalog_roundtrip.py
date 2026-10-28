@@ -20,6 +20,17 @@ from requake.catalog import RequakeEvent, RequakeCatalog
 from requake.config import config
 from requake.database.db import get_db_path
 from requake.database.catalog import read_catalog, write_catalog
+from requake.database.catalogs import create_catalog
+
+
+def _write_new_catalog(catalog):
+    """Write a catalog under a new registry entry and return its id."""
+    catalog = list(catalog)
+    catalog_id = create_catalog(
+        'test-hash', '{}', source='test', nevents=len(catalog)
+    )
+    write_catalog(catalog, catalog_id)
+    return catalog_id
 
 
 class TestCatalogRoundtrip(unittest.TestCase):
@@ -101,7 +112,7 @@ class TestCatalogRoundtrip(unittest.TestCase):
         events = self._create_synthetic_events(n_events)
 
         with self._patch_runtime_config():
-            write_catalog(events)
+            _write_new_catalog(events)
             cat_in = read_catalog()
 
         cat_out = RequakeCatalog()
@@ -147,7 +158,7 @@ class TestCatalogRoundtrip(unittest.TestCase):
         events = self._create_synthetic_events(1)
 
         with self._patch_runtime_config():
-            write_catalog(events)
+            _write_new_catalog(events)
             cat_in = read_catalog()
 
         # Check that all fields are present (not None)
@@ -169,7 +180,7 @@ class TestCatalogRoundtrip(unittest.TestCase):
     def test_catalog_empty_write_read(self):
         """Test that empty catalog round-trip produces empty catalog."""
         with self._patch_runtime_config():
-            write_catalog([])
+            _write_new_catalog([])
             cat_in = read_catalog()
 
         # Assert empty
@@ -181,7 +192,7 @@ class TestCatalogRoundtrip(unittest.TestCase):
         cat_out.extend(self._create_synthetic_events(3))
 
         with self._patch_runtime_config():
-            write_catalog(cat_out)
+            _write_new_catalog(cat_out)
             self.assertTrue(os.path.exists(get_db_path()))
 
             cat_in = read_catalog()

@@ -288,12 +288,14 @@ def _log_memory_if_due(state, label=''):
     log_memory_usage(prefix=label)
 
 
-def init_pair_processing_state(npairs, initial_processed, total_pairs):
+def init_pair_processing_state(npairs, initial_processed, total_pairs,
+                               scan_id=None):
     """Build mutable state for pair processing."""
     if total_pairs is None:
         total_pairs = npairs
     start_time = time.monotonic()
     return {
+        'scan_id': scan_id,
         'start_time': start_time,
         'next_log_time': start_time + 60.0,
         'next_memory_log_time': start_time + _MEMORY_LOG_INTERVAL_S,
