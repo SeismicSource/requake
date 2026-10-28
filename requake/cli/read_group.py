@@ -15,9 +15,7 @@ from .common import (
 from .help_format import NewlineHelpFormatter
 
 _CATALOG_FILE_HELP = (
-    'Specifies the event catalog file to be used. If not provided, '
-    'the event catalog will be downloaded from the FDSN web service '
-    'configured in the control file.\n\n'
+    'Specifies the event catalog file to be used.\n\n'
     'Acceptable catalog file formats are:\n'
     '- FDSN text\n'
     '- QuakeML\n'
@@ -34,19 +32,39 @@ _CATALOG_FILE_HELP = (
 )
 
 
-def _add_catalog_leaf(leaves, name, help_text):
-    """Add the leaf that reads an event catalog."""
+def _add_common_options(parser):
+    """Add the options shared by the two ways of reading a catalog."""
+    parser.add_argument(
+        '-a', '--append', action='store_true',
+        help='append events to existing catalog'
+    )
+    # Both commands fill the same table with the same code, which tells
+    # them apart by the presence of the file argument, so they share the
+    # action id and, with it, the log file name.
+    set_action(parser, 'read_catalog')
+
+
+def _add_fdsn_leaf(leaves, name, help_text):
+    """Add the leaf that reads a catalog from FDSN web services."""
+    parser = leaves.add_parser(
+        name,
+        parents=[parent_force(), parent_catalog_id(), parent_label()],
+        help=help_text
+    )
+    _add_common_options(parser)
+    return parser
+
+
+def _add_file_leaf(leaves, name, help_text):
+    """Add the leaf that reads a catalog from a local file."""
     parser = leaves.add_parser(
         name,
         parents=[parent_force(), parent_catalog_id(), parent_label()],
         help=help_text, formatter_class=NewlineHelpFormatter
     )
-    parser.add_argument('catalog_file', nargs='?', help=_CATALOG_FILE_HELP)
-    parser.add_argument(
-        '-a', '--append', action='store_true',
-        help='append events to existing catalog'
-    )
-    set_action(parser, 'read_catalog')
+    parser.add_argument('catalog_file', metavar='CATALOG_FILE',
+                        help=_CATALOG_FILE_HELP)
+    _add_common_options(parser)
     return parser
 
 
@@ -55,8 +73,10 @@ def add_to(subparsers):
     group, leaves = add_group(
         subparsers, 'read', 'read a data set into the output database'
     )
-    _add_catalog_leaf(
-        leaves, 'catalog',
-        'read an event catalog from web services or from a file'
+    _add_fdsn_leaf(
+        leaves, 'fdsn', 'read an event catalog from FDSN web services'
+    )
+    _add_file_leaf(
+        leaves, 'file', 'read an event catalog from a local file'
     )
     return group

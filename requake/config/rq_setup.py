@@ -306,7 +306,10 @@ def configure(args):
     try:
         if args.action in actions_needing_fdsn_station_dataselect:
             _connect_station_dataselect()
-        if args.action == 'read_catalog' and not args.catalog_file:
+        if (
+            args.action == 'read_catalog'
+            and not getattr(args, 'catalog_file', None)
+        ):
             _connect_fdsn_catalog()
     except (FileNotFoundError, ValueError) as msg:
         logger.error(msg)

@@ -43,7 +43,7 @@ echo ""
 
 # Step 1: Read catalog
 echo "[1/$TOTAL_STEPS] Reading catalog..."
-requake read catalog requake.catalog.txt || { echo "FAILED: read catalog"; exit 1; }
+requake read file requake.catalog.txt || { echo "FAILED: read file"; exit 1; }
 echo "✓ Catalog read complete"
 echo "----------------------------------------"
 echo ""

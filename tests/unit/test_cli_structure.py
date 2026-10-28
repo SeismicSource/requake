@@ -29,7 +29,8 @@ from requake.cli import build_parser, parse_arguments
 COMMANDS = {
     'config sample': 'sample_config',
     'config update': 'update_config',
-    'read catalog': 'read_catalog',
+    'read fdsn': 'read_catalog',
+    'read file': 'read_catalog',
     'scan catalog': 'scan_catalog',
     'scan templates': 'scan_templates',
     'build families': 'build_families',
@@ -59,6 +60,7 @@ COMMANDS = {
 
 # Positional arguments needed by each command
 POSITIONALS = {
+    'read file': ['events.csv'],
     'delete catalog': ['3'],
     'delete scan': ['3'],
     'delete build': ['3'],

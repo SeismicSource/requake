@@ -168,7 +168,7 @@ def read_catalog():
                 f'in db file {get_db_path()}'
             )
     logger.debug('Reading catalog...')
-    input_cat_file = config.args.catalog_file
+    input_cat_file = getattr(config.args, 'catalog_file', None)
     if input_cat_file is not None:
         try:
             catalog += run_with_spinner(
