@@ -7,7 +7,7 @@ Catalogs, Scans And Family Builds
 Requake keeps three levels of results in the output database (see
 :doc:`database_schemas`):
 
-- a *catalog*, read by ``requake read catalog``;
+- a *catalog*, read by ``requake read fdsn`` or ``requake read file``;
 - a *catalog scan*, run by ``requake scan catalog`` on one catalog;
 - a *family build*, run by ``requake build families`` on one scan.
 
@@ -58,15 +58,15 @@ details of a single entry, including the full list of parameters used:
 Reading Catalogs
 ----------------
 
-``requake read catalog`` never replaces an existing catalog: every run
-writes a new catalog id.  If a catalog read with the same parameters
-already exists, Requake only warns, so a scan that used the previous
-catalog stays valid.  Use ``-l``/``--label`` to give the new catalog a
-memorable name:
+``requake read fdsn`` and ``requake read file`` never replace an
+existing catalog: every run writes a new catalog id.  If a catalog read
+with the same parameters already exists, Requake only warns, so a scan
+that used the previous catalog stays valid.  Use ``-l``/``--label`` to
+give the new catalog a memorable name:
 
 .. code-block::
 
-   requake read catalog -l "2020 relocated" catalog.csv
+   requake read file -l "2020 relocated" catalog.csv
 
 Use ``-a``/``--append`` to add events to a catalog instead of creating
 a new one; ``--catalog-id`` selects the catalog to extend (the latest

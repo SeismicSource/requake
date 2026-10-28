@@ -56,8 +56,8 @@ Catalogs Table
 ^^^^^^^^^^^^^^
 
 The ``catalogs`` table registers every catalog read by
-``requake read catalog``.  Reading a catalog always creates a new row,
-so an existing catalog is never replaced.
+``requake read fdsn`` or ``requake read file``.  Reading a catalog
+always creates a new row, so an existing catalog is never replaced.
 
 .. code-block:: sql
 
@@ -80,7 +80,7 @@ Catalog Table
 ^^^^^^^^^^^^^
 
 The ``catalog`` table stores the events of every catalog read by
-``requake read catalog``.
+``requake read fdsn`` or ``requake read file``.
 
 .. code-block:: sql
 

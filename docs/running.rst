@@ -65,14 +65,14 @@ download the event catalog:
 
 .. code-block::
 
-   requake read catalog
+   requake read fdsn
 
 
 or
 
 .. code-block::
 
-   requake read catalog CATALOG_FILE
+   requake read file CATALOG_FILE
 
 
 When relying on FDSN web services for waveform data, it is strongly

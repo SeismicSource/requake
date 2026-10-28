@@ -160,11 +160,11 @@ The first thing you will want to do is to generate a sample config file:
 Edit the config file according to your needs, then read or download the event
 catalog:
 
-    requake read catalog
+    requake read fdsn
 
 or
 
-    requake read catalog CATALOG_FILE
+    requake read file CATALOG_FILE
 
 Now, build the catalog of event pairs with:
 

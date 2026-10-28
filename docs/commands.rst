@@ -63,8 +63,13 @@ Config Commands
 Read Commands
 -------------
 
-``read catalog [CATALOG_FILE]``
-   Read an event catalog from FDSN web services or from a local file
+``read fdsn``
+   Read an event catalog from the FDSN web service configured in the
+   :ref:`configuration file <configuration_file>` and store it in the
+   output database (see :doc:`read_catalog`).
+
+``read file CATALOG_FILE``
+   Read an event catalog from a local file (QuakeML, FDSN text or CSV)
    and store it in the output database (see :doc:`read_catalog`).
 
 

@@ -19,9 +19,9 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   catalog and several family builds per scan, each with its parameters.
 - New ``delete`` command, with ``catalog``, ``scan`` and ``build``
   subcommands, to remove an entry and everything built from it.
-- ``read catalog`` no longer replaces the stored catalog;
-  ``-l``/``--label`` gives a name to a catalog, a scan or a family
-  build, and ``--append`` adds to a stored catalog.
+- Reading a catalog is now two commands, ``read fdsn`` for the online
+  source and ``read file`` for a local file; neither replaces the
+  stored catalog, and ``-l``/``--label`` names it.
 - On Windows, the ``windows-curses`` package is now installed
   automatically, so the interactive pager works out of the box.
 

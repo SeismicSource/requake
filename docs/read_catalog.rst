@@ -4,9 +4,10 @@
 Reading a Catalog
 ##################
 
-The command ``requake read catalog`` imports an earthquake catalog into
-Requake's output database, ready for scanning.  It can fetch events from
-an FDSN event web service or read them from a local file.
+Two commands import an earthquake catalog into Requake's output
+:doc:`database <database_schemas>`, ready for scanning: ``requake read
+fdsn`` downloads it from an FDSN event web service, and ``requake read
+file`` reads it from a local file.
 
 
 Sources
@@ -15,11 +16,9 @@ Sources
 FDSN web service
 ^^^^^^^^^^^^^^^^
 
-If no file is given on the command line:
-
 .. code-block::
 
-   requake read catalog
+   requake read fdsn
 
 Requake downloads the catalog from the FDSN event service configured in
 the :doc:`configuration file <configuration_file>` (``catalog_fdsn_event_url``
@@ -30,11 +29,9 @@ filters defined in the same configuration file.
 Local file
 ^^^^^^^^^^
 
-A local catalog file can be provided directly:
-
 .. code-block::
 
-   requake read catalog CATALOG_FILE
+   requake read file CATALOG_FILE
 
 Requake auto-detects the format from the file content, supporting:
 
@@ -90,11 +87,12 @@ been created, with ``requake flag duplicates`` (see :doc:`pairs`).
 Appending to an existing catalog
 --------------------------------
 
-Use ``--append`` to add new events to an already stored catalog:
+Use ``--append`` to add new events to an already stored catalog; both
+``read fdsn`` and ``read file`` accept it:
 
 .. code-block::
 
-   requake read catalog --append
+   requake read file --append catalog.csv
 
 Existing events are kept; only new events (by event ID) are added.
 The catalog to extend is the latest one, unless ``--catalog-id`` is
@@ -116,7 +114,7 @@ Use ``-l``/``--label`` to give the new catalog a recognizable name, and
 
 .. code-block::
 
-   requake read catalog -l "2020 relocated" catalog.csv
+   requake read file -l "2020 relocated" catalog.csv
 
 Once the catalog is ready, proceed with the :doc:`catalog scan
 <scan_catalog>`.
