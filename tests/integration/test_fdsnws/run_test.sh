@@ -34,7 +34,7 @@ echo ""
 
 echo ""
 echo "[1/$TOTAL_TESTS] Reading catalog..."
-requake read catalog
+requake read fdsn
 echo "----------------------------------------"
 
 echo ""
