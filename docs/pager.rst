@@ -4,14 +4,17 @@
 Interactive Pager
 #################
 
-All ``print_`` commands (``print_catalog``, ``print_pairs``,
-``print_families``) open an interactive `curses
+All ``print`` commands (``print catalog``, ``print pairs``,
+``print families``) open an interactive `curses
 <https://en.wikipedia.org/wiki/Curses_(programming_library)>`_ pager
 when the output is a terminal.  Use ``--no-pager`` to fall back to
 plain-text output (e.g., for piping to ``wc`` or ``grep``).  Requesting
 a specific output format with ``-f``/``--format`` implies
 ``--no-pager``, since the pager draws the table with its own layout and
 ignores the output format.
+
+The ``list`` commands (``list catalogs``, ``list scans``,
+``list builds``) print plain text and never use the pager.
 
 
 Navigation

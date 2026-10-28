@@ -4,7 +4,7 @@
 Catalog Scan
 ############
 
-The command ``requake scan_catalog`` is the core of Requake's
+The command ``requake scan catalog`` is the core of Requake's
 catalog-based repeater search.  It compares every event in an earthquake
 :doc:`catalog <read_catalog>` against its neighbours and identifies
 pairs with highly similar waveforms — the building blocks of
@@ -160,15 +160,15 @@ Resuming an interrupted scan
 ----------------------------
 
 If the scan is interrupted (e.g., by a network outage or a user
-pressing Ctrl‑C), running ``requake scan_catalog`` again will detect
+pressing Ctrl‑C), running ``requake scan catalog`` again will detect
 the existing scan with the same parameters and offer to continue it
-from where it stopped.  Use ``--force-continue`` to skip the prompt in
+from where it stopped.  Use ``--resume`` to skip the prompt in
 scripts, and ``--force`` to replace the interrupted scan instead of
 resuming it.
 
 Every scan is stored separately: use ``--scan-id`` to resume a
 specific scan, ``-l``/``--label`` to give it a name, and
-``requake print_scans`` to see what is stored.  See
+``requake list scans`` to see what is stored.  See
 :doc:`catalogs_scans_builds`.
 
 

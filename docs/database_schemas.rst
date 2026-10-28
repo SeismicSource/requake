@@ -56,7 +56,7 @@ Catalogs Table
 ^^^^^^^^^^^^^^
 
 The ``catalogs`` table registers every catalog read by
-``requake read_catalog``.  Reading a catalog always creates a new row,
+``requake read catalog``.  Reading a catalog always creates a new row,
 so an existing catalog is never replaced.
 
 .. code-block:: sql
@@ -80,7 +80,7 @@ Catalog Table
 ^^^^^^^^^^^^^
 
 The ``catalog`` table stores the events of every catalog read by
-``requake read_catalog``.
+``requake read catalog``.
 
 .. code-block:: sql
 
@@ -111,7 +111,7 @@ Index:
 
 - ``idx_catalog_orig_time`` on ``catalog(catalog_id, orig_time)``
 
-The ``duplicate`` column is set to ``1`` by ``requake dedup_events``
+The ``duplicate`` column is set to ``1`` by ``requake flag duplicates``
 for events that are considered duplicates of another catalog event,
 within the catalog of the selected scan.
 
@@ -119,7 +119,7 @@ Scans Table
 ^^^^^^^^^^^
 
 The ``scans`` table registers every execution of
-``requake scan_catalog``, with the parameters it used.
+``requake scan catalog``, with the parameters it used.
 
 .. code-block:: sql
 
@@ -147,7 +147,7 @@ Index:
 
 ``status`` is ``running`` while the scan is in progress, then
 ``complete`` or ``failed``.  A scan that is still ``running`` can be
-resumed with ``requake scan_catalog --force-continue``.
+resumed with ``requake scan catalog --resume``.
 
 Event Keys Table
 ^^^^^^^^^^^^^^^^
@@ -177,7 +177,7 @@ Event Pairs Table
 ^^^^^^^^^^^^^^^^^
 
 The ``event_pairs`` table stores cross-correlation results from
-``requake scan_catalog`` and is optimized for storage efficiency:
+``requake scan catalog`` and is optimized for storage efficiency:
 
 - repeated text identifiers are replaced by integer lookup keys;
 - cross-correlation is encoded as ``cc_x100``;
@@ -219,7 +219,7 @@ Lag in seconds is reconstructed at read time from ``lag_samples`` and
 ``cc_x100`` stores ``cc_max`` with 0.01 precision using
 ``round(cc_max * 100)``.
 
-The ``invalid`` column is set to ``1`` by ``requake dedup_events``
+The ``invalid`` column is set to ``1`` by ``requake flag duplicates``
 for all the pairs involving a duplicated event.  Invalid pairs are
 ignored when families are built and when pairs are printed.
 
@@ -258,7 +258,7 @@ Family Builds Table
 ^^^^^^^^^^^^^^^^^^^
 
 The ``family_builds`` table registers every execution of
-``requake build_families``, together with the scan used as input and
+``requake build families``, together with the scan used as input and
 the clustering method.
 
 .. code-block:: sql
@@ -294,7 +294,7 @@ Families Table
 ^^^^^^^^^^^^^^
 
 The ``families`` table stores event-family assignments produced by
-``requake build_families``.
+``requake build families``.
 
 .. code-block:: sql
 
@@ -331,7 +331,7 @@ Template Detections Table
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``template_detections`` table stores detections produced by
-``requake scan_templates``, for the family build used as reference.
+``requake scan templates``, for the family build used as reference.
 
 .. code-block:: sql
 
@@ -384,7 +384,7 @@ Key-value metadata.  Currently stores:
 - ``schema_version`` — cache schema version.
 - ``tp_min_{trace_id}``, ``tp_max_{trace_id}`` — standardized waveform
   window offsets (in seconds) for a given trace ID.  Written by
-  ``wfcache prefetch`` and consumed by ``scan_catalog`` to produce
+  ``wfcache prefetch`` and consumed by ``scan catalog`` to produce
   identical cache keys across independent processes.
 
 waveform_cache Table

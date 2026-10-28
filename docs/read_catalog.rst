@@ -4,7 +4,7 @@
 Reading a Catalog
 ##################
 
-The command ``requake read_catalog`` imports an earthquake catalog into
+The command ``requake read catalog`` imports an earthquake catalog into
 Requake's output database, ready for scanning.  It can fetch events from
 an FDSN event web service or read them from a local file.
 
@@ -19,7 +19,7 @@ If no file is given on the command line:
 
 .. code-block::
 
-   requake read_catalog
+   requake read catalog
 
 Requake downloads the catalog from the FDSN event service configured in
 the :doc:`configuration file <configuration_file>` (``catalog_fdsn_event_url``
@@ -34,7 +34,7 @@ A local catalog file can be provided directly:
 
 .. code-block::
 
-   requake read_catalog CATALOG_FILE
+   requake read catalog CATALOG_FILE
 
 Requake auto-detects the format from the file content, supporting:
 
@@ -84,7 +84,7 @@ catalog is sorted by origin time before being written to the database.
 Duplicates with different event IDs (e.g. the same event reported by
 different agencies or with slightly different origin times) are not removed
 at this stage.  They can be detected and flagged once the event pairs have
-been created, with ``requake dedup_events`` (see :doc:`pairs`).
+been created, with ``requake flag duplicates`` (see :doc:`pairs`).
 
 
 Appending to an existing catalog
@@ -94,7 +94,7 @@ Use ``--append`` to add new events to an already stored catalog:
 
 .. code-block::
 
-   requake read_catalog --append
+   requake read catalog --append
 
 Existing events are kept; only new events (by event ID) are added.
 The catalog to extend is the latest one, unless ``--catalog-id`` is
@@ -111,12 +111,12 @@ used it remain valid.  If a catalog read with the same parameters is
 already stored, Requake only warns about it and goes on.
 
 Use ``-l``/``--label`` to give the new catalog a recognizable name, and
-``requake print_catalogs`` to list what is stored (see
+``requake list catalogs`` to list what is stored (see
 :doc:`catalogs_scans_builds`):
 
 .. code-block::
 
-   requake read_catalog -l "2020 relocated" catalog.csv
+   requake read catalog -l "2020 relocated" catalog.csv
 
 Once the catalog is ready, proceed with the :doc:`catalog scan
 <scan_catalog>`.

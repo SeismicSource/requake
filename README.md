@@ -120,35 +120,24 @@ To get help, use:
 
     requake -h
 
-Different commands are available:
+Different commands are available; each one is a verb followed by the object
+it acts on:
 
-    sample_config       write sample config file to current directory and exit
-    update_config       update an existing config file to the latest version
-    read_catalog        read an event catalog from web services or from a file
-    print_catalog       print the event catalog to screen
-    scan_catalog        scan an existing catalog for earthquake pairs
-    print_pairs         print pairs to screen
-    dedup_events        detect and flag duplicate events in the catalog from
-                        close event pairs
-    plot_pair           plot traces for a given event pair
-    build_families      build families of repeating earthquakes from a catalog
-                        of pairs
-    print_families      print families to screen
-    plot_families       plot traces for one ore more event families
-    plot_timespans      plot family timespans
-    plot_cumulative     cumulative plot for one or more families
-    map_families        plot families on a map
-    flag_family         flag a family of repeating earthquakes as valid or not
-                        valid.
-    build_templates     build waveform templates for one or more event
-                        families
-    scan_templates      scan a continuous waveform stream using one or more
-                        templates
-    wfcache             manage persistent waveform cache (prefetch, print,
-                        inspect, extract, reset_failures)
+    config              write or update the configuration file
+    read                read a data set into the output database
+    scan                search data already in the output database or new
+                        waveforms
+    build               build derived data from the output database
+    print               print data to screen
+    list                list the entries stored in the output database
+    plot                plot data to screen or file
+    flag                flag entries of the output database
+    delete              delete a catalog, a catalog scan or a family build
+    wfcache             manage the persistent waveform cache
 
-Certain commands (e.g., `plot_pair`) require further arguments (use, e.g.,
-`requake plot_pair -h` to get help).
+Typing a verb alone, as in `requake plot`, lists the objects it can act on;
+use `-h` after an object (e.g., `requake plot pair -h`) to get the options of
+that command.
 
 Requake supports command line tab completion for commands and arguments, thanks
 to [argcomplete].
@@ -166,20 +155,20 @@ Or, alternatively, add the following line to your `.bashrc` or `.zshrc`:
 
 The first thing you will want to do is to generate a sample config file:
 
-    requake sample_config
+    requake config sample
 
 Edit the config file according to your needs, then read or download the event
 catalog:
 
-    requake read_catalog
+    requake read catalog
 
 or
 
-    requake read_catalog CATALOG_FILE
+    requake read catalog CATALOG_FILE
 
 Now, build the catalog of event pairs with:
 
-    requake scan_catalog
+    requake scan catalog
 
 When relying on FDSN web services for waveform data, it is strongly
 recommended to prefetch all waveform windows before running the scan.
@@ -192,11 +181,11 @@ overall runtime for large catalogs:
 Once done ([it will take time!](#performances)), you are ready to build
 repeating earthquake families:
 
-    requake build_families
+    requake build families
 
 ## Performances
 
-- `requake scan_catalog` is designed to fully utilize available CPU cores by
+- `requake scan catalog` is designed to fully utilize available CPU cores by
   processing earthquake pairs in parallel. On an M2 MacBook Air, scanning
   95,034 earthquake pairs downloaded via FDSNWS took approximately 5 minutes
   using 7 worker processes, yielding ~19,000 pairs per minute. When repeating
@@ -206,12 +195,12 @@ repeating earthquake families:
   computation.
 
 - For large FDSN-based runs, use `requake wfcache prefetch` before
-  `requake scan_catalog` to download all waveforms upfront into a local
+  `requake scan catalog` to download all waveforms upfront into a local
   SQLite cache.  This eliminates repeated downloads, lets the scan read
   exclusively from disk, and is the single most effective way to speed up
   catalog scanning.
 
-- `requake build_families` is fast™.
+- `requake build families` is fast™.
 
 ## How to Cite
 

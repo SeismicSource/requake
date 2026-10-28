@@ -4,12 +4,22 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- Commands are now a verb followed by an object, as in ``requake print
+  pairs`` or ``requake plot map``; the old one-word names are gone, so
+  scripts using them need updating.
+- New ``list`` command, with ``catalogs``, ``scans`` and ``builds``
+  subcommands, replacing ``print_catalogs``, ``print_scans`` and
+  ``print_family_builds``.
+- ``scan catalog --force-continue`` is now ``--resume``; multi-word
+  options are hyphenated (``--cc-min``, ``--freq-band``,
+  ``--longer-than``, ...), and the old spellings are still accepted.
+- Fixed ``--longer-than``, ``--shorter-than`` and the ``wfcache``
+  durations, where an hour counted as 24 minutes.
 - The output database now keeps several catalogs, several scans per
-  catalog and several family builds per scan, each with its parameters;
-  ``print_catalogs``, ``print_scans`` and ``print_family_builds`` list them.
+  catalog and several family builds per scan, each with its parameters.
 - New ``delete`` command, with ``catalog``, ``scan`` and ``build``
   subcommands, to remove an entry and everything built from it.
-- ``read_catalog`` no longer replaces the stored catalog;
+- ``read catalog`` no longer replaces the stored catalog;
   ``-l``/``--label`` gives a name to a catalog, a scan or a family
   build, and ``--append`` adds to a stored catalog.
 - On Windows, the ``windows-curses`` package is now installed

@@ -61,7 +61,7 @@ You can install it easily through ``pip``\ :
 Optional dependencies
 ^^^^^^^^^^^^^^^^^^^^^
 
-The ``folium`` backend of the ``map_families`` command (see
+The ``folium`` backend of the ``plot map`` command (see
 :doc:`running`) requires the optional `folium
 <https://python-visualization.github.io/folium/>`_ package, which is not
 installed by default:
