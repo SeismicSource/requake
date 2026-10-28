@@ -45,7 +45,9 @@ Typing ``requake`` with no arguments lists all the commands:
    update_config       update an existing config file to the latest version
    read_catalog        read an event catalog from web services or from a file
    print_catalog       print the event catalog to screen
+   print_catalogs      list the catalogs stored in the database
    scan_catalog        scan an existing catalog for earthquake pairs
+   print_scans         list the catalog scans stored in the database
    print_pairs         print pairs to screen
    dedup_events        detect and flag duplicate events in the catalog from
                        close event pairs
@@ -53,6 +55,8 @@ Typing ``requake`` with no arguments lists all the commands:
    build_families      build families of repeating earthquakes from a catalog
                        of pairs
    print_families      print families to screen
+   print_family_builds
+                       list the family builds stored in the database
    plot_families       plot traces for one or more event families
    plot_timespans      plot family timespans
    plot_cumulative     cumulative plot for one or more families
@@ -64,6 +68,7 @@ Typing ``requake`` with no arguments lists all the commands:
    scan_templates      scan a continuous waveform stream using one or more
                        templates
    wfcache             manage persistent waveform cache
+   delete              delete a catalog, a catalog scan or a family build
 
 
 The commands are described below by analysis stage; each group links to
@@ -93,6 +98,10 @@ Reading and inspecting the catalog
    Print the stored catalog to screen, in the interactive
    :doc:`pager` or in plain text.
 
+``print_catalogs``
+   List the catalogs stored in the database, or show the details of a
+   single one (see :doc:`catalogs_scans_builds`).
+
 
 Searching event pairs
 ^^^^^^^^^^^^^^^^^^^^^
@@ -105,6 +114,11 @@ Searching event pairs
 ``print_pairs``, ``plot_pair``, ``dedup_events``
    Print the event pairs, plot the waveforms of a single pair, or
    detect and flag duplicate events (see :doc:`pairs`).
+
+``print_scans``
+   List the catalog scans stored in the database, with their status and
+   pair counts, or show the details of a single one (see
+   :doc:`catalogs_scans_builds`).
 
 
 Building families
@@ -119,6 +133,11 @@ Building families
 ``print_families``
    Print one row per family, or one row per event, as a table or in
    CSV or Markdown format.
+
+``print_family_builds``
+   List the family builds stored in the database, with the scan and the
+   clustering method each of them used (see
+   :doc:`catalogs_scans_builds`).
 
 ``plot_families``
    Plot the aligned waveforms of each family, with the family average.
@@ -153,6 +172,17 @@ Waveform cache
    Manage the persistent waveform cache, with the ``prefetch``,
    ``print``, ``inspect``, ``extract`` and ``reset-failures``
    subcommands (see :doc:`wfcache`).
+
+
+Deleting results
+^^^^^^^^^^^^^^^^
+
+``delete``
+   Delete a catalog, a catalog scan or a family build, with the
+   ``catalog``, ``scan`` and ``build`` subcommands.  The deletion is
+   cascading and asks for confirmation; ``-n``/``--dry-run`` shows
+   what would be removed without touching the database (see
+   :doc:`catalogs_scans_builds`).
 
 The ``print_`` commands open an interactive pager on the terminal, to
 scroll, sort and copy the table rows (see :doc:`pager`).

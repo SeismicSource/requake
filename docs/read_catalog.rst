@@ -97,14 +97,29 @@ Use ``--append`` to add new events to an already stored catalog:
    requake read_catalog --append
 
 Existing events are kept; only new events (by event ID) are added.
+The catalog to extend is the latest one, unless ``--catalog-id`` is
+given.
 
 
 Output
 ------
 
-The catalog is stored in the ``catalog`` table of the
-:doc:`output database <database_schemas>`.  Once the catalog is ready,
-proceed with the :doc:`catalog scan <scan_catalog>`.
+Every run writes a *new* catalog in the ``catalog`` table of the
+:doc:`output database <database_schemas>`, identified by a new
+``catalog_id``: an existing catalog is never replaced, so the scans that
+used it remain valid.  If a catalog read with the same parameters is
+already stored, Requake only warns about it and goes on.
+
+Use ``-l``/``--label`` to give the new catalog a recognizable name, and
+``requake print_catalogs`` to list what is stored (see
+:doc:`catalogs_scans_builds`):
+
+.. code-block::
+
+   requake read_catalog -l "2020 relocated" catalog.csv
+
+Once the catalog is ready, proceed with the :doc:`catalog scan
+<scan_catalog>`.
 
 
 Minimal catalog: origin times only

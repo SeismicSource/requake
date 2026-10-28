@@ -25,6 +25,10 @@ from the :doc:`configuration file <configuration_file>`.
 Use ``requake <command> -h`` to get the full list of options of each
 command.
 
+The pairs belong to a catalog scan: ``print_pairs`` and
+``dedup_events`` use the latest scan, unless another one is selected
+with ``--scan-id``.  See :doc:`catalogs_scans_builds`.
+
 
 print_pairs
 -----------
@@ -129,7 +133,7 @@ show a progress indicator and can be interrupted with ``Ctrl+C``
 
 .. note::
 
-   A full re-scan of the catalog (``requake scan_catalog`` with
-   overwrite) recreates the event pairs, and a new :doc:`catalog read
-   <read_catalog>` may reset the duplicate flags.  Run
-   ``requake dedup_events`` again after either operation.
+   Duplicate flags belong to the catalog, invalid flags to the scan.
+   Rerunning ``requake scan_catalog`` on the same catalog keeps the
+   duplicate flags but creates a new scan whose pairs are all valid:
+   run ``requake dedup_events`` again after the new scan.

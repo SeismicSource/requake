@@ -5,21 +5,38 @@ Requake stores scan outputs in a SQLite database named ``requake.sqlite`` in
 the selected output directory.  A separate ``waveform_cache.sqlite`` file in
 the same directory holds the persistent waveform cache.
 
-The main database currently contains seven domain tables:
+The main database contains ten tables, organized in three levels:
+read catalogs, catalog scans, and family builds.
 
-- ``catalog``
+- ``catalogs``: one row per catalog read
+- ``catalog``: event rows, scoped by ``catalog_id``
+- ``scans``: one row per catalog scan
 - ``event_keys``
 - ``trace_keys``
-- ``event_pairs``
-- ``trace_metadata``
-- ``families``
-- ``template_detections``
+- ``event_pairs``: scoped by ``scan_id``
+- ``trace_metadata``: scoped by ``scan_id``
+- ``family_builds``: one row per family build
+- ``families``: scoped by ``build_id``
+- ``template_detections``: scoped by ``build_id``
+
+Each level owns its rows, so several catalogs, several scans per
+catalog and several family builds per scan can coexist in the same
+database file.  See :doc:`catalogs_scans_builds` for the commands that
+list, select and delete them.
 
 Schema Version
 ^^^^^^^^^^^^^^
 
 The SQLite ``PRAGMA user_version`` field is used to track schema version.
 The current version is ``1``.
+
+.. warning::
+
+   The database layout changed during the 0.8.x development series
+   without a version bump: the version number alone cannot tell an old
+   database from a new one.  A database written by an earlier release
+   must be migrated, or recreated from scratch.  Requake reports an
+   explicit error when it detects the old layout.
 
 Connection and Concurrency Settings
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -35,15 +52,41 @@ Write operations also use a bounded retry policy for transient lock errors
 (``SQLITE_BUSY`` and ``SQLITE_LOCKED`` style conditions), with exponential
 backoff and jitter.
 
+Catalogs Table
+^^^^^^^^^^^^^^
+
+The ``catalogs`` table registers every catalog read by
+``requake read_catalog``.  Reading a catalog always creates a new row,
+so an existing catalog is never replaced.
+
+.. code-block:: sql
+
+   CREATE TABLE catalogs (
+     catalog_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+     label           TEXT,
+     created_at      TEXT NOT NULL,
+     source          TEXT,
+     params_hash     TEXT NOT NULL,
+     params_json     TEXT NOT NULL,
+     requake_version TEXT,
+     nevents         INTEGER
+   )
+
+``params_hash`` identifies the catalog selection parameters; it is used
+to warn when the same catalog is read twice.  ``params_json`` stores
+the full parameter snapshot.
+
 Catalog Table
 ^^^^^^^^^^^^^
 
-The ``catalog`` table stores events read by ``requake read_catalog``.
+The ``catalog`` table stores the events of every catalog read by
+``requake read_catalog``.
 
 .. code-block:: sql
 
    CREATE TABLE catalog (
-     evid            TEXT PRIMARY KEY,
+     catalog_id      INTEGER NOT NULL,
+     evid            TEXT NOT NULL,
      orig_time       TEXT NOT NULL,
      lat             REAL,
      lon             REAL,
@@ -57,11 +100,54 @@ The ``catalog`` table stores events read by ``requake read_catalog``.
      contributor_id  TEXT,
      location_name   TEXT,
      trace_id        TEXT,
-     duplicate       INTEGER NOT NULL DEFAULT 0
+     duplicate       INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (catalog_id, evid),
+     FOREIGN KEY (catalog_id)
+       REFERENCES catalogs(catalog_id)
+       ON UPDATE CASCADE ON DELETE CASCADE
    )
 
+Index:
+
+- ``idx_catalog_orig_time`` on ``catalog(catalog_id, orig_time)``
+
 The ``duplicate`` column is set to ``1`` by ``requake dedup_events``
-for events that are considered duplicates of another catalog event.
+for events that are considered duplicates of another catalog event,
+within the catalog of the selected scan.
+
+Scans Table
+^^^^^^^^^^^
+
+The ``scans`` table registers every execution of
+``requake scan_catalog``, with the parameters it used.
+
+.. code-block:: sql
+
+   CREATE TABLE scans (
+     scan_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+     catalog_id       INTEGER NOT NULL,
+     label            TEXT,
+     created_at       TEXT NOT NULL,
+     finished_at      TEXT,
+     status           TEXT NOT NULL DEFAULT 'running',
+     params_hash      TEXT NOT NULL,
+     params_json      TEXT NOT NULL,
+     requake_version  TEXT,
+     nevents          INTEGER,
+     npairs_stored    INTEGER,
+     npairs_analyzed  INTEGER,
+     FOREIGN KEY (catalog_id)
+       REFERENCES catalogs(catalog_id)
+       ON UPDATE CASCADE ON DELETE CASCADE
+   )
+
+Index:
+
+- ``idx_scans_catalog`` on ``scans(catalog_id)``
+
+``status`` is ``running`` while the scan is in progress, then
+``complete`` or ``failed``.  A scan that is still ``running`` can be
+resumed with ``requake scan_catalog --force-continue``.
 
 Event Keys Table
 ^^^^^^^^^^^^^^^^
@@ -108,12 +194,16 @@ Lag in seconds is reconstructed at read time from ``lag_samples`` and
 
    CREATE TABLE event_pairs (
      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+     scan_id         INTEGER NOT NULL,
      event1_id       INTEGER NOT NULL,
      event2_id       INTEGER NOT NULL,
      trace_key_id    INTEGER NOT NULL,
      lag_samples     INTEGER,
      cc_x100         INTEGER,
      invalid         INTEGER NOT NULL DEFAULT 0,
+     FOREIGN KEY (scan_id)
+       REFERENCES scans(scan_id)
+       ON UPDATE CASCADE ON DELETE CASCADE,
      FOREIGN KEY (event1_id)
        REFERENCES event_keys(event_id)
        ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -123,7 +213,7 @@ Lag in seconds is reconstructed at read time from ``lag_samples`` and
      FOREIGN KEY (trace_key_id)
        REFERENCES trace_keys(trace_key_id)
        ON UPDATE CASCADE ON DELETE RESTRICT,
-     UNIQUE (event1_id, event2_id, trace_key_id)
+     UNIQUE (scan_id, event1_id, event2_id, trace_key_id)
    )
 
 ``cc_x100`` stores ``cc_max`` with 0.01 precision using
@@ -137,11 +227,13 @@ Trace Metadata Table
 ^^^^^^^^^^^^^^^^^^^^
 
 The ``trace_metadata`` table stores sampling rate, coordinates, and
-elevation/depth using time-valid intervals per ``trace_id``.
+elevation/depth using time-valid intervals per ``trace_id``.  Rows
+belong to the scan that stored them.
 
 .. code-block:: sql
 
    CREATE TABLE trace_metadata (
+     scan_id           INTEGER NOT NULL,
      trace_id          TEXT NOT NULL,
      valid_from_utc    TEXT NOT NULL,
      valid_to_utc      TEXT,
@@ -151,13 +243,52 @@ elevation/depth using time-valid intervals per ``trace_id``.
      elevation         REAL,
      local_depth       REAL,
      updated_at        TEXT,
-     PRIMARY KEY (trace_id, valid_from_utc)
+     PRIMARY KEY (scan_id, trace_id, valid_from_utc),
+     FOREIGN KEY (scan_id)
+       REFERENCES scans(scan_id)
+       ON UPDATE CASCADE ON DELETE CASCADE
    )
 
 Index:
 
 - ``idx_trace_metadata_lookup`` on
-  ``trace_metadata(trace_id, valid_from_utc, valid_to_utc)``
+  ``trace_metadata(scan_id, trace_id, valid_from_utc, valid_to_utc)``
+
+Family Builds Table
+^^^^^^^^^^^^^^^^^^^
+
+The ``family_builds`` table registers every execution of
+``requake build_families``, together with the scan used as input and
+the clustering method.
+
+.. code-block:: sql
+
+   CREATE TABLE family_builds (
+     build_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+     scan_id          INTEGER NOT NULL,
+     label            TEXT,
+     created_at       TEXT NOT NULL,
+     finished_at      TEXT,
+     status           TEXT NOT NULL DEFAULT 'running',
+     method           TEXT NOT NULL,
+     cc_min           REAL,
+     params_hash      TEXT NOT NULL,
+     params_json      TEXT NOT NULL,
+     requake_version  TEXT,
+     nfamilies        INTEGER,
+     nevents          INTEGER,
+     FOREIGN KEY (scan_id)
+       REFERENCES scans(scan_id)
+       ON UPDATE CASCADE ON DELETE CASCADE
+   )
+
+Index:
+
+- ``idx_family_builds_scan`` on ``family_builds(scan_id)``
+
+``method`` stores the ``clustering_algorithm`` value (``shared`` or
+``UPGMA``): the same pair set can produce several builds with
+different methods and thresholds.
 
 Families Table
 ^^^^^^^^^^^^^^
@@ -168,6 +299,8 @@ The ``families`` table stores event-family assignments produced by
 .. code-block:: sql
 
    CREATE TABLE families (
+     build_id        INTEGER NOT NULL,
+     catalog_id      INTEGER NOT NULL,
      evid            TEXT NOT NULL,
      trace_id        TEXT NOT NULL,
      orig_time       TEXT NOT NULL,
@@ -178,26 +311,33 @@ The ``families`` table stores event-family assignments produced by
      mag             REAL,
      family_number   INTEGER NOT NULL,
      valid           INTEGER NOT NULL DEFAULT 1,
-     FOREIGN KEY (evid)
-       REFERENCES catalog(evid)
-       ON UPDATE CASCADE ON DELETE RESTRICT,
-     PRIMARY KEY (evid, trace_id, family_number)
+     FOREIGN KEY (build_id)
+       REFERENCES family_builds(build_id)
+       ON UPDATE CASCADE ON DELETE CASCADE,
+     FOREIGN KEY (catalog_id, evid)
+       REFERENCES catalog(catalog_id, evid)
+       ON UPDATE CASCADE ON DELETE CASCADE,
+     PRIMARY KEY (build_id, family_number, evid, trace_id)
    )
 
 Index:
 
-- ``idx_families_number`` on ``families(family_number)``
+- ``idx_families_number`` on ``families(build_id, family_number)``
+
+``family_number`` is meaningful only within its build: the same pair
+set clustered with a different method produces a different numbering.
 
 Template Detections Table
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``template_detections`` table stores detections produced by
-``requake scan_templates``.
+``requake scan_templates``, for the family build used as reference.
 
 .. code-block:: sql
 
    CREATE TABLE template_detections (
      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+     build_id        INTEGER NOT NULL,
      family_number   INTEGER NOT NULL,
      trace_id        TEXT NOT NULL,
      evid            TEXT NOT NULL,
@@ -206,13 +346,18 @@ The ``template_detections`` table stores detections produced by
      lat             REAL,
      depth_km        REAL,
      cc_max          REAL,
-     UNIQUE (family_number, trace_id, evid)
+     FOREIGN KEY (build_id)
+       REFERENCES family_builds(build_id)
+       ON UPDATE CASCADE ON DELETE CASCADE,
+     UNIQUE (build_id, family_number, trace_id, evid)
    )
 
 Indexes:
 
-- ``idx_template_detections_family`` on ``template_detections(family_number)``
-- ``idx_template_detections_trace`` on ``template_detections(trace_id)``
+- ``idx_template_detections_family`` on
+  ``template_detections(build_id, family_number)``
+- ``idx_template_detections_trace`` on
+  ``template_detections(build_id, trace_id)``
 
 Waveform Cache Database
 ^^^^^^^^^^^^^^^^^^^^^^^

@@ -4,6 +4,14 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- The output database now keeps several catalogs, several scans per
+  catalog and several family builds per scan, each with its parameters;
+  ``print_catalogs``, ``print_scans`` and ``print_family_builds`` list them.
+- New ``delete`` command, with ``catalog``, ``scan`` and ``build``
+  subcommands, to remove an entry and everything built from it.
+- ``read_catalog`` no longer replaces the stored catalog;
+  ``-l``/``--label`` gives a name to a catalog, a scan or a family
+  build, and ``--append`` adds to a stored catalog.
 - On Windows, the ``windows-curses`` package is now installed
   automatically, so the interactive pager works out of the box.
 

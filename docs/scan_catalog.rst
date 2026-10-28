@@ -161,8 +161,15 @@ Resuming an interrupted scan
 
 If the scan is interrupted (e.g., by a network outage or a user
 pressing Ctrl‑C), running ``requake scan_catalog`` again will detect
-the existing pairs in the database and offer to resume from where it
-stopped.  Use ``--force-continue`` to skip the prompt in scripts.
+the existing scan with the same parameters and offer to continue it
+from where it stopped.  Use ``--force-continue`` to skip the prompt in
+scripts, and ``--force`` to replace the interrupted scan instead of
+resuming it.
+
+Every scan is stored separately: use ``--scan-id`` to resume a
+specific scan, ``-l``/``--label`` to give it a name, and
+``requake print_scans`` to see what is stored.  See
+:doc:`catalogs_scans_builds`.
 
 
 Slurm clusters
@@ -186,8 +193,8 @@ behaviour:
 
 * **Non-interactive mode.**  If a scan is interrupted on a cluster,
   Requake will not prompt for input (since ``stdin`` is typically not
-  available).  Use ``--force`` to overwrite an existing scan or
-  ``--force-continue`` to resume it.
+  available).  Use ``--force`` to replace an existing scan with the
+  same parameters or ``--force-continue`` to resume it.
 
 .. note::
 
