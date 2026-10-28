@@ -24,7 +24,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from requake.catalog import RequakeEvent
 from requake.config import config
-from requake.config.parse_arguments import parse_arguments
+from requake.cli import parse_arguments
 from requake.families.families import Family
 
 
@@ -135,35 +135,35 @@ class TestMapFamiliesBackendCli(unittest.TestCase):
 
     def test_default_backend_is_cartopy(self):
         """The cartopy backend should be used by default."""
-        args = self._parse(['requake', 'map_families'])
+        args = self._parse(['requake', 'plot', 'map'])
         self.assertEqual(args.action, 'map_families')
         self.assertEqual(args.backend, 'cartopy')
 
     def test_short_backend_option(self):
         """The -b/--backend option should select the folium backend."""
-        args = self._parse(['requake', 'map_families', '-b', 'folium'])
+        args = self._parse(['requake', 'plot', 'map', '-b', 'folium'])
         self.assertEqual(args.backend, 'folium')
 
     def test_invalid_backend(self):
         """An unknown backend should be rejected by argparse."""
         with self.assertRaises(SystemExit) as exc:
-            self._parse(['requake', 'map_families', '-b', 'nope'])
+            self._parse(['requake', 'plot', 'map', '-b', 'nope'])
         self.assertEqual(exc.exception.code, 2)
 
     def test_default_sizeby(self):
         """Markers should be scaled with the number of events by default."""
-        args = self._parse(['requake', 'map_families'])
+        args = self._parse(['requake', 'plot', 'map'])
         self.assertEqual(args.sizeby, 'number_of_events')
 
     def test_short_sizeby_option(self):
-        """The -s/--sizeby option should select the marker size quantity."""
-        args = self._parse(['requake', 'map_families', '-s', 'depth'])
+        """The -s/--size-by option should select the marker size quantity."""
+        args = self._parse(['requake', 'plot', 'map', '-s', 'depth'])
         self.assertEqual(args.sizeby, 'depth')
 
     def test_invalid_sizeby(self):
         """An unknown marker size quantity should be rejected by argparse."""
         with self.assertRaises(SystemExit) as exc:
-            self._parse(['requake', 'map_families', '--sizeby', 'nope'])
+            self._parse(['requake', 'plot', 'map', '--size-by', 'nope'])
         self.assertEqual(exc.exception.code, 2)
 
 

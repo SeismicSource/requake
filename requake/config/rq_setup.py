@@ -261,7 +261,10 @@ def configure(args):
         write_sample_config(configspec, 'requake')
         sys.exit(0)
     if args.action == 'update_config':
-        update_config_file(args.configfile, configspec)
+        # The config file to update can be given as a positional argument
+        # or, as for every other command, with -c/--configfile.
+        config_file = getattr(args, 'config_file', None) or args.configfile
+        update_config_file(config_file, configspec)
         sys.exit(0)
     config_obj = read_config(args.configfile, configspec)
     # Set to None all the 'None' strings

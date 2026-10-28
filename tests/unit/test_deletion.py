@@ -19,7 +19,7 @@ from unittest.mock import patch
 from obspy import UTCDateTime
 from requake.catalog import RequakeEvent
 from requake.config import config
-from requake.config.parse_arguments import parse_arguments
+from requake.cli import parse_arguments
 from requake.database.catalog import write_catalog
 from requake.database.catalogs import (
     create_catalog,

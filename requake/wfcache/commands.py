@@ -19,7 +19,7 @@ from obspy.geodetics import gps2dist_azimuth
 from tqdm import tqdm
 
 from ..config import config, rq_exit
-from ..config.parse_arguments import _timespec_to_sec
+from ..cli.values import timespec_to_sec
 from ..terminal import style
 from .storage import (
     begin_cache_write_batch,
@@ -402,7 +402,7 @@ def _resolve_group_window_seconds():
     """Parse grouped-download span from CLI arguments."""
     group_window_spec = getattr(config.args, 'group_window', '1h')
     try:
-        return max(float(_timespec_to_sec(group_window_spec)), 0.0)
+        return max(float(timespec_to_sec(group_window_spec)), 0.0)
     except ValueError as err:
         logger.error(err)
         rq_exit(2)
@@ -917,7 +917,7 @@ def wfcache_reset_failures():
     older_than_s = None
     if older_than_spec is not None:
         try:
-            older_than_s = _timespec_to_sec(older_than_spec)
+            older_than_s = timespec_to_sec(older_than_spec)
         except ValueError as err:
             logger.error(err)
             rq_exit(2)

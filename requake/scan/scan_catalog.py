@@ -79,7 +79,7 @@ def _ask_scan_action(scan_row):
         logger.error(message)
         logger.error(
             '[rq:scan] Cannot prompt in non-interactive mode. '
-            'Use --force to replace it, --force-continue to resume it, '
+            'Use --force to replace it, --resume to resume it, '
             'or --scan-id with a new scan id to add a new scan.'
         )
         rq_exit(1)

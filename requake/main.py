@@ -14,90 +14,66 @@ Main script for Requake.
 # pylint: disable=relative-beyond-top-level,import-outside-toplevel
 
 
+# Map the action ids set by the command line to the function that
+# implements each command.  The ids do not follow the command paths
+# (e.g. "plot map" is "map_families"), so that the log files and the
+# configuration keep their historical names.
+_ACTIONS = {
+    'read_catalog': ('.catalog', 'read_catalog'),
+    'print_catalog': ('.catalog', 'print_catalog'),
+    'print_catalogs': ('.catalog', 'print_catalogs'),
+    'delete_catalog': ('.catalog', 'delete_catalog'),
+    'scan_catalog': ('.scan', 'scan_catalog'),
+    'scan_templates': ('.scan', 'scan_templates'),
+    'print_scans': ('.scan', 'print_scans'),
+    'delete_scan': ('.scan', 'delete_scan'),
+    'print_pairs': ('.families', 'print_pairs'),
+    'dedup_events': ('.families', 'dedup_events'),
+    'build_families': ('.families', 'build_families'),
+    'build_templates': ('.families', 'build_templates'),
+    'print_families': ('.families', 'print_families'),
+    'print_family_builds': ('.families', 'print_family_builds'),
+    'delete_build': ('.families', 'delete_family_build'),
+    'flag_family': ('.families', 'flag_family'),
+    'plot_pair': ('.plot', 'plot_pair'),
+    'plot_families': ('.plot', 'plot_families'),
+    'plot_timespans': ('.plot', 'plot_timespans'),
+    'plot_cumulative': ('.plot', 'plot_cumulative'),
+    'map_families': ('.plot', 'map_families'),
+    'wfcache_prefetch': ('.wfcache', 'wfcache_prefetch'),
+    'wfcache_print': ('.wfcache', 'wfcache_print'),
+    'wfcache_inspect': ('.wfcache', 'wfcache_inspect'),
+    'wfcache_extract': ('.wfcache', 'wfcache_extract'),
+    'wfcache_reset_failures': ('.wfcache', 'wfcache_reset_failures'),
+}
+
+
+def dispatch(action):
+    """
+    Run the function implementing a command.
+
+    The module holding the function is imported here, and not at the top
+    of this file, to keep the startup time short.
+
+    :param action: the action id set by the command line
+    :type action: str
+    """
+    from importlib import import_module
+    target = _ACTIONS.get(action)
+    if target is None:
+        return
+    package, function = target
+    module = import_module(package, package=__package__)
+    getattr(module, function)()
+
+
 def run():
     """Run Requake."""
-    from .config.parse_arguments import parse_arguments
+    from .cli import parse_arguments
     args = parse_arguments()
     from .config.rq_setup import configure, rq_exit
     configure(args)
-    if args.action == 'read_catalog':
-        from .catalog import read_catalog
-        read_catalog()
-    if args.action == 'print_catalog':
-        from .catalog import print_catalog
-        print_catalog()
-    if args.action == 'print_catalogs':
-        from .catalog import print_catalogs
-        print_catalogs()
-    if args.action == 'delete_catalog':
-        from .catalog import delete_catalog
-        delete_catalog()
-    if args.action == 'scan_catalog':
-        from .scan import scan_catalog
-        scan_catalog()
-    if args.action == 'print_scans':
-        from .scan import print_scans
-        print_scans()
-    if args.action == 'delete_scan':
-        from .scan import delete_scan
-        delete_scan()
-    if args.action == 'print_pairs':
-        from .families import print_pairs
-        print_pairs()
-    if args.action == 'dedup_events':
-        from .families import dedup_events
-        dedup_events()
-    if args.action == 'scan_templates':
-        from .scan import scan_templates
-        scan_templates()
-    if args.action == 'plot_pair':
-        from .plot import plot_pair
-        plot_pair()
-    if args.action == 'build_families':
-        from .families import build_families
-        build_families()
-    if args.action == 'print_families':
-        from .families import print_families
-        print_families()
-    if args.action == 'print_family_builds':
-        from .families import print_family_builds
-        print_family_builds()
-    if args.action == 'delete_build':
-        from .families import delete_family_build
-        delete_family_build()
-    if args.action == 'plot_families':
-        from .plot import plot_families
-        plot_families()
-    if args.action == 'plot_timespans':
-        from .plot import plot_timespans
-        plot_timespans()
-    if args.action == 'plot_cumulative':
-        from .plot import plot_cumulative
-        plot_cumulative()
-    if args.action == 'map_families':
-        from .plot import map_families
-        map_families()
-    if args.action == 'flag_family':
-        from .families import flag_family
-        flag_family()
-    if args.action == 'build_templates':
-        from .families import build_templates
-        build_templates()
-    if args.action == 'wfcache_prefetch':
-        from .wfcache import wfcache_prefetch
-        wfcache_prefetch()
-    if args.action == 'wfcache_print':
-        from .wfcache import wfcache_print
-        wfcache_print()
-    if args.action == 'wfcache_inspect':
-        from .wfcache import wfcache_inspect
-        wfcache_inspect()
-    if args.action == 'wfcache_extract':
-        from .wfcache import wfcache_extract
-        wfcache_extract()
-    if args.action == 'wfcache_reset_failures':
-        from .wfcache import wfcache_reset_failures
-        wfcache_reset_failures()
+    dispatch(args.action)
     rq_exit(0)
 
 

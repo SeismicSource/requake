@@ -15,7 +15,7 @@ import io
 import unittest
 from unittest.mock import patch
 
-from requake.config.parse_arguments import parse_arguments
+from requake.cli import parse_arguments
 from requake.logo import REQUAKE_LOGO
 
 # U+018E, LATIN CAPITAL LETTER REVERSED E

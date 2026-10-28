@@ -43,14 +43,14 @@ echo ""
 
 # Step 1: Read catalog
 echo "[1/$TOTAL_STEPS] Reading catalog..."
-requake read_catalog requake.catalog.txt || { echo "FAILED: read_catalog"; exit 1; }
+requake read catalog requake.catalog.txt || { echo "FAILED: read catalog"; exit 1; }
 echo "✓ Catalog read complete"
 echo "----------------------------------------"
 echo ""
 
 # Step 2: Print catalog to verify it was read correctly
 echo "[2/$TOTAL_STEPS] Printing catalog..."
-requake print_catalog > requake_out/catalog_output.txt 2>&1 || { echo "FAILED: print_catalog"; exit 1; }
+requake print catalog > requake_out/catalog_output.txt 2>&1 || { echo "FAILED: print catalog"; exit 1; }
 echo "✓ Catalog printed"
 echo "----------------------------------------"
 echo ""

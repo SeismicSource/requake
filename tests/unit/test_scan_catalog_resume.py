@@ -18,7 +18,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 import numpy as np
 
-from requake.config.parse_arguments import parse_arguments
+from requake.cli import parse_arguments
 from requake.scan.scan_catalog import _process_pairs
 from requake.scan.scan_catalog_pairs import load_existing_pair_ids
 from requake.scan.scan_catalog_helpers import (
@@ -130,16 +130,26 @@ class TestScanCatalogResume(unittest.TestCase):
             return resolve_scan_catalog_nprocs(npairs, slurm_context or {})
 
     def test_scan_catalog_force_flag(self):
-        """--force should be accepted for scan_catalog."""
-        with patch.object(sys, 'argv', ['requake', 'scan_catalog', '--force']):
+        """--force should be accepted for scan catalog."""
+        argv = ['requake', 'scan', 'catalog', '--force']
+        with patch.object(sys, 'argv', argv):
             args = parse_arguments('requake')
         self.assertEqual(args.action, 'scan_catalog')
         self.assertTrue(args.force)
         self.assertFalse(args.force_continue)
 
+    def test_scan_catalog_resume_flag(self):
+        """--resume should be accepted for scan catalog."""
+        argv = ['requake', 'scan', 'catalog', '--resume']
+        with patch.object(sys, 'argv', argv):
+            args = parse_arguments('requake')
+        self.assertEqual(args.action, 'scan_catalog')
+        self.assertFalse(args.force)
+        self.assertTrue(args.force_continue)
+
     def test_scan_catalog_force_continue_flag(self):
-        """--force-continue should be accepted for scan_catalog."""
-        argv = ['requake', 'scan_catalog', '--force-continue']
+        """The deprecated --force-continue spelling should keep working."""
+        argv = ['requake', 'scan', 'catalog', '--force-continue']
         with patch.object(sys, 'argv', argv):
             args = parse_arguments('requake')
         self.assertEqual(args.action, 'scan_catalog')
@@ -147,12 +157,13 @@ class TestScanCatalogResume(unittest.TestCase):
         self.assertTrue(args.force_continue)
 
     def test_scan_catalog_force_modes_are_mutually_exclusive(self):
-        """--force and --force-continue cannot be used together."""
+        """--force and --resume cannot be used together."""
         argv = [
             'requake',
-            'scan_catalog',
+            'scan',
+            'catalog',
             '--force',
-            '--force-continue',
+            '--resume',
         ]
         with patch.object(sys, 'argv', argv):
             with self.assertRaises(SystemExit) as exc:
@@ -160,8 +171,8 @@ class TestScanCatalogResume(unittest.TestCase):
         self.assertEqual(exc.exception.code, 2)
 
     def test_scan_catalog_nprocs_flag(self):
-        """--nprocs should be accepted for scan_catalog."""
-        argv = ['requake', 'scan_catalog', '--nprocs', '4']
+        """--nprocs should be accepted for scan catalog."""
+        argv = ['requake', 'scan', 'catalog', '--nprocs', '4']
         with patch.object(sys, 'argv', argv):
             args = parse_arguments('requake')
         self.assertEqual(args.action, 'scan_catalog')
@@ -169,7 +180,7 @@ class TestScanCatalogResume(unittest.TestCase):
 
     def test_scan_catalog_nprocs_invalid(self):
         """--nprocs must be a non-negative integer."""
-        argv = ['requake', 'scan_catalog', '--nprocs', '-1']
+        argv = ['requake', 'scan', 'catalog', '--nprocs', '-1']
         with patch.object(sys, 'argv', argv):
             with self.assertRaises(SystemExit) as exc:
                 parse_arguments('requake')

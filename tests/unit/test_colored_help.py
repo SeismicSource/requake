@@ -14,7 +14,7 @@ import io
 import unittest
 from unittest.mock import patch
 
-from requake.config.parse_arguments import (
+from requake.cli.help_format import (
     ColoredHelpArgumentParser,
     SubcommandHelpFormatter,
 )
@@ -54,7 +54,7 @@ def _build_parser():
         help='config file',
     )
     parser.add_argument('catalog_file', nargs='?', help='catalog file')
-    subparser.add_parser('read_catalog', help='read an event catalog')
+    subparser.add_parser('read', help='read a data set')
     return parser
 
 
@@ -138,7 +138,7 @@ class TestColoredHelp(unittest.TestCase):
         config_invocation = _invocation(parser, '-c')
         self.assertIn(f'{CYAN}{help_invocation}{RESET}', text)
         self.assertIn(f'{CYAN}{config_invocation}{RESET}', text)
-        self.assertIn(f'{CYAN}read_catalog{RESET}', text)
+        self.assertIn(f'{CYAN}read{RESET}', text)
 
     def test_usage_has_no_colors_when_piped(self):
         """Usage written to a pipe has no escape sequences."""

@@ -13,7 +13,7 @@ import sys
 import unittest
 from unittest.mock import patch
 
-from requake.config.parse_arguments import parse_arguments
+from requake.cli import parse_arguments
 
 
 class TestWaveformCacheCli(unittest.TestCase):
