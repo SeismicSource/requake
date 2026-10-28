@@ -21,24 +21,48 @@ standard `FDSN web services <https://www.fdsn.org/webservices/>`_.
 
 Requake is written in Python and uses `ObsPy <https://obspy.org>`_ as backend.
 
+Commands are a verb followed by the object the verb acts on, as in
+``requake print pairs``; they are described in :doc:`commands`.
+
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Start
 
+   Home <self>
    installation
    running
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Using Requake
+
    commands
+   configuration_file
    pager
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Analysis
+
    read_catalog
-   catalogs_scans_builds
    scan_catalog
    pairs
    wfcache
-   performances
-   slip_models
-   configuration_file
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Results and reference
+
+   catalogs_scans_builds
    database_schemas
+   slip_models
+   performances
+
+.. toctree::
+   :maxdepth: 2
+   :caption: About
+
    changelog
    citing
    bibliography
