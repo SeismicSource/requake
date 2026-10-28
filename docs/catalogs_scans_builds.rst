@@ -116,38 +116,6 @@ example, compare the same catalog scanned on two different stations:
    requake print pairs --scan-id 2
 
 
-Clustering Pairs Into Families
-------------------------------
-
-``requake build families`` reads the pairs of the scan selected with
-``--scan-id`` (the latest one by default) and stores its result under a
-new family build id, recording the clustering method and its
-parameters.
-
-The same pair table can be clustered in different ways, and each build
-keeps its own family numbering:
-
-.. code-block::
-
-   requake build families --scan-id 1 -l "shared"
-   requake build families --scan-id 1 --build-id 2 -l "UPGMA"
-
-When a build with identical parameters already exists, Requake asks
-whether to replace it or to add a new build; ``-f``/``--force``
-replaces it without asking.  A replaced build keeps its id, while its
-families and template detections are removed.
-
-Every command that reads families (``print families``,
-``plot families``, ``plot timespans``, ``plot cumulative``,
-``plot map``, ``flag family``, ``build templates``,
-``scan templates``) selects a build with ``--build-id``:
-
-.. code-block::
-
-   requake print families --build-id 2
-   requake flag family --build-id 2 7 false
-
-
 Deleting Stored Results
 -----------------------
 

@@ -16,4 +16,10 @@ Performances
   exclusively from disk, and is the single most effective way to speed up
   catalog scanning.
 
-* ``requake build families`` is fast™.
+* ``requake build families`` is fast™ with the default ``shared``
+  method, whose time and memory grow with the number of stored pairs
+  above ``cc_min``.  The ``UPGMA`` method instead needs a distance
+  matrix over all the events linked by those pairs, so its memory use
+  grows with the square of the number of events: it is only practical
+  on catalogs with a few thousand events (see
+  :doc:`build_families`).

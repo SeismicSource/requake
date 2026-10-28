@@ -90,7 +90,8 @@ Build Commands
 --------------
 
 ``build families``
-   Group the event pairs into families of repeating earthquakes.
+   Group the event pairs into families of repeating earthquakes (see
+   :doc:`build_families`).
 
 ``build templates``
    Build waveform templates from one or more families.

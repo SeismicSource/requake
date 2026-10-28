@@ -48,6 +48,7 @@ Commands are a verb followed by the object the verb acts on, as in
    read_catalog
    scan_catalog
    pairs
+   build_families
    wfcache
 
 .. toctree::
