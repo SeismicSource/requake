@@ -173,10 +173,15 @@ class TestGroupHelp(unittest.TestCase):
                     parse_arguments()
         return exc.exception.code, stdout.getvalue()
 
+    def _check_help(self, *argv):
+        """Parse *argv* and return the help output, after a clean exit."""
+        code, output = self._parse(*argv)
+        self.assertEqual(code, 0)
+        return output
+
     def test_group_alone_prints_its_help(self):
         """A group without an object must print its own help and exit 0."""
-        code, output = self._parse('plot')
-        self.assertEqual(code, 0)
+        output = self._check_help('plot')
         self.assertIn('requake plot', output)
         self.assertIn('Plot data to screen or file.', output)
         self.assertIn('timespans', output)
@@ -184,8 +189,7 @@ class TestGroupHelp(unittest.TestCase):
 
     def test_no_argument_prints_the_main_help(self):
         """An empty command line must print the main help and exit 0."""
-        code, output = self._parse()
-        self.assertEqual(code, 0)
+        output = self._check_help()
         self.assertIn('Repeating earthquakes search and analysis', output)
         self.assertIn('wfcache', output)
 
