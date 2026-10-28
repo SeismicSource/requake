@@ -12,7 +12,7 @@ Build families of repeating earthquakes from a catalog of pairs.
 import logging
 import sys
 import contextlib
-from itertools import combinations
+import numpy as np
 from scipy.cluster.hierarchy import average, fcluster
 from ..config import config, rq_exit
 from ..config.run_params import (
@@ -93,36 +93,64 @@ def _build_families_from_shared_events(events):
     return families
 
 
+def _condensed_distances(events):
+    """
+    Return the sorted event ids and the pairwise distance matrix.
+
+    The layout is the condensed one used by
+    :func:`scipy.cluster.hierarchy.average`.  Distance is
+    1 - correlation; pairs that are not in ``events`` (i.e. never
+    measured, or below ``cc_min``) keep the maximum distance of 1, so
+    that they cannot bring two events together by themselves.
+
+    :param events: dictionary of events
+    :type events: dict
+    :return: tuple with the sorted event ids and the condensed distance
+        matrix
+    :rtype: tuple
+    """
+    evids = sorted(events)
+    n_events = len(evids)
+    index = {evid: idx for idx, evid in enumerate(evids)}
+    distances = np.ones(n_events * (n_events - 1) // 2)
+    for evid1, event in events.items():
+        idx1 = index[evid1]
+        for evid2, cc in event.correlations.items():
+            idx2 = index[evid2]
+            if idx1 >= idx2:
+                continue
+            offset = idx1 * (2 * n_events - idx1 - 1) // 2
+            distances[offset + idx2 - idx1 - 1] = 1 - cc
+    return evids, distances
+
+
 def _build_families_from_upgma(events, cc_min):
     """
     Build families of similar events using the UPGMA algorithm.
+
+    Events must already be filtered on ``cc_min``: pairs that are not
+    in ``events`` are considered as not linked and get the maximum
+    distance.
 
     Reference: https://en.wikipedia.org/wiki/UPGMA
 
     :param events: dictionary of events
     :type events: dict
+    :param cc_min: minimum cross-correlation to link two events
+    :type cc_min: float
     :return: list of families
     :rtype: list
     """
-    # We use sorted tuples of evids as keys to avoid duplicates with inverted
-    # order of evids, e.g. (evid1, evid2) and (evid2, evid1)
-    correlations = {
-        tuple(sorted((evid1, evid2))): cc
-        for evid1, ev in events.items()
-        for evid2, cc in ev.correlations.items()
-    }
-    min_correlation = min(correlations.values())
-    # Build distance dictionary. Distance is 1 - correlation.
-    # We use min_correlation for pairs for which no correlation is available
-    evids = sorted(set(events.keys()))
-    distances = {
-        k: 1 - correlations.get(k, min_correlation)
-        for k in combinations(evids, 2)
-    }
-    # Build pairwise distance matrix, then the linkage matrix,
-    # then the clusters
-    pairwise_distances = [distances[k] for k in sorted(distances.keys())]
-    linkage_matrix = average(pairwise_distances)
+    n_events = len(events)
+    if n_events < 2:
+        return []
+    logger.info(
+        f'UPGMA: {n_events} events, '
+        f'{n_events * (n_events - 1) // 2} pairwise distances'
+    )
+    evids, distances = _condensed_distances(events)
+    # Build the linkage matrix, then the clusters
+    linkage_matrix = average(distances)
     clusters = fcluster(linkage_matrix, 1 - cc_min, criterion='distance')
     # Build families
     families = [Family(number=n) for n in range(max(clusters))]
@@ -221,6 +249,20 @@ def _select_build_action(scan_id, method, params_hash):
     return int(existing['build_id']), _ask_build_action(existing)
 
 
+def _fail_family_build(build_id, msg):
+    """
+    Mark a family build as failed, log the error and exit.
+
+    :param build_id: family build to mark as failed
+    :type build_id: int
+    :param msg: error message
+    :type msg: str
+    """
+    logger.error(msg)
+    finish_family_build(build_id, status=BUILD_STATUS_FAILED)
+    rq_exit(1)
+
+
 def build_families():
     """Build families of repeating earthquakes from a catalog of pairs."""
     try:
@@ -263,14 +305,10 @@ def build_families():
         )
         logger.info(f'Family build stored as build {build_id}')
     try:
-        cc_min = (
-            config.cc_min
-            if config.clustering_algorithm == 'shared'
-            else None
-        )
+        cc_min = config.cc_min
         read_message = (
-            f'Reading events from the pairs of scan {scan_id} in '
-            f'db file {get_db_path()}...'
+            f'Reading events from the pairs of scan {scan_id} with '
+            f'cc >= {cc_min} in db file {get_db_path()}...'
         )
         logger.debug(read_message)
         events = run_with_spinner(
@@ -278,20 +316,14 @@ def build_families():
             lambda: read_events_from_pairs(cc_min=cc_min, scan_id=scan_id),
         )
     except (FileNotFoundError, PairsTableNotFoundError):
-        logger.error(
-            'Unable to find event pairs in database: '
-            f'{get_db_path()}'
+        _fail_family_build(
+            build_id,
+            f'Unable to find event pairs in database: {get_db_path()}'
         )
-        finish_family_build(build_id, status=BUILD_STATUS_FAILED)
-        rq_exit(1)
-    except (PairsMetadataError, PairsSchemaError) as msg:
-        logger.error(msg)
-        finish_family_build(build_id, status=BUILD_STATUS_FAILED)
-        rq_exit(1)
-    except DatabaseCorruptError as msg:
-        logger.error(msg)
-        finish_family_build(build_id, status=BUILD_STATUS_FAILED)
-        rq_exit(1)
+    except (
+        PairsMetadataError, PairsSchemaError, DatabaseCorruptError
+    ) as msg:
+        _fail_family_build(build_id, msg)
     if config.clustering_algorithm == 'shared':
         build_message = 'Building families from shared events...'
         logger.debug(build_message)
