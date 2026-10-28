@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 380"
+     width="780" height="380">
+  <style>
+    .node { fill: #ffffff; stroke: #333333; stroke-width: 1.5; }
+    .pair { stroke: #1f4e79; stroke-width: 1.5; }
+    .tree { stroke: #b35c00; stroke-width: 1.5; }
+    .group { fill: none; stroke: #2e7d32; stroke-width: 1.2;
+             stroke-dasharray: 6 4; }
+    .cut { stroke: #c0392b; stroke-width: 1.2; stroke-dasharray: 6 4; }
+    text { font-family: sans-serif; font-size: 13px; fill: #222222; }
+    .id { font-style: italic; text-anchor: middle; }
+    .cc { font-size: 11px; fill: #1f4e79; }
+    .dist { font-size: 11px; fill: #b35c00; }
+    .ccl { font-size: 11px; fill: #1f4e79; text-anchor: middle; }
+    .distl { font-size: 11px; fill: #b35c00; text-anchor: middle; }
+    .note { font-size: 12px; fill: #444444; text-anchor: middle; }
+    .key { font-size: 12px; font-weight: bold; fill: #222222;
+           text-anchor: middle; }
+    .title { font-size: 14px; font-weight: bold; text-anchor: middle; }
+    .result { font-size: 12px; text-anchor: middle; }
+    .cutlbl { font-size: 11px; fill: #c0392b; }
+  </style>
+
+  <!-- top: the event pairs used by both methods -->
+  <text class="title" x="375" y="24">event pairs used</text>
+
+  <line class="pair" x1="253" y1="70" x2="317" y2="70"/>
+  <line class="pair" x1="343" y1="70" x2="407" y2="70"/>
+  <line class="pair" x1="433" y1="70" x2="497" y2="70"/>
+  <text class="ccl" x="285" y="52">CC: 0.99</text>
+  <text class="distl" x="285" y="64">d: 0.01</text>
+  <text class="ccl" x="375" y="52">CC: 0.97</text>
+  <text class="distl" x="375" y="64">d: 0.03</text>
+  <text class="ccl" x="465" y="52">CC: 0.98</text>
+  <text class="distl" x="465" y="64">d: 0.02</text>
+
+  <circle class="node" cx="240" cy="70" r="13"/>
+  <circle class="node" cx="330" cy="70" r="13"/>
+  <circle class="node" cx="420" cy="70" r="13"/>
+  <circle class="node" cx="510" cy="70" r="13"/>
+  <text class="id" x="240" y="75">a</text>
+  <text class="id" x="330" y="75">b</text>
+  <text class="id" x="420" y="75">c</text>
+  <text class="id" x="510" y="75">d</text>
+
+  <text class="key" x="375" y="99">cc_min = 0.95</text>
+  <text class="note" x="375" y="114">a&#8211;c, a&#8211;d, b&#8211;d: not measured or below cc_min</text>
+
+  <!-- panel a: shared -->
+  <text class="title" x="190" y="152">(a) shared</text>
+
+  <rect class="group" x="28" y="195" width="324" height="78" rx="10"/>
+
+  <line class="pair" x1="93" y1="234" x2="137" y2="234"/>
+  <line class="pair" x1="163" y1="234" x2="207" y2="234"/>
+  <line class="pair" x1="233" y1="234" x2="287" y2="234"/>
+  <text class="ccl" x="115" y="225">CC: 0.99</text>
+  <text class="ccl" x="185" y="225">CC: 0.97</text>
+  <text class="ccl" x="260" y="225">CC: 0.98</text>
+
+  <circle class="node" cx="80" cy="234" r="13"/>
+  <circle class="node" cx="150" cy="234" r="13"/>
+  <circle class="node" cx="220" cy="234" r="13"/>
+  <circle class="node" cx="300" cy="234" r="13"/>
+  <text class="id" x="80" y="239">a</text>
+  <text class="id" x="150" y="239">b</text>
+  <text class="id" x="220" y="239">c</text>
+  <text class="id" x="300" y="239">d</text>
+
+  <text class="result" x="190" y="303">one family: {a, b, c, d}</text>
+
+  <!-- panel b: UPGMA -->
+  <text class="title" x="585" y="152">(b) UPGMA</text>
+  <text class="note" x="585" y="170">heights: d = 1 &#8722; CC</text>
+
+  <rect class="group" x="452" y="284" width="96" height="32" rx="8"/>
+  <rect class="group" x="612" y="284" width="96" height="32" rx="8"/>
+
+  <line class="tree" x1="470" y1="288" x2="470" y2="272"/>
+  <line class="tree" x1="530" y1="288" x2="530" y2="272"/>
+  <line class="tree" x1="470" y1="272" x2="530" y2="272"/>
+  <text class="cc" x="540" y="262">CC: 0.99</text>
+  <text class="dist" x="540" y="273">d: 0.01</text>
+
+  <line class="tree" x1="630" y1="288" x2="630" y2="258"/>
+  <line class="tree" x1="690" y1="288" x2="690" y2="258"/>
+  <line class="tree" x1="630" y1="258" x2="690" y2="258"/>
+  <text class="cc" x="700" y="250">CC: 0.98</text>
+  <text class="dist" x="700" y="261">d: 0.02</text>
+
+  <line class="tree" x1="500" y1="272" x2="500" y2="195"/>
+  <line class="tree" x1="660" y1="258" x2="660" y2="195"/>
+  <line class="tree" x1="500" y1="195" x2="660" y2="195"/>
+  <text class="distl" x="580" y="189">d: 0.76</text>
+
+  <line class="cut" x1="445" y1="232" x2="700" y2="232"/>
+  <text class="cutlbl" x="441" y="236" text-anchor="end">cut: d = 0.05</text>
+
+  <circle class="node" cx="470" cy="300" r="12"/>
+  <circle class="node" cx="530" cy="300" r="12"/>
+  <circle class="node" cx="630" cy="300" r="12"/>
+  <circle class="node" cx="690" cy="300" r="12"/>
+  <text class="id" x="470" y="305">a</text>
+  <text class="id" x="530" y="305">b</text>
+  <text class="id" x="630" y="305">c</text>
+  <text class="id" x="690" y="305">d</text>
+
+  <text class="result" x="585" y="345">two families: {a, b} and {c, d}</text>
+</svg>

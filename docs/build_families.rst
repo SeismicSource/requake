@@ -28,27 +28,64 @@ Clustering methods
 ------------------
 
 The method is set with ``clustering_algorithm`` in the configuration
-file, and both methods only use the event pairs with
-``cc >= cc_min``: the weaker pairs are never read from the database.
+file.  Both methods start from the event pairs with
+:math:`\mathrm{CC}_\mathrm{max} \ge \mathrm{cc}_\mathrm{min}`: the
+weaker pairs are never read from the database.
+
+The figure below is a worked example: four events in a chain,
+:math:`a`–:math:`b`–:math:`c`–:math:`d`, linked by three pairs above
+:math:`\mathrm{cc}_\mathrm{min} = 0.95`.  The three remaining pairs,
+:math:`a`–:math:`c`, :math:`a`–:math:`d` and :math:`b`–:math:`d`, are
+either not measured or below ``cc_min``, so they are not edges.
+
+.. figure:: imgs/clustering_algorithms.svg
+   :alt: the same event pairs clustered with shared and with UPGMA
+   :width: 700
+   :align: center
+
+   **Figure 1** Worked example: event pairs above ``cc_min``, labelled
+   with their :math:`\mathrm{CC}_\mathrm{max}` and the corresponding
+   distance :math:`d = 1 - \mathrm{CC}_\mathrm{max}` (top), and the
+   families produced by ``shared`` (a) and ``UPGMA`` (b).  In (b), the
+   merge heights are distances (not to scale) and the dashed line is
+   the cut at :math:`t = 1 - \mathrm{cc}_\mathrm{min} = 0.05`.
 
 ``shared``
-   Two events belong to the same family when a pair above ``cc_min``
-   links them, directly or through a chain of other events.  Because
-   the relation is transitive, a family can contain events whose own
-   pair is below ``cc_min``.
+   Families are the connected components of the graph whose vertices
+   are the events and whose edges are the pairs above ``cc_min``.  If
+   :math:`a`–:math:`b` and :math:`b`–:math:`c` are both above the
+   threshold, :math:`a` and :math:`c` end up in the same family even
+   when their own pair is missing or below ``cc_min``: because the
+   relation is transitive, a family can contain events that are not
+   similar to each other.
 
 ``UPGMA``
    Families are cut from a dendrogram built with the Unweighted Pair
-   Group Method with Arithmetic Mean (UPGMA), at a distance of
-   ``1 - cc_min``.  Only the events linked by at least one pair above
-   ``cc_min`` take part, and two events without such a pair are
-   treated as maximally distant, so a chain of pairs cannot group
-   them by itself.
+   Group Method with Arithmetic Mean (UPGMA) at a distance of
+   :math:`t = 1 - \mathrm{cc}_\mathrm{min}` (see `UPGMA on Wikipedia
+   <https://en.wikipedia.org/wiki/UPGMA>`_).  Each pair that is used
+   becomes a distance, :math:`d_{ij} = 1 - \mathrm{CC}_\mathrm{max}(i,
+   j)`, and each pair that is not used has the maximum distance,
+   :math:`d_{ij} = 1`.  At every step, the two clusters with the
+   smallest mean distance are merged:
 
-``UPGMA`` needs a distance matrix that grows with the square of the
-number of events, so it is only practical on catalogs with a few
-thousand events; ``shared`` is the default and the recommended choice
-for large ones.
+   .. math::
+
+      d(A, B) = \frac{1}{|A| \, |B|}
+      \sum_{i \in A} \sum_{j \in B} d_{ij}
+
+   In the example (``cc_min = 0.95``), :math:`a`–:math:`b` and
+   :math:`c`–:math:`d` merge at 0.01 and 0.02, while the two clusters
+   meet only at :math:`(1 + 1 + 0.03 + 1)/4 = 0.76`, above the cut at
+   0.05: the strong :math:`b`–:math:`c` pair averages with three
+   missing pairs and cannot join them.
+
+``UPGMA`` stores one distance for each couple of events, so its memory
+grows with the square of the number of events linked by at least one
+pair above ``cc_min``: with :math:`n` such events, the matrix holds
+:math:`n(n-1)/2` distances.  For reference, ``UPGMA`` completed on a
+catalog of 93,000 events in which about 15,000 were linked by at least
+one pair above ``cc_min``, a matrix of about 109 million distances.
 
 
 Replacing a build

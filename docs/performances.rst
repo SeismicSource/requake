@@ -19,7 +19,10 @@ Performances
 * ``requake build families`` is fast™ with the default ``shared``
   method, whose time and memory grow with the number of stored pairs
   above ``cc_min``.  The ``UPGMA`` method instead needs a distance
-  matrix over all the events linked by those pairs, so its memory use
-  grows with the square of the number of events: it is only practical
-  on catalogs with a few thousand events (see
+  matrix over the events linked by those pairs, so its memory use
+  grows with the square of their number: what counts is how many
+  events have a pair above ``cc_min``, not the catalog size.  For
+  reference, ``UPGMA`` completed on a catalog of 93,000 events in
+  which about 15,000 were linked by pairs above ``cc_min``, that is a
+  matrix of about 109 million distances (see
   :doc:`build_families`).
