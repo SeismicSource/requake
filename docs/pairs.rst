@@ -4,7 +4,7 @@
 Event Pairs
 ###########
 
-Every couple of events compared by :doc:`requake scan catalog
+Every pair of events compared by :doc:`requake scan catalog
 <scan_catalog>` is stored as an *event pair* in the ``event_pairs``
 table of the output database (see :doc:`database_schemas`).  Pairs are
 the building blocks of repeating-earthquake families: events connected

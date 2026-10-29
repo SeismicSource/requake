@@ -32,11 +32,42 @@ file.  Both methods start from the event pairs with
 :math:`\mathrm{CC}_\mathrm{max} \ge \mathrm{cc}_\mathrm{min}`: the
 weaker pairs are never read from the database.
 
-The figure below is a worked example: four events in a chain,
+The example used in this section is a chain of four events,
 :math:`a`–:math:`b`–:math:`c`–:math:`d`, linked by three pairs above
 :math:`\mathrm{cc}_\mathrm{min} = 0.95`.  The three remaining pairs,
 :math:`a`–:math:`c`, :math:`a`–:math:`d` and :math:`b`–:math:`d`, are
 either not measured or below ``cc_min``, so they are not edges.
+
+The six pairs of the example are:
+
+.. list-table::
+   :header-rows: 1
+   :align: center
+
+   * - Pair
+     - :math:`\mathrm{CC}_\mathrm{max}`
+     - :math:`d = 1 - \mathrm{CC}_\mathrm{max}`
+   * - :math:`a`–:math:`b`
+     - 0.99
+     - 0.01
+   * - :math:`b`–:math:`c`
+     - 0.97
+     - 0.03
+   * - :math:`c`–:math:`d`
+     - 0.98
+     - 0.02
+   * - :math:`a`–:math:`c`
+     - not used
+     - 1
+   * - :math:`a`–:math:`d`
+     - not used
+     - 1
+   * - :math:`b`–:math:`d`
+     - not used
+     - 1
+
+The figure below draws these pairs as a graph, together with the
+families that ``shared`` (a) and ``UPGMA`` (b) build from them.
 
 .. figure:: imgs/clustering_algorithms.svg
    :alt: the same event pairs clustered with shared and with UPGMA
@@ -74,13 +105,19 @@ either not measured or below ``cc_min``, so they are not edges.
       d(A, B) = \frac{1}{|A| \, |B|}
       \sum_{i \in A} \sum_{j \in B} d_{ij}
 
+   where :math:`A` and :math:`B` are the two clusters being considered,
+   :math:`|A|` and :math:`|B|` the numbers of events they contain, and
+   :math:`d_{ij}` the distance between event :math:`i` of :math:`A` and
+   event :math:`j` of :math:`B`: the distance between two clusters is
+   the mean of their :math:`|A| \cdot |B|` event-to-event distances.
+
    In the example (``cc_min = 0.95``), :math:`a`–:math:`b` and
    :math:`c`–:math:`d` merge at 0.01 and 0.02, while the two clusters
    meet only at :math:`(1 + 1 + 0.03 + 1)/4 = 0.76`, above the cut at
    0.05: the strong :math:`b`–:math:`c` pair averages with three
    missing pairs and cannot join them.
 
-``UPGMA`` stores one distance for each couple of events, so its memory
+``UPGMA`` stores one distance for each pair of events, so its memory
 grows with the square of the number of events linked by at least one
 pair above ``cc_min``: with :math:`n` such events, the matrix holds
 :math:`n(n-1)/2` distances.  For reference, ``UPGMA`` completed on a
