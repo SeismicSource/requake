@@ -72,7 +72,15 @@ Waveform retrieval
 For each candidate pair, Requake retrieves a short waveform window
 around the P‑wave arrival for one or more seismic traces
 (``catalog_trace_id``).  The window starts ``cc_pre_P`` seconds before
-the theoretical P arrival and lasts ``cc_trace_length`` seconds.
+the theoretical P arrival and lasts ``cc_trace_length`` seconds in
+total, so it ends ``cc_trace_length`` minus ``cc_pre_P`` seconds after
+P.  With the defaults (5 s and 120 s) the window runs from P − 5 s to
+P + 115 s.
+
+The same window is used wherever Requake cuts event waveforms around
+P: event pair and family plots, template building, template-based
+scans and waveform prefetch.  It is not applied to whole traces read
+from ``event_data_path``, which are used as they are.
 
 Waveforms can come from three sources, in order of priority:
 
@@ -103,10 +111,11 @@ section of the :doc:`configuration file <configuration_file>`.  The
 relevant parameters are:
 
 ``cc_pre_P``
-  seconds of signal before the P arrival
+  seconds of signal kept before the P arrival
 
 ``cc_trace_length``
-  total waveform window length in seconds
+  total waveform window length in seconds: the signal after P is
+  ``cc_trace_length`` minus ``cc_pre_P`` seconds long
 
 ``cc_freq_min``, ``cc_freq_max``
   band-pass filter corners in Hz
