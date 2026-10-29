@@ -104,10 +104,10 @@ def _color_handler_emit(fn, stream=None):
 
 
 def _setup_tqdm_logging(logger_root):
-    """Set up a tqdm logging handler."""
+    """Set up a tqdm logging handler writing on stderr."""
 
     class TqdmLoggingHandler(logging.Handler):
-        """A logging handler that writes to tqdm."""
+        """A logging handler that writes to tqdm, on stderr."""
 
         def __init__(self, level=logging.NOTSET):
             super().__init__(level)
@@ -115,7 +115,7 @@ def _setup_tqdm_logging(logger_root):
         def emit(self, record):
             try:
                 msg = self.format(record)
-                tqdm.tqdm.write(msg)
+                tqdm.tqdm.write(msg, file=sys.stderr)
                 self.flush()
             except (ValueError, TypeError, IOError, OSError):
                 self.handleError(record)
@@ -123,8 +123,8 @@ def _setup_tqdm_logging(logger_root):
     console.setLevel(logging.INFO)
     console.addFilter(_memory_log_filter)
     # Add logger color coding on all platforms but win32
-    if sys.platform != 'win32' and color_enabled(sys.stdout):
-        console.emit = _color_handler_emit(console.emit, stream=sys.stdout)
+    if sys.platform != 'win32' and color_enabled(sys.stderr):
+        console.emit = _color_handler_emit(console.emit, stream=sys.stderr)
     logger_root.addHandler(console)
 
 

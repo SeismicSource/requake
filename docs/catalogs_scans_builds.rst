@@ -26,8 +26,9 @@ uses the most recent one and logs which one it picked:
    INFO Using scan 3 (label "band 2-8") on catalog 2
    INFO Using family build 5 (method UPGMA, 42 families) from scan 3
 
-Pass ``--catalog-id``, ``--scan-id`` or ``--build-id`` to select a
-different one.
+These messages go to standard error, so the output of a command
+redirected to a file stays clean.  Pass ``--catalog-id``, ``--scan-id``
+or ``--build-id`` to select a different catalog, scan or build.
 
 
 Listing the stored results

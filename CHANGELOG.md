@@ -28,6 +28,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   unrelated events into one family.
 - On Windows, the ``windows-curses`` package is now installed
   automatically, so the interactive pager works out of the box.
+- Log messages such as ``Using family build 2`` now go to standard
+  error, so ``--format csv`` output can be redirected to a file.
 
 ## [0.8.4] - 2026-10-23
 
