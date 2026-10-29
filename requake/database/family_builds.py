@@ -201,6 +201,31 @@ def finish_family_build(build_id, nfamilies=None, nevents=None,
         conn.close()
 
 
+def update_family_build_label(build_id, label):
+    """
+    Store the label of a family build.
+
+    :param build_id: family build id
+    :type build_id: int
+    :param label: new label, or None to remove it
+    :type label: str or None
+    """
+    conn = get_db_connection(initdb=False)
+    try:
+        cursor = conn.cursor()
+        execute_with_retry(
+            lambda: cursor.execute(
+                f'UPDATE {FAMILY_BUILDS_TABLE} SET label = ? '
+                'WHERE build_id = ?',
+                (label, int(build_id)),
+            ),
+            'update family build label',
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def read_family_builds(scan_id=None):
     """
     Return stored family builds, ordered by id.

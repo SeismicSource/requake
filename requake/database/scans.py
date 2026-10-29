@@ -160,6 +160,30 @@ def create_scan(catalog_id, params_hash, params_json, label=None,
     return scan_id
 
 
+def update_scan_label(scan_id, label):
+    """
+    Store the label of a catalog scan.
+
+    :param scan_id: scan id
+    :type scan_id: int
+    :param label: new label, or None to remove it
+    :type label: str or None
+    """
+    conn = get_db_connection(initdb=False)
+    try:
+        cursor = conn.cursor()
+        execute_with_retry(
+            lambda: cursor.execute(
+                f'UPDATE {SCANS_TABLE} SET label = ? WHERE scan_id = ?',
+                (label, int(scan_id)),
+            ),
+            'update scan label',
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def finish_scan(scan_id, npairs_stored=None, npairs_analyzed=None,
                 status=SCAN_STATUS_COMPLETE):
     """

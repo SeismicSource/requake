@@ -99,7 +99,7 @@ inflate the families:
 
 .. code-block::
 
-   requake flag duplicates
+   requake scan duplicates
 
 
 Then, build the repeating earthquake families:

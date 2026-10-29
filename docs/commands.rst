@@ -24,7 +24,7 @@ for:
    print               print data to screen
    list                list the entries stored in the output database
    plot                plot data to screen or file
-   flag                flag entries of the output database
+   edit                edit entries stored in the output database
    delete              delete a catalog, a catalog scan or a family build
    wfcache             manage the persistent waveform cache
 
@@ -84,6 +84,11 @@ Scan Commands
 ``scan templates``
    Scan a continuous waveform stream with the templates, to detect new
    events by template matching.
+
+``scan duplicates``
+   Detect and flag duplicate events in the catalog from close event
+   pairs, so that they do not inflate the families (see
+   :doc:`pairs`).
 
 
 Build Commands
@@ -153,16 +158,17 @@ Plot Commands
    HTML map.
 
 
-Flag Commands
+Edit Commands
 -------------
 
-``flag family``
-   Flag a family of repeating earthquakes as valid or not valid.
+``edit catalog``, ``edit scan``, ``edit build``
+   Change the label of a catalog, a catalog scan or a family build.
+   The entry is the latest one unless ``--catalog-id``, ``--scan-id``
+   or ``--build-id`` is given; an empty label removes it (see
+   :doc:`catalogs_scans_builds`).
 
-``flag duplicates``
-   Detect and flag duplicate events in the catalog from close event
-   pairs, so that they do not inflate the families (see
-   :doc:`pairs`).
+``edit family``
+   Flag a family of repeating earthquakes as valid or not valid.
 
 
 Delete Commands

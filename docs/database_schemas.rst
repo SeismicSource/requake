@@ -111,7 +111,7 @@ Index:
 
 - ``idx_catalog_orig_time`` on ``catalog(catalog_id, orig_time)``
 
-The ``duplicate`` column is set to ``1`` by ``requake flag duplicates``
+The ``duplicate`` column is set to ``1`` by ``requake scan duplicates``
 for events that are considered duplicates of another catalog event,
 within the catalog of the selected scan.
 
@@ -219,7 +219,7 @@ Lag in seconds is reconstructed at read time from ``lag_samples`` and
 ``cc_x100`` stores ``cc_max`` with 0.01 precision using
 ``round(cc_max * 100)``.
 
-The ``invalid`` column is set to ``1`` by ``requake flag duplicates``
+The ``invalid`` column is set to ``1`` by ``requake scan duplicates``
 for all the pairs involving a duplicated event.  Invalid pairs are
 ignored when families are built and when pairs are printed.
 

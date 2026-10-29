@@ -56,6 +56,26 @@ details of a single entry, including the full list of parameters used:
    requake list scans 3
 
 
+Changing a label
+----------------
+
+The label of a stored catalog, scan or family build can be changed
+later, without recomputing anything:
+
+.. code-block::
+
+   requake edit catalog --catalog-id 2 "2020 relocated"
+   requake edit scan --scan-id 3 "band 2-8"
+   requake edit build --build-id 5 "upgma test"
+
+The entry is the latest one unless ``--catalog-id``, ``--scan-id`` or
+``--build-id`` is given.  An empty label removes it:
+
+.. code-block::
+
+   requake edit scan --scan-id 3 ""
+
+
 Reading Catalogs
 ----------------
 

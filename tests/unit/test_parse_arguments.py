@@ -116,12 +116,12 @@ class TestPrintPairsOptions(unittest.TestCase):
         self.assertEqual(args.cc_max, 0.99)
 
 
-class TestFlagDuplicatesOptions(unittest.TestCase):
-    """Test the ``flag duplicates`` command line options."""
+class TestScanDuplicatesOptions(unittest.TestCase):
+    """Test the ``scan duplicates`` command line options."""
 
     def test_default_thresholds(self):
         """Default thresholds must be the documented ones."""
-        args = _parse_args('flag', 'duplicates')
+        args = _parse_args('scan', 'duplicates')
         self.assertEqual(args.cc_min, 0.98)
         self.assertEqual(args.max_time_diff, 60.)
         self.assertEqual(args.max_distance, 2.)
@@ -130,7 +130,7 @@ class TestFlagDuplicatesOptions(unittest.TestCase):
     def test_thresholds_can_be_overridden(self):
         """Thresholds and dry-run must be settable from the command line."""
         args = _parse_args(
-            'flag', 'duplicates',
+            'scan', 'duplicates',
             '-c', '0.99', '-t', '30', '-d', '1.5', '-n',
         )
         self.assertEqual(args.cc_min, 0.99)
@@ -140,9 +140,9 @@ class TestFlagDuplicatesOptions(unittest.TestCase):
 
     def test_reset_option(self):
         """``--reset`` must be off by default."""
-        self.assertFalse(_parse_args('flag', 'duplicates').reset)
+        self.assertFalse(_parse_args('scan', 'duplicates').reset)
         self.assertTrue(
-            _parse_args('flag', 'duplicates', '--reset').reset
+            _parse_args('scan', 'duplicates', '--reset').reset
         )
 
 

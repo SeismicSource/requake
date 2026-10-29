@@ -10,8 +10,8 @@ The ``scan`` command group.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 from .common import (
-    add_group, parent_build_id, parent_family_numbers, parent_label,
-    parent_longer_than, parent_min_events, parent_scan_id,
+    add_group, parent_build_id, parent_dry_run, parent_family_numbers,
+    parent_label, parent_longer_than, parent_min_events, parent_scan_id,
     parent_shorter_than, parent_traceid, set_action
 )
 from .values import hide_aliases, nonnegative_int
@@ -68,6 +68,40 @@ def _add_templates_leaf(leaves, name, help_text):
     return parser
 
 
+def _add_duplicates_leaf(leaves, name, help_text):
+    """Add the leaf that flags duplicate events."""
+    parser = leaves.add_parser(
+        name, parents=[parent_scan_id(), parent_dry_run()], help=help_text
+    )
+    hide_aliases(
+        parser.add_argument(
+            '-c', '--cc-min', '--cc_min', type=float, default=0.98,
+            help='minimum cross-correlation coefficient for two events to be '
+                 'considered duplicates (default: %(default)s)'
+        ),
+        '--cc_min'
+    )
+    parser.add_argument(
+        '-t', '--max-time-diff',
+        type=float, default=60., metavar='SECONDS',
+        help='maximum origin-time difference for two events to be '
+             'considered duplicates (default: %(default)s s)'
+    )
+    parser.add_argument(
+        '-d', '--max-distance',
+        type=float, default=2., metavar='KM',
+        help='maximum horizontal distance for two events to be '
+             'considered duplicates (default: %(default)s km)'
+    )
+    parser.add_argument(
+        '--reset', action='store_true',
+        help='reset the duplicate and invalid flags and exit, without '
+             'performing duplicate detection'
+    )
+    set_action(parser, 'dedup_events')
+    return parser
+
+
 def add_to(subparsers):
     """Add the "scan" group to the command line."""
     group, leaves = add_group(
@@ -80,5 +114,10 @@ def add_to(subparsers):
     _add_templates_leaf(
         leaves, 'templates',
         'scan a continuous waveform stream using one or more templates'
+    )
+    _add_duplicates_leaf(
+        leaves, 'duplicates',
+        'detect and flag duplicate events in the catalog from close '
+        'event pairs'
     )
     return group

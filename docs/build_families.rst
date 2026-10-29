@@ -139,14 +139,14 @@ Using a build
 
 Every command that reads families (``print families``,
 ``plot families``, ``plot timespans``, ``plot cumulative``,
-``plot map``, ``flag family``, ``build templates``,
+``plot map``, ``edit family``, ``build templates``,
 ``scan templates``) uses the latest build, unless another one is
 selected with ``--build-id``:
 
 .. code-block::
 
    requake print families --build-id 2
-   requake flag family --build-id 2 7 false
+   requake edit family --build-id 2 7 false
 
 ``requake list builds`` shows the stored builds, with the scan and the
 clustering method each of them used.

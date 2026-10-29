@@ -17,6 +17,7 @@ from .build_families import build_families  # noqa
 from .print_families import print_families  # noqa
 from .print_family_builds import print_family_builds  # noqa
 from .delete_family_build import delete_family_build  # noqa
+from .edit_family_build import edit_family_build  # noqa
 from .flag_family import flag_family  # noqa
 from .build_templates import build_templates  # noqa
 from .families import (  # noqa

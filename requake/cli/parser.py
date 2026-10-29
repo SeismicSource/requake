@@ -20,15 +20,16 @@ import argcomplete
 from .._version import get_versions
 from ..logo import REQUAKE_LOGO
 from . import (
-    build_group, config_group, delete_group, flag_group, list_group,
-    plot_group, print_group, read_group, scan_group, wfcache_group,
+    build_group, config_group, delete_group, edit_group,
+    list_group, plot_group, print_group, read_group, scan_group,
+    wfcache_group,
 )
 from .help_format import ColoredHelpArgumentParser, SubcommandHelpFormatter
 from .values import timespec_to_sec
 
 _GROUPS = (
     config_group, read_group, scan_group, build_group, print_group,
-    list_group, plot_group, flag_group, delete_group, wfcache_group,
+    list_group, plot_group, edit_group, delete_group, wfcache_group,
 )
 
 

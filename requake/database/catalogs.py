@@ -169,6 +169,31 @@ def update_catalog_nevents(catalog_id, nevents):
         conn.close()
 
 
+def update_catalog_label(catalog_id, label):
+    """
+    Store the label of a catalog.
+
+    :param catalog_id: catalog id
+    :type catalog_id: int
+    :param label: new label, or None to remove it
+    :type label: str or None
+    """
+    conn = get_db_connection(initdb=False)
+    try:
+        cursor = conn.cursor()
+        execute_with_retry(
+            lambda: cursor.execute(
+                f'UPDATE {CATALOGS_TABLE} SET label = ? '
+                'WHERE catalog_id = ?',
+                (label, int(catalog_id)),
+            ),
+            'update catalog label',
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def read_catalogs():
     """
     Return all stored catalogs, ordered by id.

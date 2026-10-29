@@ -17,7 +17,7 @@ Requake provides three commands to inspect and curate the event pairs:
 
    requake print pairs       print pairs to screen
    requake plot pair         plot traces for a given event pair
-   requake flag duplicates   detect and flag duplicate events in the
+   requake scan duplicates   detect and flag duplicate events in the
                              catalog from close event pairs
 
 All of them read the output directory (``OUTDIR``) and the parameters
@@ -26,7 +26,7 @@ Use ``requake <verb> <object> -h`` to get the full list of options of
 each command.
 
 The pairs belong to a catalog scan: ``print pairs`` and
-``flag duplicates`` use the latest scan, unless another one is selected
+``scan duplicates`` use the latest scan, unless another one is selected
 with ``--scan-id``.  See :doc:`catalogs_scans_builds`.
 
 
@@ -45,7 +45,7 @@ not be analysed are stored in the database but not listed:
 
 ``-c``/``--cc-min`` and ``-C``/``--cc-max`` restrict the selection to a
 :math:`CC_\mathrm{max}` range.  Pairs flagged as invalid by
-`flag duplicates`_ are hidden unless ``--include-invalid`` is used, which
+`scan duplicates`_ are hidden unless ``--include-invalid`` is used, which
 adds an ``invalid`` column to the table.
 
 In the interactive pager (see :doc:`the interactive pager <pager>`) the
@@ -92,7 +92,7 @@ write a PNG with the default name.  For example:
 To plot all the events of a family, use ``requake plot families``.
 
 
-flag duplicates
+scan duplicates
 ---------------
 
 Event catalogs often contain the same earthquake more than once, for
@@ -102,7 +102,7 @@ inflate families, they can be flagged before building families:
 
 .. code-block::
 
-   requake flag duplicates
+   requake scan duplicates
 
 The command works on the stored event pairs, so
 :doc:`requake scan catalog <scan_catalog>` must have been run first.  A
@@ -136,4 +136,4 @@ show a progress indicator and can be interrupted with ``Ctrl+C``
    Duplicate flags belong to the catalog, invalid flags to the scan.
    Rerunning ``requake scan catalog`` on the same catalog keeps the
    duplicate flags but creates a new scan whose pairs are all valid:
-   run ``requake flag duplicates`` again after the new scan.
+   run ``requake scan duplicates`` again after the new scan.

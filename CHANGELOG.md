@@ -10,6 +10,10 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 - New ``list`` command, with ``catalogs``, ``scans`` and ``builds``
   subcommands, replacing ``print_catalogs``, ``print_scans`` and
   ``print_family_builds``.
+- New ``edit`` command, with ``catalog``, ``scan`` and ``build``
+  subcommands, to change the label of a stored entry.
+- ``flag family`` is now ``edit family``, and ``flag duplicates`` is
+  now ``scan duplicates``.
 - ``scan catalog --force-continue`` is now ``--resume``; multi-word
   options are hyphenated (``--cc-min``, ``--freq-band``,
   ``--longer-than``, ...), and the old spellings are still accepted.

@@ -81,7 +81,7 @@ catalog is sorted by origin time before being written to the database.
 Duplicates with different event IDs (e.g. the same event reported by
 different agencies or with slightly different origin times) are not removed
 at this stage.  They can be detected and flagged once the event pairs have
-been created, with ``requake flag duplicates`` (see :doc:`pairs`).
+been created, with ``requake scan duplicates`` (see :doc:`pairs`).
 
 
 Appending to an existing catalog
