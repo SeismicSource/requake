@@ -245,7 +245,7 @@ def hyperlink(url, text=None, stream=None):
     return f'\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\'
 
 
-def _display_width(text):
+def display_width(text):
     """
     Return the number of terminal columns used by ``text``.
 
@@ -265,6 +265,39 @@ def _display_width(text):
     )
 
 
+def truncate_to_width(text, width):
+    """
+    Truncate ``text`` to ``width`` terminal columns.
+
+    A single-column ellipsis marks the truncation.  Style the result,
+    not ``text``: cutting a styled string could break an escape
+    sequence in two.
+
+    :param text: text to truncate
+    :type text: str
+    :param width: maximum number of columns
+    :type width: int
+
+    :return: text no wider than ``width`` columns
+    :rtype: str
+    """
+    if width <= 0:
+        return ''
+    if display_width(text) <= width:
+        return text
+    if width == 1:
+        return '…'
+    kept = []
+    used = 0
+    for char in text:
+        char_width = display_width(char)
+        if used + char_width > width - 1:
+            break
+        kept.append(char)
+        used += char_width
+    return ''.join(kept) + '…'
+
+
 def frame(text, stream=None):
     """
     Draw a frame around ``text``.
@@ -282,13 +315,13 @@ def frame(text, stream=None):
     :rtype: str
     """
     lines = str(text).splitlines() or ['']
-    width = max(_display_width(line) for line in lines)
+    width = max(display_width(line) for line in lines)
     border = '─' * (width + 2)
     bar = style('│', 'red', stream=stream)
     framed = [
         style(f'┌{border}┐', 'red', stream=stream),
         *(
-            f'{bar} {line}{" " * (width - _display_width(line))} {bar}'
+            f'{bar} {line}{" " * (width - display_width(line))} {bar}'
             for line in lines
         ),
         style(f'└{border}┘', 'red', stream=stream),

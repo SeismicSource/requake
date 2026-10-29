@@ -30,6 +30,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   automatically, so the interactive pager works out of the box.
 - Log messages such as ``Using family build 2`` now go to standard
   error, so ``--format csv`` output can be redirected to a file.
+- Progress spinners fit their message on one line, truncating it with
+  an ellipsis, instead of repeating it on the screen.
 
 ## [0.8.4] - 2026-10-23
 

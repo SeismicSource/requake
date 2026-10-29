@@ -17,7 +17,9 @@ import hashlib
 import threading
 import multiprocessing
 from datetime import datetime
-from ..terminal import error, frame, hyperlink, style
+from ..terminal import (
+    display_width, error, frame, hyperlink, style, truncate_to_width,
+)
 from .configobj import ConfigObj, ParseError
 from .configobj.validate import Validator
 locale.setlocale(locale.LC_ALL, '')
@@ -359,12 +361,31 @@ def abort_operation(thread):
     request_abort(False)
 
 
+def _terminal_columns(stream=None):
+    """
+    Return the number of columns of the terminal running *stream*.
+
+    :param stream: stream to query (defaults to ``sys.stderr``)
+    :type stream: io.TextIOBase
+
+    :return: number of columns, or None when it cannot be determined
+    :rtype: int or None
+    """
+    stream = sys.stderr if stream is None else stream
+    try:
+        return os.get_terminal_size(stream.fileno()).columns
+    except (AttributeError, ValueError, OSError):
+        return None
+
+
 def run_with_spinner(message, func):
     r"""Run *func* in a thread, showing a braille spinner on stderr.
 
-    The spinner animates on a single line via ``\r``.  When the
-    operation completes the line is cleared.  ``Ctrl+C`` is handled
-    so the terminal is left in a clean state.
+    The spinner animates on a single line via ``\r``, truncating
+    *message* to the width of the terminal: a wrapped line cannot be
+    erased by a carriage return, so its frames would pile up on the
+    screen.  When the operation completes the line is cleared.
+    ``Ctrl+C`` is handled so the terminal is left in a clean state.
 
     Outside the main process (e.g. in parallel workers) *func* is
     simply run in place, to keep the terminal output of the workers
@@ -387,9 +408,16 @@ def run_with_spinner(message, func):
     thread = threading.Thread(target=_target, daemon=True)
     thread.start()
 
+    columns = _terminal_columns()
+    # Keep the line one column short of the terminal width: a terminal
+    # wrapping as soon as the last column is written would push the
+    # following frames to a new line, where ``\r`` cannot erase them.
+    if columns is not None and columns > 3:
+        message = truncate_to_width(message, columns - 3)
+
     # Visible width of the spinner line: a braille frame (one column) plus
     # a space plus the message, whose ANSI styling adds no visible column.
-    width = len(message) + 2
+    width = display_width(message) + 2
     i = 0
     try:
         while not done.wait(0.1):

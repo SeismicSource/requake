@@ -17,12 +17,13 @@ from requake.config.generic_printer import _style_table
 from requake.terminal import (
     _LINK_RGB,
     _LINK_RGB_256,
-    _display_width,
     color_enabled,
+    display_width,
     error,
     frame,
     hyperlink,
     style,
+    truncate_to_width,
     warning,
 )
 
@@ -343,7 +344,7 @@ class TestTerminalFrame(unittest.TestCase):
         stream = _FakeStream(True)
         link = hyperlink('https://example.org', 'example.org', stream=stream)
         framed = frame(f'see {link}', stream=stream)
-        widths = {_display_width(line) for line in framed.splitlines()}
+        widths = {display_width(line) for line in framed.splitlines()}
         self.assertEqual(widths, {19})
 
     def test_frame_border_is_colored(self):
@@ -355,6 +356,39 @@ class TestTerminalFrame(unittest.TestCase):
     def test_frame_is_plain_without_colors(self):
         """No escape sequences are emitted when colors are disabled."""
         self.assertNotIn('\x1b[', frame('a', stream=_FakeStream(False)))
+
+
+class TestTruncateToWidth(unittest.TestCase):
+    """Test truncating text to a number of terminal columns."""
+
+    def test_short_text_is_unchanged(self):
+        """Text that already fits is returned as is."""
+        self.assertEqual(truncate_to_width('reading', 20), 'reading')
+
+    def test_fitting_text_is_unchanged(self):
+        """Text exactly as wide as the limit is not truncated."""
+        self.assertEqual(truncate_to_width('reading', 7), 'reading')
+
+    def test_long_text_ends_with_an_ellipsis(self):
+        """A long text is cut and marked with a single-column ellipsis."""
+        truncated = truncate_to_width('reading the events', 10)
+        self.assertEqual(truncated, 'reading t…')
+        self.assertEqual(display_width(truncated), 10)
+
+    def test_wide_characters_are_not_cut_in_half(self):
+        """A wide character is dropped rather than split."""
+        truncated = truncate_to_width('🐞🐞🐞', 4)
+        self.assertEqual(truncated, '🐞…')
+        self.assertEqual(display_width(truncated), 3)
+
+    def test_zero_width_gives_empty_text(self):
+        """No column can hold any text."""
+        self.assertEqual(truncate_to_width('reading', 0), '')
+        self.assertEqual(truncate_to_width('reading', -5), '')
+
+    def test_single_column_holds_only_the_ellipsis(self):
+        """One column is too narrow for any character plus an ellipsis."""
+        self.assertEqual(truncate_to_width('reading', 1), '…')
 
 
 def _relative_luminance(rgb):

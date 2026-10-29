@@ -25,7 +25,7 @@ from requake.config.utils import (
     request_abort,
     run_with_spinner,
 )
-from requake.terminal import _display_width
+from requake.terminal import display_width
 
 
 class TestAbortFlag(unittest.TestCase):
@@ -81,6 +81,25 @@ class TestRunWithSpinner(unittest.TestCase):
         runs = re.findall(r' +', stderr.getvalue())
         self.assertGreaterEqual(max(len(run) for run in runs),
                                 len(message) + 2)
+
+    def test_spinner_truncates_a_long_message(self):
+        """The spinner keeps its message within the terminal width."""
+        message = 'x' * 120
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                patch.object(utils, '_terminal_columns', lambda: 40), \
+                patch.dict('os.environ', {'NO_COLOR': '1'}):
+            run_with_spinner(message, lambda: time.sleep(0.15))
+        frames = [f for f in stderr.getvalue().split('\r') if f]
+        self.assertTrue(frames[0].endswith('…'))
+        self.assertEqual(display_width(frames[0]), 39)
+
+    def test_spinner_keeps_a_short_message(self):
+        """A message that fits the terminal is printed in full."""
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                patch.object(utils, '_terminal_columns', lambda: 40), \
+                patch.dict('os.environ', {'NO_COLOR': '1'}):
+            run_with_spinner('reading...', lambda: time.sleep(0.15))
+        self.assertIn('⠋ reading...', stderr.getvalue())
 
     def test_spinner_runs_in_place_outside_main_process(self):
         """Worker processes must not animate the spinner."""
@@ -225,7 +244,7 @@ class TestUncaughtExceptionReport(unittest.TestCase):
         )
         framed = lines[top:bottom + 1]
         self.assertGreater(len(framed), 4)
-        self.assertEqual(len({_display_width(line) for line in framed}), 1)
+        self.assertEqual(len({display_width(line) for line in framed}), 1)
         self.assertIn(
             "Congratulations, you've found a bug in Requake! 🐞",
             framed[1],
