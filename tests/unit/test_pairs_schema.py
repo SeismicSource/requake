@@ -25,6 +25,7 @@ from requake.database.catalog import write_catalog
 from requake.database.catalogs import create_catalog
 from requake.database.db import get_db_path
 from requake.database.pairs import write_pair_records as write_pairs
+from requake.database.pairs import read_event_key_rows
 from requake.database.scans import create_scan
 
 
@@ -307,6 +308,25 @@ class TestPairsSchema(unittest.TestCase):
 
         self.assertEqual(metadata_row[0], 321.5)
         self.assertEqual(metadata_row[1], 12.25)
+
+    def test_read_event_key_rows_after_connection_close(self):
+        """Event key rows must be fetched before the connection closes."""
+        pairs_data = self._get_synthetic_pairs_data(1)
+
+        with self._patch_runtime_config():
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            write_pairs(pairs_data, scan_id, append=False)
+            rows = read_event_key_rows()
+
+        expected_evids = sorted(
+            event.evid
+            for pair in pairs_data
+            for event in (pair.event1, pair.event2)
+        )
+        self.assertEqual(sorted(evid for _, evid in rows), expected_evids)
+        self.assertTrue(
+            all(isinstance(event_id, int) for event_id, _ in rows)
+        )
 
     def test_pairs_filters_use_encoded_cc_values(self):
         """cc_min/cc_max filters should match reconstructed cc values."""
