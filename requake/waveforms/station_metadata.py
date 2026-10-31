@@ -11,7 +11,7 @@ Functions for downloading station metadata.
 """
 import logging
 import csv
-from obspy import read_inventory
+from obspy import UTCDateTime, read_inventory
 from obspy.core.inventory import Inventory, Network, Station, Channel
 from obspy.clients.fdsn.header import FDSNNoDataException
 from ..config import config
@@ -48,7 +48,8 @@ def _read_station_metadata_from_db():
         cursor = conn.cursor()
         try:
             rows = cursor.execute(
-                f'SELECT * FROM {TRACE_METADATA_TABLE}'
+                f'SELECT * FROM {TRACE_METADATA_TABLE} '
+                'ORDER BY scan_id, trace_id, valid_from_utc'
             ).fetchall()
         except Exception as err:
             if _is_missing_trace_metadata_table_error(err):
@@ -60,12 +61,21 @@ def _read_station_metadata_from_db():
         return None
     inv = Inventory()
     networks = {}
+    seen_intervals = set()
     for row in rows:
         trace_id = row['trace_id']
         try:
             net, sta, loc, chan = trace_id.split('.')
         except ValueError:
             continue
+        # The same trace can be stored by several scans: keep one
+        # channel per validity interval.
+        interval_key = (
+            trace_id, row['valid_from_utc'], row['valid_to_utc']
+        )
+        if interval_key in seen_intervals:
+            continue
+        seen_intervals.add(interval_key)
         net = net or '@@'
         if net not in networks:
             network = Network(code=net)
@@ -92,7 +102,13 @@ def _read_station_metadata_from_db():
             longitude=row['trace_lon'] or 0,
             elevation=row['elevation'] or 0,
             depth=row['local_depth'] or 0,
+            sample_rate=row['sampling_rate_hz'],
         )
+        # Keep the validity interval, so that trace metadata can be
+        # derived again from this inventory.
+        channel.start_date = UTCDateTime(row['valid_from_utc'])
+        if row['valid_to_utc'] is not None:
+            channel.end_date = UTCDateTime(row['valid_to_utc'])
         station.channels.append(channel)
     logger.info(
         'Built station metadata from database '

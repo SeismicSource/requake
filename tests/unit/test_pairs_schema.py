@@ -27,6 +27,9 @@ from requake.database.db import get_db_path
 from requake.database.pairs import write_pair_records as write_pairs
 from requake.database.pairs import read_event_key_rows
 from requake.database.scans import create_scan
+from requake.waveforms.station_metadata import (
+    _read_station_metadata_from_db,
+)
 
 
 class TestPairsSchema(unittest.TestCase):
@@ -308,6 +311,153 @@ class TestPairsSchema(unittest.TestCase):
 
         self.assertEqual(metadata_row[0], 321.5)
         self.assertEqual(metadata_row[1], 12.25)
+
+    @staticmethod
+    def _inventory_with_channel(start_time, end_time=None):
+        """Return an inventory with one channel valid in an interval."""
+        channel = Channel(
+            code='BHZ',
+            location_code='00',
+            latitude=45.0,
+            longitude=10.0,
+            elevation=0.0,
+            depth=0.0,
+            sample_rate=40.0,
+        )
+        channel.start_date = UTCDateTime(start_time)
+        if end_time is not None:
+            channel.end_date = UTCDateTime(end_time)
+        station = Station(
+            code='TEST',
+            latitude=45.0,
+            longitude=10.0,
+            elevation=0.0,
+            channels=[channel],
+        )
+        return Inventory(
+            networks=[Network(code='XX', stations=[station])]
+        )
+
+    def _read_metadata_rows(self):
+        """Return stored trace metadata rows as plain tuples."""
+        conn = sqlite3.connect(get_db_path())
+        try:
+            return conn.execute(
+                'SELECT valid_from_utc, valid_to_utc, sampling_rate_hz '
+                'FROM trace_metadata ORDER BY valid_from_utc'
+            ).fetchall()
+        finally:
+            conn.close()
+
+    def test_database_station_metadata_keeps_rate_and_interval(self):
+        """The DB-built inventory should keep rates and validity dates."""
+        pairs_data = self._get_synthetic_pairs_data(1)
+        inventory = self._inventory_with_channel('2016-01-01T00:00:00')
+
+        with self._patch_runtime_config():
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            with patch.dict(config, {'inventory': inventory}, clear=False):
+                write_pairs(pairs_data, scan_id, append=False)
+            db_inventory = _read_station_metadata_from_db()
+
+        channel = db_inventory[0][0][0]
+        self.assertAlmostEqual(channel.sample_rate, 40.0)
+        self.assertEqual(
+            channel.start_date, UTCDateTime('2016-01-01T00:00:00')
+        )
+        self.assertIsNone(channel.end_date)
+
+    def test_resume_with_database_station_metadata_does_not_overlap(self):
+        """Rewriting pairs with the DB-built inventory must not overlap."""
+        pairs_data = self._get_synthetic_pairs_data(1)
+        inventory = self._inventory_with_channel('2016-01-01T00:00:00')
+
+        with self._patch_runtime_config():
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            with patch.dict(config, {'inventory': inventory}, clear=False):
+                write_pairs(pairs_data, scan_id, append=False)
+            db_inventory = _read_station_metadata_from_db()
+            with patch.dict(
+                config, {'inventory': db_inventory}, clear=False
+            ):
+                write_pairs(pairs_data, scan_id, append=True)
+            rows = self._read_metadata_rows()
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(
+            UTCDateTime(rows[0][0]), UTCDateTime('2016-01-01T00:00:00')
+        )
+        self.assertAlmostEqual(rows[0][2], 40.0)
+
+    def test_wider_metadata_interval_fills_the_gaps(self):
+        """A wider interval should fill the gaps around stored rows."""
+        pairs_data = self._get_synthetic_pairs_data(1)
+        inventory = self._inventory_with_channel('2016-01-01T00:00:00')
+
+        with self._patch_runtime_config():
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            with patch.dict(config, {'inventory': inventory}, clear=False):
+                write_pairs(pairs_data, scan_id, append=False)
+            with patch.dict(config, {'inventory': None}, clear=False):
+                write_pairs(pairs_data, scan_id, append=True)
+            rows = self._read_metadata_rows()
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            UTCDateTime(rows[0][0]), UTCDateTime('1900-01-01T00:00:00')
+        )
+        self.assertEqual(
+            UTCDateTime(rows[0][1]), UTCDateTime('2016-01-01T00:00:00')
+        )
+        self.assertEqual(
+            UTCDateTime(rows[1][0]), UTCDateTime('2016-01-01T00:00:00')
+        )
+        self.assertIsNone(rows[1][1])
+
+    def test_covered_metadata_interval_is_not_stored(self):
+        """An interval already covered by a stored row should be skipped."""
+        pairs_data = self._get_synthetic_pairs_data(1)
+        inventory = self._inventory_with_channel('2016-01-01T00:00:00')
+
+        with self._patch_runtime_config():
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            with patch.dict(config, {'inventory': None}, clear=False):
+                write_pairs(pairs_data, scan_id, append=False)
+            with patch.dict(config, {'inventory': inventory}, clear=False):
+                write_pairs(pairs_data, scan_id, append=True)
+            rows = self._read_metadata_rows()
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0], '1900-01-01T00:00:00')
+
+    def test_partially_overlapping_metadata_intervals_are_trimmed(self):
+        """A partially overlapping interval should only fill the gap."""
+        pairs_data = self._get_synthetic_pairs_data(1)
+        first = self._inventory_with_channel(
+            '2016-01-01T00:00:00', '2018-01-01T00:00:00'
+        )
+        second = self._inventory_with_channel(
+            '2017-01-01T00:00:00', '2019-01-01T00:00:00'
+        )
+
+        with self._patch_runtime_config():
+            scan_id = self._seed_scan_for_pairs(pairs_data)
+            with patch.dict(config, {'inventory': first}, clear=False):
+                write_pairs(pairs_data, scan_id, append=False)
+            with patch.dict(config, {'inventory': second}, clear=False):
+                write_pairs(pairs_data, scan_id, append=True)
+            rows = self._read_metadata_rows()
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            UTCDateTime(rows[0][0]), UTCDateTime('2016-01-01T00:00:00')
+        )
+        self.assertEqual(
+            UTCDateTime(rows[1][0]), UTCDateTime('2018-01-01T00:00:00')
+        )
+        self.assertEqual(
+            UTCDateTime(rows[1][1]), UTCDateTime('2019-01-01T00:00:00')
+        )
 
     def test_read_event_key_rows_after_connection_close(self):
         """Event key rows must be fetched before the connection closes."""

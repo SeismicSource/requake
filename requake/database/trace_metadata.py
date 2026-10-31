@@ -229,6 +229,34 @@ def _intervals_overlap(existing, candidate):
     return end2 is None or end2 > start1
 
 
+def _subtract_intervals(start, end, holes):
+    """Return the pieces of ``[start, end)`` left after removing *holes*.
+
+    Bounds are ``UTCDateTime`` objects; ``end`` is ``None`` for an open
+    end, so that a wider candidate can fill the gaps around the
+    intervals that are already stored.
+    """
+    pieces = [(start, end)]
+    for hole_start, hole_end in sorted(holes, key=lambda hole: hole[0]):
+        updated = []
+        for piece_start, piece_end in pieces:
+            # The hole is fully outside this piece.
+            if piece_end is not None and hole_start >= piece_end:
+                updated.append((piece_start, piece_end))
+                continue
+            if hole_end is not None and hole_end <= piece_start:
+                updated.append((piece_start, piece_end))
+                continue
+            if piece_start < hole_start:
+                updated.append((piece_start, hole_start))
+            if hole_end is not None and (
+                piece_end is None or hole_end < piece_end
+            ):
+                updated.append((hole_end, piece_end))
+        pieces = updated
+    return pieces
+
+
 def _warn_trace_metadata_change(existing, candidate):
     """Warn when refreshed metadata differs from stored values."""
     changed_fields = []
@@ -278,23 +306,60 @@ def _insert_trace_metadata_row(cursor, scan_id, row):
         ''',
         (int(scan_id), row['trace_id']),
     ).fetchall()
-    matched_existing = None
+    start = UTCDateTime(row['valid_from_utc'])
+    end = (
+        None
+        if row['valid_to_utc'] is None
+        else UTCDateTime(row['valid_to_utc'])
+    )
+    holes = []
     for existing in existing_rows:
         existing_dict = dict(existing)
-        if existing_dict['valid_from_utc'] == row['valid_from_utc']:
-            matched_existing = existing_dict
-            break
-        if _intervals_overlap(existing_dict, row):
-            raise PairsMetadataError(
-                'Overlapping trace metadata intervals found for '
-                f'{row["trace_id"]}'
-            )
-    if matched_existing is not None:
-        if _trace_metadata_value_differs(matched_existing, row):
-            _warn_trace_metadata_change(matched_existing, row)
+        existing_start = UTCDateTime(existing_dict['valid_from_utc'])
+        if existing_start == start:
+            if _trace_metadata_value_differs(existing_dict, row):
+                _warn_trace_metadata_change(existing_dict, row)
+            return
+        if not _intervals_overlap(existing_dict, row):
+            continue
+        existing_end = (
+            None
+            if existing_dict['valid_to_utc'] is None
+            else UTCDateTime(existing_dict['valid_to_utc'])
+        )
+        holes.append((existing_start, existing_end))
+    if not holes:
+        _store_metadata_piece(
+            cursor, scan_id, row, row['valid_from_utc'], row['valid_to_utc']
+        )
         return
+    # Stored metadata wins on the overlapping part: the candidate only
+    # fills the gaps, so that no coverage is lost.
+    logger.debug(
+        'Partial trace metadata coverage for '
+        f'{row["trace_id"]} '
+        f'[{row["valid_from_utc"]}, {row["valid_to_utc"]}): '
+        'keeping the stored intervals'
+    )
+    for piece_start, piece_end in _subtract_intervals(start, end, holes):
+        if piece_start == start and piece_end == end:
+            valid_from_utc = row['valid_from_utc']
+            valid_to_utc = row['valid_to_utc']
+        else:
+            valid_from_utc = str(piece_start)
+            valid_to_utc = (
+                None if piece_end is None else str(piece_end)
+            )
+        _store_metadata_piece(
+            cursor, scan_id, row, valid_from_utc, valid_to_utc
+        )
+
+
+def _store_metadata_piece(cursor, scan_id, row, valid_from_utc,
+                          valid_to_utc):
+    """Insert a metadata row for one validity interval."""
     execute_with_retry(
-        lambda row=row: cursor.execute(
+        lambda: cursor.execute(
             f'''
             INSERT INTO {TRACE_METADATA_TABLE} (
               scan_id, trace_id, valid_from_utc, valid_to_utc,
@@ -305,8 +370,8 @@ def _insert_trace_metadata_row(cursor, scan_id, row):
             (
                 int(scan_id),
                 row['trace_id'],
-                row['valid_from_utc'],
-                row['valid_to_utc'],
+                valid_from_utc,
+                valid_to_utc,
                 row['sampling_rate_hz'],
                 row['trace_lon'],
                 row['trace_lat'],
