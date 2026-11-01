@@ -36,6 +36,10 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   error, so ``--format csv`` output can be redirected to a file.
 - Progress spinners fit their message on one line, truncating it with
   an ellipsis, instead of repeating it on the screen.
+- ``scan catalog --resume`` no longer crashes while loading the pairs
+  already stored for the scan.
+- Resuming a scan no longer fails with ``Overlapping trace metadata
+  intervals`` when the station metadata is read back from the database.
 
 ## [0.8.4] - 2026-10-23
 
