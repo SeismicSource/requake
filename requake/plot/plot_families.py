@@ -11,6 +11,7 @@ Download and plot traces for one or more event families.
 """
 import contextlib
 import logging
+from math import ceil
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -89,12 +90,9 @@ def _labeled_rows(ntraces, max_labels):
     """
     Return the rows of a family plot that carry a label.
 
-    At most ``max_labels`` rows are labeled, evenly spaced across the
-    plot. The first and the last rows are always labeled, so that the
-    top and bottom traces of a wiggle plot always have a label.
-
-    When the labels would end up on adjacent rows, all the rows are
-    labeled instead.
+    At most ``max_labels`` rows are labeled, at a regular interval of
+    at least two rows, starting from the first row. The last row is
+    labeled only when it falls on the regular grid.
 
     :param ntraces: Number of traces in the plot.
     :type ntraces: int
@@ -108,10 +106,10 @@ def _labeled_rows(ntraces, max_labels):
         return list(range(ntraces))
     if max_labels == 1:
         return [ntraces - 1]
-    step = (ntraces - 1) / (max_labels - 1)
-    if round(step) < 2:
-        return list(range(ntraces))
-    return [round(n * step) for n in range(max_labels)]
+    step = max(2, round((ntraces - 1) / (max_labels - 1)))
+    while ceil(ntraces / step) > max_labels:
+        step += 1
+    return list(range(0, ntraces, step))
 
 
 def _ordinal(number):
@@ -720,21 +718,20 @@ def _scale_lines(lines, zoom_level, center=None):
         line.set_ydata((ydata - ycenter) * zoom_level + ycenter)
 
 
-def _labeled_every_text(ntraces, nlabeled):
+def _labeled_every_text(ntraces, rows):
     """
     Return the title hint on the label interval, or an empty string.
 
     :param ntraces: number of traces in the plot
     :type ntraces: int
-    :param nlabeled: number of labeled traces
-    :type nlabeled: int
+    :param rows: labeled rows
+    :type rows: list
     :return: title hint
     :rtype: str
     """
-    if nlabeled >= ntraces or nlabeled < 2:
+    if len(rows) >= ntraces or len(rows) < 2:
         return ''
-    step = round((ntraces - 1) / (nlabeled - 1))
-    return f' | labeled every {_ordinal(step)}'
+    return f' | labeled every {_ordinal(rows[1] - rows[0])}'
 
 
 def _plot_family(family):
@@ -888,7 +885,7 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
     ax.tick_params(axis='x', which='both', direction='in')
     ax.set_xlim(*_time_axis_limits(t0, t1))
     ax.tick_params(labelbottom=False)
-    extra = _labeled_every_text(ntraces, len(labeled_rows))
+    extra = _labeled_every_text(ntraces, sorted(labeled_rows))
     _set_family_titles(
         fig, ax, family, ntraces, tr0, extra=extra,
         fontsize=10 if extra else None)
@@ -1013,7 +1010,7 @@ def _plot_family_heatmap(family, st, tr0, t0, t1):
     ax.minorticks_on()
     ax.tick_params(
         which='both', top=True, labeltop=False, labelbottom=False)
-    extra = _labeled_every_text(ntraces, len(positions))
+    extra = _labeled_every_text(ntraces, positions)
     _set_family_titles(
         fig, ax, family, ntraces, tr0, extra=extra,
         fontsize=9 if extra else None)

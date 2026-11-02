@@ -45,6 +45,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   no longer add out-of-window artifacts or ringing at the window edges.
 - ``plot families --mode heatmap`` now covers the whole trace, so
   de-zooming reveals the waveforms beyond the default view.
+- ``plot families`` labels traces at a regular interval with
+  ``--max-labels``, instead of clustering some labels together.
 
 ## [0.8.4] - 2026-10-23
 

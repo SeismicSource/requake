@@ -91,26 +91,23 @@ class TestLabeledRows(unittest.TestCase):
         self.assertEqual(_labeled_rows(100, 1), [99])
 
     def test_label_count_never_exceeds_limit(self):
-        """The label limit must not be exceeded, but for adjacent labels."""
-        self.assertEqual(len(_labeled_rows(22)), 15)
+        """The label limit must not be exceeded."""
+        self.assertEqual(len(_labeled_rows(22)), 11)
         self.assertEqual(len(_labeled_rows(30)), 15)
         self.assertEqual(len(_labeled_rows(119)), 15)
-        self.assertEqual(len(_labeled_rows(863)), 15)
+        self.assertEqual(len(_labeled_rows(863)), 14)
         self.assertEqual(len(_labeled_rows(100, 10)), 10)
 
-    def test_adjacent_labels_label_all_rows(self):
-        """When the labels would be adjacent, all the rows are labeled."""
-        self.assertEqual(_labeled_rows(16), list(range(16)))
-        self.assertEqual(_labeled_rows(21), list(range(21)))
+    def test_labels_are_regularly_spaced(self):
+        """The labels must fall every fixed number of rows."""
+        self.assertEqual(_labeled_rows(22), list(range(0, 22, 2)))
+        self.assertEqual(_labeled_rows(31), list(range(0, 31, 3)))
 
-    def test_first_and_last_rows_are_labeled(self):
-        """The first row and the last (top) row must always be labeled."""
+    def test_first_row_is_labeled(self):
+        """The first (bottom) row must always be labeled."""
         self.assertEqual(_labeled_rows(16)[0], 0)
-        self.assertEqual(_labeled_rows(16)[-1], 15)
         self.assertEqual(_labeled_rows(119)[0], 0)
-        self.assertEqual(_labeled_rows(119)[-1], 118)
         self.assertEqual(_labeled_rows(863)[0], 0)
-        self.assertEqual(_labeled_rows(863)[-1], 862)
 
     def test_rows_are_sorted_and_unique(self):
         """The labeled rows must be sorted, without duplicates."""
@@ -121,10 +118,10 @@ class TestLabeledRows(unittest.TestCase):
             _labeled_rows(863), sorted(set(_labeled_rows(863))))
 
     def test_rows_are_evenly_spaced(self):
-        """The rows must be spread evenly across the plot."""
+        """All the gaps between labeled rows must be equal."""
         positions = _labeled_rows(119)
         gaps = {b - a for a, b in zip(positions[:-1], positions[1:])}
-        self.assertLessEqual(max(gaps) - min(gaps), 1)
+        self.assertEqual(gaps, {8})
 
 
 class TestOrdinal(unittest.TestCase):
