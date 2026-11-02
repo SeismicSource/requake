@@ -90,6 +90,17 @@ write a PNG with the default name.  For example:
    requake plot pair 12345 67890 -o pdf
 
 To plot all the events of a family, use ``requake plot families``.
+The traces are trimmed to the same window used by the scan, described
+by ``cc_pre_P`` and ``cc_trace_length``: they start ``cc_pre_P``
+seconds before the theoretical P arrival and last ``cc_trace_length``
+seconds in total.  The family cross-correlation uses the same window.
+The plot keeps one extra ``cc_pre_P`` of signal before time 0, so that
+the event labels on the left do not cover the waveform; missing data
+in that margin are padded with the trace mean.  By default the plot
+ends where the smoothed envelope of the family average falls below 30%
+of its maximum.  Use ``-s``/``--start-time`` and ``-e``/``--end-time``
+to change the window of the plot, in seconds relative to the trace
+start.
 
 
 scan duplicates

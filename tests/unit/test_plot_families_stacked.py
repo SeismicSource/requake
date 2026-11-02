@@ -51,6 +51,7 @@ def _plot_families_module():
 
 plot_families_module = _plot_families_module()
 AVERAGE_COLOR = plot_families_module.AVERAGE_COLOR
+MISSING = object()
 
 
 def _press_keys(fig, *keys):
@@ -425,6 +426,84 @@ class TestHeatmapLayout(unittest.TestCase):
         self.assertAlmostEqual(image.get_clim()[0], expected)
         _press_keys(self.fig, '0')
         self.assertEqual(image.get_clim(), (vmin, vmax))
+
+
+class TestTimeLimits(unittest.TestCase):
+    """Test the time window used in a family plot."""
+
+    def setUp(self):
+        """Set the scan window and build a stream with one trace."""
+        self.config_keys = ('cc_pre_P', 'cc_trace_length')
+        self.original_config = {
+            key: config.get(key, MISSING) for key in self.config_keys
+        }
+        config['cc_pre_P'] = 1.0
+        config['cc_trace_length'] = 6.0
+        self.original_args = config.get('args', MISSING)
+        # the trace starts at 0, its P arrival is at 1.5 s and the
+        # signal ends at 3 s
+        time = np.arange(700) * 0.01
+        data = np.zeros(700)
+        burst = (time >= 1.0) & (time <= 3.0)
+        data[burst] = np.sin(2 * np.pi * 5 * time[burst])
+        self.stream = Stream([_make_trace('ev00', data)])
+
+    def tearDown(self):
+        """Restore the config values modified by the tests."""
+        for key, value in self.original_config.items():
+            if value is MISSING:
+                config.pop(key, None)
+            else:
+                config[key] = value
+        if self.original_args is MISSING:
+            config.pop('args', None)
+        else:
+            config['args'] = self.original_args
+
+    def _time_limits(self, starttime=None, endtime=None):
+        """Return the time limits for the given command line options."""
+        config['args'] = Namespace(starttime=starttime, endtime=endtime)
+        return plot_families_module._time_limits(self.stream)
+
+    def test_default_window_starts_before_p_and_follows_signal(self):
+        """By default the window starts before P and ends with the signal."""
+        t0, t1 = self._time_limits()
+        self.assertAlmostEqual(t0, 0.5)
+        self.assertGreater(t1, 3.0)
+        self.assertLess(t1, 7.0)
+
+    def test_start_and_end_override_window(self):
+        """The command line options override both window limits."""
+        self.assertEqual(self._time_limits(2.0, 4.0), (2.0, 4.0))
+
+    def test_start_only_overrides_window_start(self):
+        """--start-time alone keeps the default window end."""
+        _, t1_default = self._time_limits()
+        t0, t1 = self._time_limits(starttime=2.0)
+        self.assertEqual(t0, 2.0)
+        self.assertEqual(t1, t1_default)
+
+    def test_end_only_overrides_window_end(self):
+        """--end-time alone keeps the default window start."""
+        t0, t1 = self._time_limits(endtime=4.0)
+        self.assertAlmostEqual(t0, 0.5)
+        self.assertEqual(t1, 4.0)
+
+    def test_envelope_uses_the_average_trace(self):
+        """The window end follows the average, not the noisiest trace."""
+        time = np.arange(700) * 0.01
+        noisy = np.sin(2 * np.pi * 5 * time)
+        burst = np.zeros(700)
+        in_burst = (time >= 1.0) & (time <= 2.0)
+        burst[in_burst] = np.sin(2 * np.pi * 5 * time[in_burst])
+        config['args'] = Namespace(starttime=None, endtime=None)
+        _, t1_noisy = plot_families_module._time_limits(
+            Stream([_make_trace('ev00', noisy)]))
+        _, t1_average = plot_families_module._time_limits(Stream([
+            _make_trace('ev00', noisy),
+            _make_trace(
+                'average01', burst, starttime='1900-01-01T00:00:00')]))
+        self.assertLess(t1_average, t1_noisy)
 
 
 if __name__ == '__main__':

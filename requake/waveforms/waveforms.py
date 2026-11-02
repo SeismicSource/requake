@@ -371,12 +371,65 @@ def _get_event_waveform_from_event_data_path(evid, traceid):
     return st[0]
 
 
-def get_event_waveform(ev):
+def _trim_to_cc_window(trace, pre_margin=0.0):
+    """
+    Trim a trace to the cross-correlation window around its P arrival.
+
+    The window starts ``cc_pre_P`` seconds before the theoretical P
+    arrival and lasts ``cc_trace_length`` seconds, as defined in the
+    scan configuration. Waveform caches can store longer windows, shared
+    by several events, so the trace is trimmed here to make the
+    cross-correlation and the plots use the same window as the scan.
+
+    :param trace: trace to trim
+    :type trace: obspy.Trace
+    :param pre_margin: extra seconds of data kept before the window
+        start. When the data do not extend that far back, the missing
+        samples are filled with the trace mean, so that the P arrival
+        keeps the same position in every trace.
+    :type pre_margin: float
+
+    :return: trimmed trace
+    :rtype: obspy.Trace
+
+    :raises NoWaveformError: if the trace has no data in the window
+    """
+    t0 = trace.stats.P_arrival_time - config.cc_pre_P - pre_margin
+    t1 = t0 + pre_margin + config.cc_trace_length
+    tr = trace.copy().trim(t0, t1)
+    if tr.stats.npts == 0:
+        raise NoWaveformError(
+            f'No waveform data for trace id: {trace.id} '
+            f'between {t0} and {t1}'
+        )
+    # remember the cross-correlation window, which stays fixed when the
+    # trace is shifted during the alignment and can be narrower than
+    # the trace when a pre-margin is kept for the plots
+    tr.stats.cc_window_start = trace.stats.P_arrival_time - config.cc_pre_P
+    tr.stats.cc_window_end = (
+        tr.stats.cc_window_start + config.cc_trace_length)
+    if pre_margin and tr.stats.starttime > t0:
+        # The data do not reach the requested window start: pad the
+        # trace with its mean, which does not ring when filtered
+        pad = int(round(
+            (tr.stats.starttime - t0) * tr.stats.sampling_rate))
+        if pad > 0:
+            fill = float(np.mean(trace.data))
+            tr.data = np.concatenate(
+                (np.full(pad, fill, dtype=float), tr.data))
+            tr.stats.starttime = tr.stats.starttime - pad * tr.stats.delta
+    return tr
+
+
+def get_event_waveform(ev, pre_margin=0.0):
     """
     Get waveform for an event using the configured or requested trace id.
 
     :param ev: an event
     :type ev: RequakeEvent
+    :param pre_margin: extra seconds of data kept before the
+        cross-correlation window, used by the family plots
+    :type pre_margin: float
 
     :return: waveform trace
     :rtype: obspy.Trace
@@ -469,7 +522,7 @@ def get_event_waveform(ev):
         'S_arrival_time': s_arrival_time
     }
     tr.stats.update(tr_stats)
-    return tr
+    return _trim_to_cc_window(tr, pre_margin)
 
 
 def process_waveforms(tr_or_st):
@@ -543,23 +596,48 @@ def cc_waveform_pair(tr1, tr2, mode='events'):
     return lag, lag_sec, cc_max, cc_mad
 
 
+def _cc_window_copy(trace):
+    """
+    Return a copy of a trace restricted to its cross-correlation window.
+
+    The window is stored in the ``cc_window_start`` and ``cc_window_end``
+    stats when the trace is trimmed. It stays fixed when the trace is
+    shifted during the alignment, and it can be narrower than the trace
+    when extra data are kept for the plots.
+
+    :param trace: trace to copy
+    :type trace: obspy.Trace
+    :return: copy of the trace, restricted to the window
+    :rtype: obspy.Trace
+    """
+    t0 = trace.stats.get('cc_window_start')
+    t1 = trace.stats.get('cc_window_end')
+    if t0 is None or t1 is None:
+        return _trim_to_cc_window(trace)
+    return trace.copy().trim(t0, t1)
+
+
 def align_pair(tr1, tr2):
     """Align tr2 respect to tr1 using cross-correlation."""
-    lag, lag_sec, cc_max = cc_waveform_pair(tr1, tr2)
+    # compute the lag on the cross-correlation window only, so that any
+    # extra data kept for the plots does not change the result
+    lag, lag_sec, cc_max = cc_waveform_pair(
+        _cc_window_copy(tr1), _cc_window_copy(tr2))
     # make sure lag is an integer
     lag = int(round(lag))
     # apply lag to trace #2
-    # if lag is positive, trace #2 is delayed
-    if lag > 0:
-        data2 = np.zeros_like(tr2.data)
-        data2[lag:] = tr2.data[:-lag]
-    # if lag is negative, trace #2 is advanced
-    elif lag < 0:
-        data2 = np.zeros_like(tr2.data)
-        data2[:lag] = tr2.data[-lag:]
-    else:
-        data2 = tr2.data
-    tr2.data = data2
+    if lag:
+        # Fill the samples left empty by the shift with the trace mean,
+        # not with zeros: raw waveforms often carry a large offset, and
+        # a step down to zero would ring when the trace is filtered.
+        data2 = np.full_like(tr2.data, tr2.data.mean(), dtype=float)
+        if lag > 0:
+            # if lag is positive, trace #2 is delayed
+            data2[lag:] = tr2.data[:-lag]
+        else:
+            # if lag is negative, trace #2 is advanced
+            data2[:lag] = tr2.data[-lag:]
+        tr2.data = data2
     tr2.stats.P_arrival_time += lag_sec
     tr2.stats.S_arrival_time += lag_sec
     return lag, lag_sec, cc_max
@@ -615,9 +693,19 @@ def _stack_traces(st):
     tr_stack.data /= len(st)
     p_arrival /= len(st)
     s_arrival /= len(st)
+    offsets = [
+        tr.stats.cc_window_start - tr.stats.starttime
+        for tr in st if 'cc_window_start' in tr.stats]
+    window_start = (
+        float(np.mean(offsets)) if offsets
+        else p_arrival - config.cc_pre_P)
     tr_stack.stats.starttime = UTCDateTime('1900/01/01T00:00:00')
     tr_stack.stats.P_arrival_time = tr_stack.stats.starttime + p_arrival
     tr_stack.stats.S_arrival_time = tr_stack.stats.starttime + s_arrival
+    tr_stack.stats.cc_window_start = (
+        tr_stack.stats.starttime + window_start)
+    tr_stack.stats.cc_window_end = (
+        tr_stack.stats.cc_window_start + config.cc_trace_length)
     tr_stack.stats.cc_mean = 0
     tr_stack.stats.cc_npairs = 0
     return tr_stack

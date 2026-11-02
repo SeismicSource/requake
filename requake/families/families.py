@@ -279,12 +279,15 @@ def get_family(families, family_number):
     raise FamilyNotFoundError(f'No family found with number "{family_number}"')
 
 
-def get_family_waveforms(family):
+def get_family_waveforms(family, pre_margin=0.0):
     """
     Get waveforms for a given family.
 
     :param family: The family.
     :type family: Family
+    :param pre_margin: extra seconds of data kept before the
+        cross-correlation window, used by the family plots
+    :type pre_margin: float
     :return: The waveforms.
     :rtype: obspy.Stream
 
@@ -300,7 +303,7 @@ def get_family_waveforms(family):
             f'{clear_line}Family {family.number}: '
             f'reading waveform for event {ev.evid}: {n + 1}/{nevs}')
         try:
-            st += get_event_waveform(ev)
+            st += get_event_waveform(ev, pre_margin)
         except NoWaveformError as msg:
             sys.stdout.write('\n')
             logger.error(msg)
@@ -315,19 +318,22 @@ def get_family_waveforms(family):
     return st
 
 
-def get_family_aligned_waveforms_and_template(family):
+def get_family_aligned_waveforms_and_template(family, pre_margin=0.0):
     """
     Get aligned waveforms and template for a given family.
 
     :param family: The family.
     :type family: Family
+    :param pre_margin: extra seconds of data kept before the
+        cross-correlation window, used by the family plots
+    :type pre_margin: float
     :return: An obspy stream containing the aligned waveforms and the template.
     :rtype: obspy.Stream
 
     :raises: NoWaveformError: if no waveforms are found
     """
     try:
-        st = get_family_waveforms(family)
+        st = get_family_waveforms(family, pre_margin)
     except (NoWaveformError, MetadataMismatchError) as msg:
         raise NoWaveformError(msg) from msg
     align_traces(st)

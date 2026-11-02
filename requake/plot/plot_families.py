@@ -257,13 +257,32 @@ def _unlabeled_alpha(ntraces, nlabeled, base_alpha=UNLABELED_ALPHA,
     return base_alpha * min(1, (ref_traces / nunlabeled) ** 0.75)
 
 
+def _envelope_reference_trace(st):
+    """
+    Return the trace whose envelope is used to set the plot window end.
+
+    The average (template) trace is used when available, because the
+    envelope of a single event may not decay below the threshold, for
+    example when the event has a long coda or a high noise floor.
+
+    :param st: stream of aligned traces
+    :type st: obspy.Stream
+    :return: the average trace, or the first trace if there is none
+    :rtype: obspy.Trace
+    """
+    return next((tr for tr in st if _is_average(tr)), st[0])
+
+
 def _time_limits(st):
     """
     Return the time window used to plot the traces of a family.
 
-    The window is taken from the command line options, if given. Otherwise,
-    it is derived from the envelope of the first trace and from its
-    theoretical P arrival.
+    The window starts ``cc_pre_P`` seconds before the theoretical P
+    arrival of the first trace and ends where the smoothed envelope
+    of the average trace falls below 30% of its maximum, so that the
+    plot follows the length of the signal. The ``--start-time`` and
+    ``--end-time`` options override the window start and end,
+    respectively.
 
     :param st: stream of aligned traces
     :type st: obspy.Stream
@@ -271,24 +290,41 @@ def _time_limits(st):
         trace start
     :rtype: float, float
     """
-    t0 = config.args.starttime
-    t1 = config.args.endtime
-    # Use P_arrival and smooth envelope amplitude of first trace
-    # to determine default time limits (if above values are None)
     tr0 = st[0]
-    env = smooth(envelope(tr0.data), 200)
+    p_arrival = tr0.stats.P_arrival_time - tr0.stats.starttime
+    t0 = p_arrival - config.cc_pre_P
+    env_trace = _envelope_reference_trace(st)
+    env = smooth(envelope(env_trace.data), 200)
     env_max = env.max()
-    times = tr0.times()
-    if t0 is None:
-        # For t0, take the earliest time between 10% of envelope
-        # and theoretical P arrival
-        p_arrival = tr0.stats.P_arrival_time - tr0.stats.starttime
-        t0_p = p_arrival - 1
-        t0_env = times[env > 0.1 * env_max][0]
-        t0 = min(t0_p, t0_env)
-    if t1 is None:
-        t1 = times[env > 0.3 * env_max][-1]
+    times = env_trace.times()
+    above_threshold = times[env > 0.3 * env_max]
+    t1 = above_threshold[-1] if above_threshold.size else times[-1]
+    if config.args.starttime is not None:
+        t0 = config.args.starttime
+    if config.args.endtime is not None:
+        t1 = config.args.endtime
     return t0, t1
+
+
+def _time_axis_limits(t0, t1):
+    """
+    Return the limits of the time axis of a family plot.
+
+    The axis starts at the beginning of the data, so that the extra
+    signal kept before the scan window is visible, unless the user chose
+    the window start with ``--start-time``.
+
+    :param t0: start of the time window, in seconds relative to trace start
+    :type t0: float
+    :param t1: end of the time window, in seconds relative to trace start
+    :type t1: float
+    :return: left and right axis limits
+    :rtype: float, float
+    """
+    args = config.get('args')
+    starttime = getattr(args, 'starttime', None)
+    left = 0 if starttime is not None else -t0
+    return left, t1 - t0
 
 
 def _build_amplitude_matrix(traces, t0, t1):
@@ -524,7 +560,7 @@ def _style_bottom_panel(ax, t0, t1):
         -STACKED_AMPLITUDE - PANEL_MARGIN,
         STACKED_AMPLITUDE + PANEL_MARGIN)
     ax.set_yticks([])
-    ax.set_xlim(0, t1 - t0)
+    ax.set_xlim(*_time_axis_limits(t0, t1))
     ax.set_xlabel('Time (s)')
     ax.minorticks_on()
     ax.tick_params(which='both', top=True, labeltop=False)
@@ -648,7 +684,8 @@ def _labeled_every_text(ntraces, nlabeled):
 def _plot_family(family):
     """Plot the traces of a family, using the selected plot mode."""
     try:
-        st = get_family_aligned_waveforms_and_template(family)
+        st = get_family_aligned_waveforms_and_template(
+            family, pre_margin=config.cc_pre_P)
     except NoWaveformError as msg:
         logger.error(msg)
         return
@@ -754,7 +791,7 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
     ax.minorticks_on()
     ax.tick_params(which='both', top=True, labeltop=False)
     ax.tick_params(axis='x', which='both', direction='in')
-    ax.set_xlim(0, t1 - t0)
+    ax.set_xlim(*_time_axis_limits(t0, t1))
     ax.tick_params(labelbottom=False)
     extra = _labeled_every_text(ntraces, len(labeled_rows))
     _set_family_titles(
@@ -821,7 +858,9 @@ def _plot_family_heatmap(family, st, tr0, t0, t1):
     st.sort()
     events, tr_average = _events_and_average(st)
     ntraces = len(events)
-    matrix, _ = _build_amplitude_matrix(events, t0, t1)
+    axis_left, axis_right = _time_axis_limits(t0, t1)
+    matrix_left = 0 if axis_left < 0 else t0
+    matrix, _ = _build_amplitude_matrix(events, matrix_left, t1)
     # fixed margins leave a constant room for the tick and colorbar
     # labels, so that the layout does not change when the color range is
     # changed; the colorbar gets its own column, so that the heatmap and
@@ -835,7 +874,8 @@ def _plot_family_heatmap(family, st, tr0, t0, t1):
         bottom_lines = stacked_lines + [average_line]
     image = ax.imshow(
         matrix, aspect='auto', origin='upper', cmap=AMPLITUDE_CMAP,
-        vmin=-1, vmax=1, extent=(0, t1 - t0, ntraces - 0.5, -0.5),
+        vmin=-1, vmax=1,
+        extent=(matrix_left - t0, axis_right, ntraces - 0.5, -0.5),
         interpolation=AMPLITUDE_INTERPOLATION,
     )
     # leave room for the labels of the first and last rows

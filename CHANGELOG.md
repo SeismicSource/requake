@@ -38,6 +38,13 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   an ellipsis, instead of repeating it on the screen.
 - ``scan catalog --resume`` no longer crashes while loading the pairs
   already stored for the scan.
+- ``plot families`` now computes the family cross-correlation on the
+  scan window (``cc_pre_P``, ``cc_trace_length``), so cached waveforms
+  no longer add out-of-window artifacts or ringing at the window edges.
+- ``plot families`` plots one extra ``cc_pre_P`` of signal before
+  time 0, outside the cross-correlation window, and ends the view
+  where the average trace's envelope decays, so the labels on the
+  left do not cover the waveform.
 - Resuming a scan no longer fails with ``Overlapping trace metadata
   intervals`` when the station metadata is read back from the database.
 
