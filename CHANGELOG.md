@@ -12,45 +12,41 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   ``print_family_builds``.
 - New ``edit`` command, with ``catalog``, ``scan`` and ``build``
   subcommands, to change the label of a stored entry.
+- New ``delete`` command, with ``catalog``, ``scan`` and ``build``
+  subcommands, to remove an entry and everything built from it.
 - ``flag family`` is now ``edit family``, and ``flag duplicates`` is
   now ``scan duplicates``.
 - ``scan catalog --force-continue`` is now ``--resume``; multi-word
   options are hyphenated (``--cc-min``, ``--freq-band``,
   ``--longer-than``, ...), and the old spellings are still accepted.
-- Fixed ``--longer-than``, ``--shorter-than`` and the ``wfcache``
-  durations, where an hour counted as 24 minutes.
 - The output database now keeps several catalogs, several scans per
   catalog and several family builds per scan, each with its parameters.
-- New ``delete`` command, with ``catalog``, ``scan`` and ``build``
-  subcommands, to remove an entry and everything built from it.
 - Reading a catalog is now two commands, ``read fdsn`` for the online
   source and ``read file`` for a local file; neither replaces the
   stored catalog, and ``-l``/``--label`` names it.
-- ``build families`` with ``clustering_algorithm = UPGMA`` now only
-  considers the event pairs with ``cc >= cc_min``, as ``shared`` always
-  did: large catalogs can be clustered and weak pairs no longer merge
-  unrelated events into one family.
-- On Windows, the ``windows-curses`` package is now installed
-  automatically, so the interactive pager works out of the box.
-- Log messages such as ``Using family build 2`` now go to standard
-  error, so ``--format csv`` output can be redirected to a file.
-- Progress spinners fit their message on one line, truncating it with
-  an ellipsis, instead of repeating it on the screen.
-- ``scan catalog --resume`` no longer crashes while loading the pairs
-  already stored for the scan.
-- ``plot families`` now computes the family cross-correlation on the
-  scan window (``cc_pre_P``, ``cc_trace_length``), so cached waveforms
-  no longer add out-of-window artifacts or ringing at the window edges.
 - ``plot families`` plots one extra ``cc_pre_P`` of signal before
   time 0, outside the cross-correlation window, and ends the view
   where the average trace's envelope decays, so the labels on the
   left do not cover the waveform.
-- ``plot families --mode heatmap`` now covers the whole trace, so
-  de-zooming reveals the waveforms beyond the default view.
 - ``plot families`` in wiggle mode: press ``w`` to show or hide the
   cross-correlation window behind the waveforms.
+- On Windows, the ``windows-curses`` package is now installed
+  automatically, so the interactive pager works out of the box.
+- Fixed ``--longer-than``, ``--shorter-than`` and the ``wfcache``
+  durations, where an hour counted as 24 minutes.
+- ``scan catalog --resume`` no longer crashes while loading the pairs
+  already stored for the scan.
 - Resuming a scan no longer fails with ``Overlapping trace metadata
   intervals`` when the station metadata is read back from the database.
+- ``build families`` with ``clustering_algorithm = UPGMA`` now only
+  considers the event pairs with ``cc >= cc_min``, as ``shared`` always
+  did: large catalogs can be clustered and weak pairs no longer merge
+  unrelated events into one family.
+- ``plot families`` now computes the family cross-correlation on the
+  scan window (``cc_pre_P``, ``cc_trace_length``), so cached waveforms
+  no longer add out-of-window artifacts or ringing at the window edges.
+- ``plot families --mode heatmap`` now covers the whole trace, so
+  de-zooming reveals the waveforms beyond the default view.
 
 ## [0.8.4] - 2026-10-23
 
