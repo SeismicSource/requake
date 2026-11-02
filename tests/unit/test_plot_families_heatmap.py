@@ -283,6 +283,16 @@ class TestPlotFamilyHeatmap(unittest.TestCase):
         image = fig.axes[0].get_images()[0]
         self.assertEqual(image.get_array().shape[0], len(st) - 1)
 
+    def test_heatmap_covers_the_whole_trace(self):
+        """The image must extend beyond the default time window."""
+        family = Namespace(number=1)
+        st = _make_traces()
+        fig, _ = plot_families_module._plot_family_heatmap(
+            family, st, st[0], 1.0, 3.0)
+        image = fig.axes[0].get_images()[0]
+        _, xmax, _, _ = image.get_extent()
+        self.assertAlmostEqual(xmax, st[0].times()[-1] - 1.0)
+
     def test_max_labels_sets_the_number_of_labels(self):
         """--max-labels must limit the number of labeled rows."""
         family = Namespace(number=1)

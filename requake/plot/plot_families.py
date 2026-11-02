@@ -331,29 +331,35 @@ def _time_axis_limits(t0, t1):
     return left, t1 - t0
 
 
-def _build_amplitude_matrix(traces, t0, t1):
+def _build_amplitude_matrix(traces, t0, t1, norm_t0=None, norm_t1=None):
     """
     Build a matrix of normalized trace amplitudes.
 
     Each row of the matrix is a trace, demeaned and normalized to the
-    [-1, 1] range within the [t0, t1] time window, and resampled on a
-    common time axis.
+    [-1, 1] range within the [norm_t0, norm_t1] time window, and
+    resampled on a common time axis spanning [t0, t1].
 
     :param traces: traces, in the order of the matrix rows
     :type traces: list of obspy.Trace
-    :param t0: start of the time window, in seconds relative to trace start
+    :param t0: start of the time axis, in seconds relative to trace start
     :type t0: float
-    :param t1: end of the time window, in seconds relative to trace start
+    :param t1: end of the time axis, in seconds relative to trace start
     :type t1: float
+    :param norm_t0: start of the normalization window; defaults to t0
+    :type norm_t0: float or None
+    :param norm_t1: end of the normalization window; defaults to t1
+    :type norm_t1: float or None
     :return: matrix of amplitudes (one row per trace) and time axis
     :rtype: numpy.ndarray, numpy.ndarray
     """
+    norm_t0 = t0 if norm_t0 is None else norm_t0
+    norm_t1 = t1 if norm_t1 is None else norm_t1
     dt = 1.0 / traces[0].stats.sampling_rate
     nsamples = int(round((t1 - t0) / dt)) + 1
     times = t0 + np.arange(nsamples) * dt
     matrix = np.zeros((len(traces), nsamples))
     for n, tr in enumerate(traces):
-        tr_times, data = _normalized_trace_data(tr, t0, t1)
+        tr_times, data = _normalized_trace_data(tr, norm_t0, norm_t1)
         matrix[n] = np.interp(times, tr_times, data, left=0., right=0.)
     return matrix, times
 
@@ -904,9 +910,11 @@ def _plot_family_heatmap(family, st, tr0, t0, t1):
     st.sort()
     events, tr_average = _events_and_average(st)
     ntraces = len(events)
-    axis_left, axis_right = _time_axis_limits(t0, t1)
-    matrix_left = 0 if axis_left < 0 else t0
-    matrix, _ = _build_amplitude_matrix(events, matrix_left, t1)
+    # build the heatmap over the whole trace, not only over the default
+    # window, so that de-zooming reveals the rest of the waveform; the
+    # amplitude is normalized on the default window
+    trace_end = max(float(tr.times()[-1]) for tr in events)
+    matrix, _ = _build_amplitude_matrix(events, 0, trace_end, t0, t1)
     # fixed margins leave a constant room for the tick and colorbar
     # labels, so that the layout does not change when the color range is
     # changed; the colorbar gets its own column, so that the heatmap and
@@ -921,7 +929,7 @@ def _plot_family_heatmap(family, st, tr0, t0, t1):
     image = ax.imshow(
         matrix, aspect='auto', origin='upper', cmap=AMPLITUDE_CMAP,
         vmin=-1, vmax=1,
-        extent=(matrix_left - t0, axis_right, ntraces - 0.5, -0.5),
+        extent=(-t0, trace_end - t0, ntraces - 0.5, -0.5),
         interpolation=AMPLITUDE_INTERPOLATION,
     )
     # leave room for the labels of the first and last rows
