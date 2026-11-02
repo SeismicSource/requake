@@ -122,8 +122,7 @@ def _setup_tqdm_logging(logger_root):
     console = TqdmLoggingHandler()
     console.setLevel(logging.INFO)
     console.addFilter(_memory_log_filter)
-    # Add logger color coding on all platforms but win32
-    if sys.platform != 'win32' and color_enabled(sys.stderr):
+    if color_enabled(sys.stderr):
         console.emit = _color_handler_emit(console.emit, stream=sys.stderr)
     logger_root.addHandler(console)
 
@@ -163,8 +162,7 @@ def _setup_logging(progname, action_name):
         console.setLevel(logging.INFO)
         formatter = logging.Formatter('%(levelname)-8s %(message)s')
         console.setFormatter(formatter)
-        # Add logger color coding on all platforms but win32
-        if sys.platform != 'win32' and color_enabled(sys.stderr):
+        if color_enabled(sys.stderr):
             console.emit = _color_handler_emit(
                 console.emit, stream=sys.stderr
             )
