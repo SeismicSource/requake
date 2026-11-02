@@ -11,7 +11,6 @@ Unit tests for configuration utility helpers.
 """
 
 import io
-import re
 import time
 import threading
 import unittest
@@ -73,25 +72,24 @@ class TestRunWithSpinner(unittest.TestCase):
             with self.assertRaises(ValueError):
                 run_with_spinner('working...', _worker)
 
-    def test_spinner_clears_the_whole_line(self):
-        """The spinner must erase the line it printed, however long."""
+    def test_spinner_prints_the_message_on_its_own_line(self):
+        """The message is printed once, above the animated frame."""
         message = 'x' * 120
-        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                patch.dict('os.environ', {'NO_COLOR': '1'}):
             run_with_spinner(message, lambda: time.sleep(0.15))
-        runs = re.findall(r' +', stderr.getvalue())
-        self.assertGreaterEqual(max(len(run) for run in runs),
-                                len(message) + 2)
+        self.assertTrue(stderr.getvalue().startswith(message + '\n'))
 
     def test_spinner_truncates_a_long_message(self):
-        """The spinner keeps its message within the terminal width."""
+        """The message is kept within the terminal width."""
         message = 'x' * 120
         with contextlib.redirect_stderr(io.StringIO()) as stderr, \
                 patch.object(utils, '_terminal_columns', lambda: 40), \
                 patch.dict('os.environ', {'NO_COLOR': '1'}):
             run_with_spinner(message, lambda: time.sleep(0.15))
-        frames = [f for f in stderr.getvalue().split('\r') if f]
-        self.assertTrue(frames[0].endswith('…'))
-        self.assertEqual(display_width(frames[0]), 39)
+        first_line = stderr.getvalue().split('\n')[0]
+        self.assertTrue(first_line.endswith('…'))
+        self.assertEqual(display_width(first_line), 39)
 
     def test_spinner_keeps_a_short_message(self):
         """A message that fits the terminal is printed in full."""
@@ -99,7 +97,74 @@ class TestRunWithSpinner(unittest.TestCase):
                 patch.object(utils, '_terminal_columns', lambda: 40), \
                 patch.dict('os.environ', {'NO_COLOR': '1'}):
             run_with_spinner('reading...', lambda: time.sleep(0.15))
-        self.assertIn('⠋ reading...', stderr.getvalue())
+        out = stderr.getvalue()
+        self.assertIn('reading...\n', out)
+        self.assertIn('⠋', out)
+
+    def test_spinner_clears_both_lines_on_a_terminal(self):
+        """Message and spinner lines are erased when nothing resized."""
+        env = {'NO_COLOR': '1', 'TERM': 'xterm'}
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                patch.object(utils, '_terminal_columns', lambda: 40), \
+                patch.object(stderr, 'isatty', lambda: True), \
+                patch.dict('os.environ', env):
+            run_with_spinner('reading...', lambda: time.sleep(0.15))
+        out = stderr.getvalue()
+        self.assertIn('\r\x1b[2K', out)
+        self.assertIn('\x1b[1A\x1b[2K', out)
+        self.assertEqual(out.count('\x1b[?25l'), 1)
+        self.assertTrue(out.endswith('\x1b[?25h'))
+
+    def test_spinner_keeps_the_message_after_resize(self):
+        """A resized terminal may rewrap the message, so it is kept."""
+        columns = [40]
+
+        def _worker():
+            time.sleep(0.15)
+            columns[0] = 20
+            time.sleep(0.25)
+
+        env = {'NO_COLOR': '1', 'TERM': 'xterm'}
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                patch.object(
+                    utils, '_terminal_columns', lambda: columns[0]), \
+                patch.object(stderr, 'isatty', lambda: True), \
+                patch.dict('os.environ', env):
+            run_with_spinner('x' * 120, _worker)
+        out = stderr.getvalue()
+        self.assertIn('…', out)
+        self.assertNotIn('\x1b[1A', out)
+        self.assertTrue(out.endswith('\x1b[?25h'))
+
+    def test_spinner_avoids_escape_sequences_when_redirected(self):
+        """Redirected output carries no ANSI cursor-control sequences."""
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                patch.object(utils, '_terminal_columns', lambda: 40), \
+                patch.dict('os.environ', {'NO_COLOR': '1'}):
+            run_with_spinner('reading...', lambda: time.sleep(0.15))
+        self.assertNotIn('\x1b', stderr.getvalue())
+
+    def test_spinner_falls_back_without_ansi_support(self):
+        """A terminal without ANSI support gets plain output."""
+        env = {'NO_COLOR': '1'}
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                patch.object(utils, '_terminal_columns', lambda: 40), \
+                patch.object(utils, 'ansi_enabled', lambda s=None: False), \
+                patch.dict('os.environ', env):
+            run_with_spinner('reading...', lambda: time.sleep(0.15))
+        self.assertNotIn('\x1b', stderr.getvalue())
+
+    def test_spinner_uses_ansi_when_supported(self):
+        """ANSI terminals get erase sequences and cursor hiding."""
+        env = {'NO_COLOR': '1'}
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                patch.object(utils, '_terminal_columns', lambda: 40), \
+                patch.object(utils, 'ansi_enabled', lambda s=None: True), \
+                patch.dict('os.environ', env):
+            run_with_spinner('reading...', lambda: time.sleep(0.15))
+        out = stderr.getvalue()
+        self.assertIn('\x1b[?25l', out)
+        self.assertTrue(out.endswith('\x1b[?25h'))
 
     def test_spinner_runs_in_place_outside_main_process(self):
         """Worker processes must not animate the spinner."""
@@ -146,8 +211,11 @@ class TestRunWithSpinner(unittest.TestCase):
         fake_threading = SimpleNamespace(
             Event=_InterruptedEvent, Thread=threading.Thread
         )
+        env = {'NO_COLOR': '1', 'TERM': 'xterm'}
         with patch.object(utils, 'threading', fake_threading), \
-                contextlib.redirect_stderr(io.StringIO()):
+                contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                patch.object(stderr, 'isatty', lambda: True), \
+                patch.dict('os.environ', env):
             with self.assertRaises(SystemExit):
                 run_with_spinner('working...', _worker)
         # The worker must have seen the abort request and been joined
@@ -155,6 +223,8 @@ class TestRunWithSpinner(unittest.TestCase):
         self.assertEqual(observed, [True])
         self.assertEqual(released, ['resources released'])
         self.assertFalse(abort_requested())
+        # The cursor must be visible again after the interrupt.
+        self.assertTrue(stderr.getvalue().endswith('\x1b[?25h'))
 
 
 class _FakeTerminalStream(io.StringIO):

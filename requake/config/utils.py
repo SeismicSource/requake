@@ -18,7 +18,7 @@ import threading
 import multiprocessing
 from datetime import datetime
 from ..terminal import (
-    display_width, error, frame, hyperlink, style, truncate_to_width,
+    ansi_enabled, error, frame, hyperlink, style, truncate_to_width,
 )
 from .configobj import ConfigObj, ParseError
 from .configobj.validate import Validator
@@ -378,14 +378,28 @@ def _terminal_columns(stream=None):
         return None
 
 
+def _clear_spinner_line(stream, erase_line):
+    """Clear the current spinner line on *stream*."""
+    if erase_line:
+        print('\r' + erase_line, file=stream, end='')
+    else:
+        print('\r  \r', file=stream, end='')
+    stream.flush()
+
+
 def run_with_spinner(message, func):
     r"""Run *func* in a thread, showing a braille spinner on stderr.
 
-    The spinner animates on a single line via ``\r``, truncating
-    *message* to the width of the terminal: a wrapped line cannot be
-    erased by a carriage return, so its frames would pile up on the
-    screen.  When the operation completes the line is cleared.
-    ``Ctrl+C`` is handled so the terminal is left in a clean state.
+    *message* is printed on its own line, truncated to the terminal
+    width, and the spinner animates on the line below it.  A spinner
+    line holding only a braille frame cannot be wrapped by the
+    terminal, so resizing the terminal while the operation runs cannot
+    leave copies of old frames on the screen.  The terminal cursor is
+    hidden while the spinner runs, so that it does not sit right after
+    the braille frame.  When the operation completes both lines are
+    cleared, unless the terminal was resized: in that case the message
+    line may have been rewrapped and is left in place.  ``Ctrl+C`` is
+    handled so the terminal is left in a clean state.
 
     Outside the main process (e.g. in parallel workers) *func* is
     simply run in place, to keep the terminal output of the workers
@@ -408,37 +422,58 @@ def run_with_spinner(message, func):
     thread = threading.Thread(target=_target, daemon=True)
     thread.start()
 
+    # Print the message on its own line, so that the animated line only
+    # holds the braille frame. Truncate to one column less than the
+    # terminal width, so that the message always occupies a known
+    # number of rows (one).
     columns = _terminal_columns()
-    # Keep the line one column short of the terminal width: a terminal
-    # wrapping as soon as the last column is written would push the
-    # following frames to a new line, where ``\r`` cannot erase them.
-    if columns is not None and columns > 3:
-        message = truncate_to_width(message, columns - 3)
+    if columns is not None and columns > 1:
+        message = truncate_to_width(message, columns - 1)
+    print(style(message, 'dim', stream=sys.stderr), file=sys.stderr)
+    sys.stderr.flush()
 
-    # Visible width of the spinner line: a braille frame (one column) plus
-    # a space plus the message, whose ANSI styling adds no visible column.
-    width = display_width(message) + 2
+    erase_line = (
+        '\x1b[2K' if ansi_enabled(sys.stderr) else None
+    )
+    hide_cursor = '\x1b[?25l' if erase_line else None
+    show_cursor = '\x1b[?25h' if erase_line else None
+    if hide_cursor:
+        print(hide_cursor, file=sys.stderr, end='')
+        sys.stderr.flush()
+    resized = False
     i = 0
     try:
         while not done.wait(0.1):
+            if _terminal_columns() != columns:
+                resized = True
             frame = style(_SPINNER_FRAMES[i % len(_SPINNER_FRAMES)],
                           'cyan', stream=sys.stderr)
-            text = style(message, 'dim', stream=sys.stderr)
-            print(f'\r{frame} {text}', file=sys.stderr, end='')
+            prefix = '\r' + erase_line if erase_line else '\r'
+            print(f'{prefix}{frame} ', file=sys.stderr, end='')
             sys.stderr.flush()
             i += 1
-        # Clear the spinner line: erase as many columns as the widest line
-        # printed, or part of it is left over when the next message is
-        # shorter than this one.
-        print('\r' + ' ' * width, file=sys.stderr, end='\r')
-        sys.stderr.flush()
+        # Clear the spinner line.
+        _clear_spinner_line(sys.stderr, erase_line)
+        if erase_line and not resized:
+            # Remove the message line too, restoring the terminal as it
+            # was before the spinner. Skip this when the terminal was
+            # resized: the message line may have been rewrapped, so its
+            # row count is no longer known and erasing blindly could
+            # remove other output.
+            print('\x1b[1A' + erase_line, file=sys.stderr, end='')
+            sys.stderr.flush()
     except (KeyboardInterrupt, SystemExit):
-        # Leave a clean line after the spinner and stop the running
-        # operation, waiting for it to release its resources.
+        # Clear the spinner line, then leave a clean line and stop the
+        # running operation, waiting for it to release its resources.
         abort_operation(thread)
+        _clear_spinner_line(sys.stderr, erase_line)
         print(file=sys.stderr)
         sys.stderr.flush()
         raise
+    finally:
+        if show_cursor:
+            print(show_cursor, file=sys.stderr, end='')
+            sys.stderr.flush()
 
     if errors[0] is not None:
         raise errors[0]
