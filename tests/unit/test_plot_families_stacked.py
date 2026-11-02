@@ -532,5 +532,35 @@ class TestTimeLimits(unittest.TestCase):
         self.assertLess(t1_average, t1_noisy)
 
 
+class TestSignalMargin(unittest.TestCase):
+    """Test the extra data kept around the plotted signal."""
+
+    def test_margin_is_a_quarter_of_the_signal(self):
+        """The margin must be 25% of the signal length."""
+        margin = plot_families_module._signal_margin(2.0, 10.0, 5.0)
+        self.assertAlmostEqual(margin, 2.0)
+
+    def test_margin_does_not_start_before_the_data(self):
+        """The margin must not extend before the trace start."""
+        margin = plot_families_module._signal_margin(0.5, 10.0, 5.0)
+        self.assertAlmostEqual(margin, 0.5)
+
+    def test_margin_does_not_exceed_the_fetched_data(self):
+        """The margin must not exceed the margin fetched with the data."""
+        margin = plot_families_module._signal_margin(5.0, 30.0, 2.0)
+        self.assertAlmostEqual(margin, 2.0)
+
+    def test_stream_is_trimmed_to_the_margins(self):
+        """The traces must span the signal plus the margins."""
+        st = _make_stream()
+        plot_families_module._trim_to_signal_margins(st, 1.0, 3.0, 0.5)
+        self.assertEqual(len(st), 4)
+        self.assertEqual(st[0].stats.npts, 301)
+        self.assertEqual(
+            st[0].stats.starttime,
+            UTCDateTime('2020-01-01T00:00:00') + 0.5)
+        self.assertEqual(st[-1].stats.npts, 301)
+
+
 if __name__ == '__main__':
     unittest.main()

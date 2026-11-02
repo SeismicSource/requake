@@ -118,6 +118,28 @@ class TestTrimToCCWindow(unittest.TestCase):
         self.assertEqual(cc.stats.endtime, start + 20)
         self.assertEqual(cc.stats.npts, 601)
 
+    def test_post_margin_is_kept(self):
+        """Extra data after the window is kept, without moving P."""
+        start = UTCDateTime('2020-01-01T00:00:00')
+        tr = _make_trace(start, 30, 15)
+        out = waveform_module._trim_to_cc_window(tr, post_margin=2.0)
+        self.assertEqual(out.stats.starttime, start + 14)
+        self.assertEqual(out.stats.endtime, start + 22)
+        self.assertEqual(out.stats.npts, 801)
+        self.assertAlmostEqual(
+            out.stats.P_arrival_time - out.stats.starttime, 1.0)
+        self.assertEqual(out.stats.cc_window_start, start + 14)
+        self.assertEqual(out.stats.cc_window_end, start + 20)
+
+    def test_post_margin_stops_at_the_data_end(self):
+        """Missing data after the window is not padded."""
+        start = UTCDateTime('2020-01-01T00:00:00')
+        tr = _make_trace(start, 20, 15)
+        out = waveform_module._trim_to_cc_window(tr, post_margin=2.0)
+        self.assertEqual(out.stats.starttime, start + 14)
+        self.assertEqual(out.stats.endtime, start + 20)
+        self.assertEqual(out.stats.npts, 601)
+
     def test_missing_pre_margin_is_padded(self):
         """Missing data before the window is padded with the trace mean."""
         start = UTCDateTime('2020-01-01T00:00:00')

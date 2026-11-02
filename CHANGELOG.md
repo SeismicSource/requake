@@ -24,10 +24,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 - Reading a catalog is now two commands, ``read fdsn`` for the online
   source and ``read file`` for a local file; neither replaces the
   stored catalog, and ``-l``/``--label`` names it.
-- ``plot families`` plots one extra ``cc_pre_P`` of signal before
-  time 0, outside the cross-correlation window, and ends the view
-  where the average trace's envelope decays, so the labels on the
-  left do not cover the waveform.
+- ``plot families`` keeps an extra quarter of the signal length before
+  and after it.
 - ``plot families`` in wiggle mode: press ``w`` to show or hide the
   cross-correlation window behind the waveforms.
 - On Windows, the ``windows-curses`` package is now installed

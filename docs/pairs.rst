@@ -94,13 +94,14 @@ The traces are trimmed to the same window used by the scan, described
 by ``cc_pre_P`` and ``cc_trace_length``: they start ``cc_pre_P``
 seconds before the theoretical P arrival and last ``cc_trace_length``
 seconds in total.  The family cross-correlation uses the same window.
-The plot keeps one extra ``cc_pre_P`` of signal before time 0, so that
-the event labels on the left do not cover the waveform; missing data
-in that margin are padded with the trace mean.  By default the plot
-ends where the smoothed envelope of the family average falls below 30%
-of its maximum.  Use ``-s``/``--start-time`` and ``-e``/``--end-time``
-to change the window of the plot, in seconds relative to the trace
-start.
+The plot keeps an extra quarter of the signal length before and after
+the signal: the margin before time 0 keeps the event labels on the
+left off the waveform, and the margin after the signal appears when
+de-zooming.  Missing data before time 0 is padded with the trace mean.
+The signal starts at time 0 and ends where the smoothed envelope of
+the family average falls below 30% of its maximum.  Use
+``-s``/``--start-time`` and ``-e``/``--end-time`` to change the window
+of the plot, in seconds relative to the trace start.
 
 
 scan duplicates

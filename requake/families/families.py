@@ -279,7 +279,7 @@ def get_family(families, family_number):
     raise FamilyNotFoundError(f'No family found with number "{family_number}"')
 
 
-def get_family_waveforms(family, pre_margin=0.0):
+def get_family_waveforms(family, pre_margin=0.0, post_margin=0.0):
     """
     Get waveforms for a given family.
 
@@ -288,6 +288,9 @@ def get_family_waveforms(family, pre_margin=0.0):
     :param pre_margin: extra seconds of data kept before the
         cross-correlation window, used by the family plots
     :type pre_margin: float
+    :param post_margin: extra seconds of data kept after the
+        cross-correlation window, used by the family plots
+    :type post_margin: float
     :return: The waveforms.
     :rtype: obspy.Stream
 
@@ -303,7 +306,7 @@ def get_family_waveforms(family, pre_margin=0.0):
             f'{clear_line}Family {family.number}: '
             f'reading waveform for event {ev.evid}: {n + 1}/{nevs}')
         try:
-            st += get_event_waveform(ev, pre_margin)
+            st += get_event_waveform(ev, pre_margin, post_margin)
         except NoWaveformError as msg:
             sys.stdout.write('\n')
             logger.error(msg)
@@ -318,7 +321,8 @@ def get_family_waveforms(family, pre_margin=0.0):
     return st
 
 
-def get_family_aligned_waveforms_and_template(family, pre_margin=0.0):
+def get_family_aligned_waveforms_and_template(
+        family, pre_margin=0.0, post_margin=0.0):
     """
     Get aligned waveforms and template for a given family.
 
@@ -327,13 +331,16 @@ def get_family_aligned_waveforms_and_template(family, pre_margin=0.0):
     :param pre_margin: extra seconds of data kept before the
         cross-correlation window, used by the family plots
     :type pre_margin: float
+    :param post_margin: extra seconds of data kept after the
+        cross-correlation window, used by the family plots
+    :type post_margin: float
     :return: An obspy stream containing the aligned waveforms and the template.
     :rtype: obspy.Stream
 
     :raises: NoWaveformError: if no waveforms are found
     """
     try:
-        st = get_family_waveforms(family, pre_margin)
+        st = get_family_waveforms(family, pre_margin, post_margin)
     except (NoWaveformError, MetadataMismatchError) as msg:
         raise NoWaveformError(msg) from msg
     align_traces(st)

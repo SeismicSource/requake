@@ -65,6 +65,8 @@ AVERAGE_COLOR = '#cc8800'
 # the 'w' key
 CC_WINDOW_COLOR = '#ffe9b3'
 CC_WINDOW_ALPHA = 0.6
+# Fraction of the signal length kept as extra data before and after it
+SIGNAL_MARGIN_FRACTION = 0.25
 # Bottom panel, where all the traces are stacked on top of each other,
 # with the average trace drawn on top of them
 AVERAGE_LINEWIDTH = 1.2
@@ -329,6 +331,50 @@ def _time_axis_limits(t0, t1):
     starttime = getattr(args, 'starttime', None)
     left = 0 if starttime is not None else -t0
     return left, t1 - t0
+
+
+def _signal_margin(t0, t1, fetch_margin):
+    """
+    Return the extra data kept before and after the signal.
+
+    The margin is a fraction of the signal length, limited so that it
+    does not start before the available data and does not exceed the
+    margin that was fetched.
+
+    :param t0: start of the signal, in seconds relative to trace start
+    :type t0: float
+    :param t1: end of the signal, in seconds relative to trace start
+    :type t1: float
+    :param fetch_margin: margin fetched with the waveforms, in seconds
+    :type fetch_margin: float
+    :return: margin, in seconds
+    :rtype: float
+    """
+    signal = t1 - t0
+    return min(SIGNAL_MARGIN_FRACTION * signal, max(t0, 0), fetch_margin)
+
+
+def _trim_to_signal_margins(st, t0, t1, margin):
+    """
+    Trim a stream to the signal window plus its margins.
+
+    :param st: stream of traces
+    :type st: obspy.Stream
+    :param t0: start of the signal, in seconds relative to trace start
+    :type t0: float
+    :param t1: end of the signal, in seconds relative to trace start
+    :type t1: float
+    :param margin: margin before and after the signal, in seconds
+    :type margin: float
+    """
+    start = t0 - margin
+    end = t1 + margin
+    traces = []
+    for tr in st:
+        tr.trim(tr.stats.starttime + start, tr.stats.starttime + end)
+        if tr.stats.npts:
+            traces.append(tr)
+    st.traces = traces
 
 
 def _build_amplitude_matrix(traces, t0, t1, norm_t0=None, norm_t1=None):
@@ -693,15 +739,22 @@ def _labeled_every_text(ntraces, nlabeled):
 
 def _plot_family(family):
     """Plot the traces of a family, using the selected plot mode."""
+    fetch_margin = SIGNAL_MARGIN_FRACTION * config.cc_trace_length
     try:
         st = get_family_aligned_waveforms_and_template(
-            family, pre_margin=config.cc_pre_P)
+            family, pre_margin=fetch_margin, post_margin=fetch_margin)
     except NoWaveformError as msg:
         logger.error(msg)
         return
     st = process_waveforms(st)
     tr0 = st[0]
     t0, t1 = _time_limits(st)
+    signal = t1 - t0
+    margin = _signal_margin(t0, t1, fetch_margin)
+    _trim_to_signal_margins(st, t0, t1, margin)
+    # the trimmed traces start ``margin`` before the signal
+    t0 = margin
+    t1 = signal + margin
     if getattr(config.args, 'mode', 'wiggle') == 'heatmap':
         return _plot_family_heatmap(family, st, tr0, t0, t1)
     return _plot_family_wiggle(family, st, tr0, t0, t1)

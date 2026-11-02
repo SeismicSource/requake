@@ -371,7 +371,7 @@ def _get_event_waveform_from_event_data_path(evid, traceid):
     return st[0]
 
 
-def _trim_to_cc_window(trace, pre_margin=0.0):
+def _trim_to_cc_window(trace, pre_margin=0.0, post_margin=0.0):
     """
     Trim a trace to the cross-correlation window around its P arrival.
 
@@ -388,14 +388,19 @@ def _trim_to_cc_window(trace, pre_margin=0.0):
         samples are filled with the trace mean, so that the P arrival
         keeps the same position in every trace.
     :type pre_margin: float
+    :param post_margin: extra seconds of data kept after the window
+        end, so that the family plots can show more signal when
+        de-zoomed
+    :type post_margin: float
 
     :return: trimmed trace
     :rtype: obspy.Trace
 
     :raises NoWaveformError: if the trace has no data in the window
     """
-    t0 = trace.stats.P_arrival_time - config.cc_pre_P - pre_margin
-    t1 = t0 + pre_margin + config.cc_trace_length
+    cc_start = trace.stats.P_arrival_time - config.cc_pre_P
+    t0 = cc_start - pre_margin
+    t1 = cc_start + config.cc_trace_length + post_margin
     tr = trace.copy().trim(t0, t1)
     if tr.stats.npts == 0:
         raise NoWaveformError(
@@ -404,10 +409,9 @@ def _trim_to_cc_window(trace, pre_margin=0.0):
         )
     # remember the cross-correlation window, which stays fixed when the
     # trace is shifted during the alignment and can be narrower than
-    # the trace when a pre-margin is kept for the plots
-    tr.stats.cc_window_start = trace.stats.P_arrival_time - config.cc_pre_P
-    tr.stats.cc_window_end = (
-        tr.stats.cc_window_start + config.cc_trace_length)
+    # the trace when margins are kept for the plots
+    tr.stats.cc_window_start = cc_start
+    tr.stats.cc_window_end = cc_start + config.cc_trace_length
     if pre_margin and tr.stats.starttime > t0:
         # The data do not reach the requested window start: pad the
         # trace with its mean, which does not ring when filtered
@@ -421,7 +425,7 @@ def _trim_to_cc_window(trace, pre_margin=0.0):
     return tr
 
 
-def get_event_waveform(ev, pre_margin=0.0):
+def get_event_waveform(ev, pre_margin=0.0, post_margin=0.0):
     """
     Get waveform for an event using the configured or requested trace id.
 
@@ -430,6 +434,9 @@ def get_event_waveform(ev, pre_margin=0.0):
     :param pre_margin: extra seconds of data kept before the
         cross-correlation window, used by the family plots
     :type pre_margin: float
+    :param post_margin: extra seconds of data kept after the
+        cross-correlation window, used by the family plots
+    :type post_margin: float
 
     :return: waveform trace
     :rtype: obspy.Trace
@@ -522,7 +529,7 @@ def get_event_waveform(ev, pre_margin=0.0):
         'S_arrival_time': s_arrival_time
     }
     tr.stats.update(tr_stats)
-    return _trim_to_cc_window(tr, pre_margin)
+    return _trim_to_cc_window(tr, pre_margin, post_margin)
 
 
 def process_waveforms(tr_or_st):
