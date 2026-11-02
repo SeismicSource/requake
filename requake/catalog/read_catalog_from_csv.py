@@ -10,6 +10,7 @@ Read an event catalog from a CSV file.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 import logging
+import sys
 import csv
 from obspy import UTCDateTime
 from ..formulas import float_or_none, int_or_none, field_match_score
@@ -164,8 +165,12 @@ def read_catalog_from_csv(filename):
         fields = _guess_field_names(reader.fieldnames)
         nrows -= 1  # first row is the header
         cat = RequakeCatalog()
+        # The row counter overwrites itself only on an interactive
+        # terminal; do not leave it in a redirected output file.
+        show_progress = sys.stdout.isatty()
         for n, row in enumerate(reader):
-            print(f'reading row {n + 1}/{nrows}\r', end='')
+            if show_progress:
+                print(f'reading row {n + 1}/{nrows}\r', end='')
             if fields['orig_time'] is None:
                 # try build a date-time field from year, month, day, hour,
                 # minute and seconds fields
@@ -210,5 +215,7 @@ def read_catalog_from_csv(filename):
                 ev.mag_type = 'M'
             ev.mag = float_or_none(row[fields['mag']])
             cat.append(ev)
-    print()  # needed to add a newline after the last "reading row" message
+    if show_progress:
+        # Add a newline after the last "reading row" message.
+        print()
     return cat

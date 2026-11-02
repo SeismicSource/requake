@@ -129,11 +129,21 @@ class TestRunWithSpinner(unittest.TestCase):
         """A message that fits the terminal is printed in full."""
         with contextlib.redirect_stderr(io.StringIO()) as stderr, \
                 patch.object(utils, '_terminal_columns', lambda: 40), \
+                patch.object(stderr, 'isatty', lambda: True), \
                 patch.dict('os.environ', {'NO_COLOR': '1'}):
             run_with_spinner('reading...', lambda: time.sleep(0.15))
         out = stderr.getvalue()
         self.assertIn('reading...\n', out)
         self.assertIn('⠋', out)
+
+    def test_spinner_is_not_animated_when_redirected(self):
+        """A redirected stderr gets the message, but no spinner frames."""
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                patch.dict('os.environ', {'NO_COLOR': '1'}):
+            result = run_with_spinner(
+                'reading...', lambda: time.sleep(0.15))
+        self.assertIsNone(result)
+        self.assertEqual(stderr.getvalue(), 'reading...\n')
 
     def test_spinner_clears_both_lines_on_a_terminal(self):
         """Message and spinner lines are erased when nothing resized."""
@@ -183,16 +193,19 @@ class TestRunWithSpinner(unittest.TestCase):
         env = {'NO_COLOR': '1'}
         with contextlib.redirect_stderr(io.StringIO()) as stderr, \
                 patch.object(utils, '_terminal_columns', lambda: 40), \
+                patch.object(stderr, 'isatty', lambda: True), \
                 patch.object(utils, 'ansi_enabled', lambda s=None: False), \
                 patch.dict('os.environ', env):
             run_with_spinner('reading...', lambda: time.sleep(0.15))
         self.assertNotIn('\x1b', stderr.getvalue())
+        self.assertIn('⠋', stderr.getvalue())
 
     def test_spinner_uses_ansi_when_supported(self):
         """ANSI terminals get erase sequences and cursor hiding."""
         env = {'NO_COLOR': '1'}
         with contextlib.redirect_stderr(io.StringIO()) as stderr, \
                 patch.object(utils, '_terminal_columns', lambda: 40), \
+                patch.object(stderr, 'isatty', lambda: True), \
                 patch.object(utils, 'ansi_enabled', lambda s=None: True), \
                 patch.dict('os.environ', env):
             run_with_spinner('reading...', lambda: time.sleep(0.15))

@@ -413,6 +413,39 @@ def _clear_spinner_line(stream, erase_line):
     stream.flush()
 
 
+def _stderr_is_terminal():
+    """Return whether stderr is an interactive terminal."""
+    try:
+        return bool(sys.stderr.isatty())
+    except (AttributeError, ValueError):
+        return False
+
+
+def _spinner_label(message):
+    """
+    Return *message*, truncated to the width of the terminal on stderr.
+
+    :param message: message to display
+    :type message: str
+
+    :return: the message, truncated if the terminal width is known
+    :rtype: str
+    """
+    columns = _terminal_columns()
+    if columns is not None and columns > 1:
+        return truncate_to_width(message, columns - 1)
+    return message
+
+
+def _print_spinner_message(message):
+    """Print the spinner message on its own line, on stderr."""
+    print(
+        style(_spinner_label(message), 'dim', stream=sys.stderr),
+        file=sys.stderr,
+    )
+    sys.stderr.flush()
+
+
 def run_with_spinner(message, func):
     r"""Run *func* in a thread, showing a braille spinner on stderr.
 
@@ -427,11 +460,16 @@ def run_with_spinner(message, func):
     line may have been rewrapped and is left in place.  ``Ctrl+C`` is
     handled so the terminal is left in a clean state.
 
-    Outside the main process (e.g. in parallel workers) *func* is
-    simply run in place, to keep the terminal output of the workers
-    clean.
+    The spinner is animated only in the main process and only when
+    stderr is an interactive terminal.  Otherwise *message* is printed
+    once and *func* is run in place: no spinner frames are written to
+    the output file of a batch scheduler, or to the terminal output of
+    the parallel workers.
     """
     if multiprocessing.current_process().name != 'MainProcess':
+        return func()
+    if not _stderr_is_terminal():
+        _print_spinner_message(message)
         return func()
     done = threading.Event()
     errors = [None]
@@ -453,10 +491,7 @@ def run_with_spinner(message, func):
     # terminal width, so that the message always occupies a known
     # number of rows (one).
     columns = _terminal_columns()
-    if columns is not None and columns > 1:
-        message = truncate_to_width(message, columns - 1)
-    print(style(message, 'dim', stream=sys.stderr), file=sys.stderr)
-    sys.stderr.flush()
+    _print_spinner_message(message)
 
     erase_line = (
         '\x1b[2K' if ansi_enabled(sys.stderr) else None

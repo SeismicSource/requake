@@ -95,7 +95,8 @@ def _scan_family_template(template, t0, t1):
             raise NoWaveformError(
                 f'No data for {trace_id} : {t0} - {t1}'
             ) from err
-    sys.stdout.write(str(tr) + '\r')
+    if sys.stdout.isatty():
+        sys.stdout.write(str(tr) + '\r')
     # We use the time_chunk length as max shift
     config.cc_max_shift = config.time_chunk
     _lag, lag_sec, cc_max, cc_mad = cc_waveform_pair(tr, template, mode='scan')

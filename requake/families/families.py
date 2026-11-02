@@ -300,15 +300,20 @@ def get_family_waveforms(family, pre_margin=0.0, post_margin=0.0):
     load_inventory()
     st = Stream()
     nevs = len(family)
-    clear_line = '\x1b[2K\r'  # escape sequence to clear line
+    # The progress line overwrites itself only on an interactive
+    # terminal; do not leave it in a redirected output file.
+    show_progress = sys.stdout.isatty()
+    clear_line = '\x1b[2K\r' if show_progress else ''
     for n, ev in enumerate(family):
-        sys.stdout.write(
-            f'{clear_line}Family {family.number}: '
-            f'reading waveform for event {ev.evid}: {n + 1}/{nevs}')
+        if show_progress:
+            sys.stdout.write(
+                f'{clear_line}Family {family.number}: '
+                f'reading waveform for event {ev.evid}: {n + 1}/{nevs}')
         try:
             st += get_event_waveform(ev, pre_margin, post_margin)
         except NoWaveformError as msg:
-            sys.stdout.write('\n')
+            if show_progress:
+                sys.stdout.write('\n')
             logger.error(msg)
     nwaves = len(st)
     plural = '' if nwaves == 1 else 's'

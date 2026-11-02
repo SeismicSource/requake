@@ -47,6 +47,9 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   de-zooming reveals the waveforms beyond the default view.
 - ``plot families`` labels traces at a regular interval with
   ``--max-labels``, instead of clustering some labels together.
+- In-place progress messages are shown only on an interactive
+  terminal, so that carriage returns and escape sequences no longer
+  end up in the output file of a batch job.
 
 ## [0.8.4] - 2026-10-23
 
