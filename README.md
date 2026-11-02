@@ -186,13 +186,20 @@ repeating earthquake families:
 ## Performances
 
 - `requake scan catalog` is designed to fully utilize available CPU cores by
-  processing earthquake pairs in parallel. On an M2 MacBook Air, scanning
-  95,034 earthquake pairs downloaded via FDSNWS took approximately 5 minutes
-  using 7 worker processes, yielding ~19,000 pairs per minute. When repeating
-  the same scan with a fully cached set of waveforms, runtime dropped to 84
-  seconds (~68,000 pairs per minute). These results indicate that overall
-  performance is typically dominated by waveform download latency rather than
-  computation.
+  processing earthquake pairs in parallel. Its runtime grows with the number
+  of event pairs within `catalog_search_range`, and retrieving the waveforms
+  dominates the cost of each pair.
+
+- For reference, a scan of a catalog of 92,947 events, with 462 million
+  candidate pairs, took 82 hours (3.4 days) on a single 64-core node of a
+  SLURM cluster, with the waveforms already in the on-disk cache: about
+  1,570 pairs/s, or 5.7 million pairs per hour. See the
+  [performances page] for the details.
+
+- On an M2 MacBook Air, scanning 95,034 earthquake pairs downloaded via
+  FDSNWS took approximately 5 minutes using 7 worker processes, yielding
+  ~19,000 pairs per minute. When repeating the same scan with a fully cached
+  set of waveforms, runtime dropped to 84 seconds (~68,000 pairs per minute).
 
 - For large FDSN-based runs, use `requake wfcache prefetch` before
   `requake scan catalog` to download all waveforms upfront into a local
@@ -231,6 +238,7 @@ You can also cite the following abstract presented at the
 [DOI-badge]: https://img.shields.io/badge/DOI-10.5281%2Fzenodo.10832203-blue.svg 
 [DOI-link]: https://doi.org/10.5281/zenodo.10832203
 [Requake GitHub repository]: https://github.com/SeismicSource/requake
+[performances page]: https://requake.readthedocs.io/en/latest/performances.html
 
 <!-- External links -->
 [FDSN web services]: https://www.fdsn.org/webservices/
