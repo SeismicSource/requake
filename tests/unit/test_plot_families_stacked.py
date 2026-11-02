@@ -71,6 +71,8 @@ def _make_trace(evid, data, starttime='2020-01-01T00:00:00', dt=0.01):
     tr.stats.orig_time = UTCDateTime(starttime)
     tr.stats.P_arrival_time = tr.stats.starttime + 1.5
     tr.stats.S_arrival_time = tr.stats.starttime + 2.5
+    tr.stats.cc_window_start = tr.stats.starttime + 0.5
+    tr.stats.cc_window_end = tr.stats.starttime + 4.5
     tr.stats.freq_min = 5.0
     tr.stats.freq_max = 10.0
     tr.stats.distance = 2.0
@@ -318,6 +320,30 @@ class TestWiggleLayout(unittest.TestCase):
     def test_average_is_in_the_bottom_panel(self):
         """The average trace must be drawn in the bottom panel."""
         self.assertEqual(len(_average_lines(self.fig.axes[1])), 1)
+
+    def test_cc_window_is_hidden_by_default(self):
+        """The CC window box must be hidden until 'w' is pressed."""
+        top, bottom = self.fig.axes
+        self.assertEqual(len(top.patches), 1)
+        self.assertEqual(len(bottom.patches), 1)
+        self.assertFalse(top.patches[0].get_visible())
+        self.assertFalse(bottom.patches[0].get_visible())
+
+    def test_cc_window_toggle_shows_both_panels(self):
+        """'w' must show and hide the CC window in both panels."""
+        top, bottom = self.fig.axes
+        _press_keys(self.fig, 'w')
+        self.assertTrue(top.patches[0].get_visible())
+        self.assertTrue(bottom.patches[0].get_visible())
+        _press_keys(self.fig, 'w')
+        self.assertFalse(top.patches[0].get_visible())
+        self.assertFalse(bottom.patches[0].get_visible())
+
+    def test_cc_window_matches_the_trace_stats(self):
+        """The box must span the stored cross-correlation window."""
+        rect = self.fig.axes[0].patches[0]
+        self.assertAlmostEqual(rect.get_x(), -0.5)
+        self.assertAlmostEqual(rect.get_width(), 4.0)
 
     def _bottom_amplitude(self, ax):
         """Return the amplitudes of the stacked and average lines."""

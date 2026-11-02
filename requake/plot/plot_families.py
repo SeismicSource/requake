@@ -61,6 +61,10 @@ AMPLITUDE_CMAP = 'seismic'
 AMPLITUDE_INTERPOLATION = 'bilinear'
 # Color of the average (template) trace
 AVERAGE_COLOR = '#cc8800'
+# Color of the box marking the cross-correlation window, toggled with
+# the 'w' key
+CC_WINDOW_COLOR = '#ffe9b3'
+CC_WINDOW_ALPHA = 0.6
 # Bottom panel, where all the traces are stacked on top of each other,
 # with the average trace drawn on top of them
 AVERAGE_LINEWIDTH = 1.2
@@ -697,6 +701,37 @@ def _plot_family(family):
     return _plot_family_wiggle(family, st, tr0, t0, t1)
 
 
+def _cc_window_spans(ax, ax_bottom, trace, t0):
+    """
+    Add the cross-correlation window box to the plot panels.
+
+    The box is hidden by default and is toggled with the ``w`` key.
+
+    :param ax: main axes
+    :type ax: matplotlib.axes.Axes
+    :param ax_bottom: bottom axes
+    :type ax_bottom: matplotlib.axes.Axes
+    :param trace: reference trace, holding the window stats
+    :type trace: obspy.Trace
+    :param t0: start of the plot time window, relative to trace start
+    :type t0: float
+    :return: artists to toggle
+    :rtype: list
+    """
+    cc_start = trace.stats.get('cc_window_start')
+    cc_end = trace.stats.get('cc_window_end')
+    if cc_start is None or cc_end is None:
+        return []
+    x0 = cc_start - trace.stats.starttime - t0
+    x1 = cc_end - trace.stats.starttime - t0
+    return [
+        axes.axvspan(
+            x0, x1, color=CC_WINDOW_COLOR, alpha=CC_WINDOW_ALPHA,
+            zorder=0, visible=False)
+        for axes in (ax, ax_bottom)
+    ]
+
+
 def _plot_family_wiggle(family, st, tr0, t0, t1):
     """Plot the traces of a family as wiggles, one per event."""
     st.sort()
@@ -717,6 +752,7 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
     average_line, stacked_lines, arrival_artists = (
         _plot_average_stacked_panel(
             ax_bottom, events, tr_average, t0, t1))
+    cc_window_artists = _cc_window_spans(ax, ax_bottom, tr0, t0)
     bottom_lines = stacked_lines
     if average_line is not None:
         bottom_lines = stacked_lines + [average_line]
@@ -817,6 +853,14 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
 
     _toggle_arrivals.visible = False
 
+    def _toggle_cc_window():
+        _toggle_cc_window.visible = not _toggle_cc_window.visible
+        for artist in cc_window_artists:
+            artist.set_visible(_toggle_cc_window.visible)
+        fig.canvas.draw_idle()
+
+    _toggle_cc_window.visible = False
+
     def _keypress(event):
         if event.key == 'up':
             _keypress.zoom_level *= 2
@@ -845,6 +889,8 @@ def _plot_family_wiggle(family, st, tr0, t0, t1):
             _keypress.pan_amount = 0
         elif event.key == 'a':
             _toggle_arrivals()
+        elif event.key == 'w':
+            _toggle_cc_window()
 
     _keypress.zoom_level = 1
     _keypress.time_zoom_level = 1
@@ -1027,6 +1073,9 @@ def plot_families():
             help_lines.append(
                 'Use shift+up/shift+down to increase/decrease the color '
                 'scale.')
+        else:
+            help_lines.append(
+                "Press 'w' to show/hide the cross-correlation window.")
         help_lines += [
             "Press '0' to reset the view.",
             "Press 'a' to show/hide theoretical arrivals.",

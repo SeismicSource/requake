@@ -45,6 +45,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
   time 0, outside the cross-correlation window, and ends the view
   where the average trace's envelope decays, so the labels on the
   left do not cover the waveform.
+- ``plot families`` in wiggle mode: press ``w`` to show or hide the
+  cross-correlation window behind the waveforms.
 - Resuming a scan no longer fails with ``Overlapping trace metadata
   intervals`` when the station metadata is read back from the database.
 
