@@ -118,7 +118,7 @@ def read_catalog_from_fdsnws():
         _download_catalog_events,
     )
     catalog = RequakeCatalog(event_list)
-    logger.info(f'{len(catalog)} events downloaded')
+    logger.info(f'{len(catalog):n} events downloaded')
     return catalog
 
 

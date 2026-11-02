@@ -186,7 +186,7 @@ def _print_pairs_table(scan_id, cc_min, cc_max, count,
     """Display pairs, using in-memory mode for small result sets."""
     if count <= _PAIRS_WARNING_THRESHOLD:
         pairs = run_with_spinner(
-            f'Loading {count} pairs...',
+            f'Loading {count:n} pairs...',
             lambda: read_pairs(
                 scan_id=scan_id, cc_min=cc_min, cc_max=cc_max,
                 include_invalid=include_invalid

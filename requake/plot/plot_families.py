@@ -964,7 +964,7 @@ def plot_families():
         rq_exit(1)
     if len(families) > 20:
         logger.warning(
-            f'Too many families selected: {len(families)}. '
+            f'Too many families selected: {len(families):n}. '
             'Plotting only the first 20.')
         logger.info(
             'See "requake plot_families -h" for information on '

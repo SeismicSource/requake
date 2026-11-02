@@ -106,7 +106,7 @@ def _filter_catalog(catalog):
     nevents_out = len(outcat)
     logger.info(
         'Catalog filtered based on configuration file: '
-        f'{nevents_out} events out of {nevents_in}'
+        f'{nevents_out:n} events out of {nevents_in:n}'
     )
     return outcat
 
@@ -196,7 +196,7 @@ def read_catalog():
     len_after = len(catalog)
     nevs_dedup = len_before - len_after
     if nevs_dedup > 0:
-        logger.info(f'{nevs_dedup} duplicate events removed')
+        logger.info(f'{nevs_dedup:n} duplicate events removed')
     # Sort catalog in increasing time order
     catalog.sort()
     # Write catalog to the output database

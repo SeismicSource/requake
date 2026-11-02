@@ -26,8 +26,8 @@ def _report(summary, verb):
     logger.warning(
         f'Family build {summary["build_id"]} of scan '
         f'{summary["scan_id"]} (method {summary["method"]}): '
-        f'{summary["families"]} family rows, '
-        f'{summary["detections"]} template detections'
+        f'{summary["families"]:n} family rows, '
+        f'{summary["detections"]:n} template detections'
     )
     logger.warning(f'All of the above {verb}')
 

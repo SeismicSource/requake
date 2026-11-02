@@ -111,7 +111,7 @@ def describe_scan_row(row):
         details.append(f'label "{label}"')
     npairs = row['npairs_stored']
     if npairs is not None:
-        details.append(f'{int(npairs)} pairs')
+        details.append(f'{int(npairs):n} pairs')
     return f' ({", ".join(details)})' if details else ''
 
 
@@ -399,8 +399,9 @@ def _warn_if_catalog_changed(row):
         return
     if current != int(nevents):
         logger.warning(
-            f'Catalog {row["catalog_id"]} now has {current} events, '
-            f'but scan {row["scan_id"]} was performed on {int(nevents)}'
+            f'Catalog {row["catalog_id"]} now has {current:n} events, '
+            f'but scan {row["scan_id"]} was performed on '
+            f'{int(nevents):n}'
         )
 
 

@@ -67,7 +67,7 @@ def _print_family_details(family, duration_units, duration_multiplier):
     :type duration_multiplier: float
     """
     print(f'Family: {family.number}')
-    print(f'Number of events: {len(family)}')
+    print(f'Number of events: {len(family):n}')
     print(f'Longitude: {family.lon:.4f}')
     print(f'Latitude: {family.lat:.4f}')
     print(f'Depth: {family.depth:.3f} km')
@@ -214,8 +214,8 @@ def _print_family_stats(families):
     )
 
     print('Family statistics:')
-    print(f'  Number of families: {len(families)}')
-    print(f'  Total number of events: {int(np.sum(nevents))}')
+    print(f'  Number of families: {len(families):n}')
+    print(f'  Total number of events: {int(np.sum(nevents)):n}')
     print(
         '  Events per family (min / median / mean / max): '
         f'{int(np.min(nevents))} / '

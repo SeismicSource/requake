@@ -221,7 +221,7 @@ def _group_duplicates(groups, events):
 def _table_title(name, count):
     """Return a table title, mentioning truncation when needed."""
     if count > _MAX_REPORT_ROWS:
-        return f'{name} (first {_MAX_REPORT_ROWS} of {count})'
+        return f'{name} (first {_MAX_REPORT_ROWS} of {count:n})'
     return name
 
 
@@ -231,7 +231,7 @@ def _compact_evids(evids):
         return ', '.join(evids)
     shown = ', '.join(evids[:_MAX_REPORT_EVIDS])
     remaining = len(evids) - _MAX_REPORT_EVIDS
-    return f'{shown}, ... (+{remaining} more)'
+    return f'{shown}, ... (+{remaining:n} more)'
 
 
 def _print_pairs_table(duplicate_pairs, duplicate_evids):
@@ -281,23 +281,28 @@ def _print_report(report):
         f'time difference <= {report["max_time_diff"]:g} s, '
         f'distance <= {report["max_distance_km"]:g} km'
     )
-    print(f'Pairs analyzed: {report["n_pairs"]}')
+    print(f'Pairs analyzed: {report["n_pairs"]:n}')
     if report['n_missing_location']:
         print(
             'Pairs skipped for missing coordinates: '
-            f'{report["n_missing_location"]}'
+            f'{report["n_missing_location"]:n}'
         )
-    print(f'Duplicate pairs found: {len(report["duplicate_pairs"])}')
-    print(f'Duplicate groups found: {len(report["groups_info"])}')
+    print(
+        f'Duplicate pairs found: {len(report["duplicate_pairs"]):n}'
+    )
+    print(f'Duplicate groups found: {len(report["groups_info"]):n}')
     print(
         'Events identified as duplicate: '
-        f'{len(report["duplicate_evids"])}'
+        f'{len(report["duplicate_evids"]):n}'
     )
     if report['dry_run']:
         print(style('Dry run: the database was not modified.', 'dim'))
     else:
-        print(f'Catalog events updated: {report["n_flagged"]}')
-        print(f'Event pairs flagged as invalid: {report["n_invalid"]}')
+        print(f'Catalog events updated: {report["n_flagged"]:n}')
+        print(
+            'Event pairs flagged as invalid: '
+            f'{report["n_invalid"]:n}'
+        )
     if report['duplicate_pairs']:
         print()
         _print_pairs_table(
@@ -350,14 +355,14 @@ def _print_reset_report(n_events, n_pairs, dry_run):
     if dry_run:
         print('Reset mode: duplicate and invalid flags would be cleared, '
               'no detection performed.')
-        print(f'Catalog events to un-flag: {n_events}')
-        print(f'Event pairs to un-flag: {n_pairs}')
+        print(f'Catalog events to un-flag: {n_events:n}')
+        print(f'Event pairs to un-flag: {n_pairs:n}')
         print(style('Dry run: the database was not modified.', 'dim'))
     else:
         print('Reset mode: duplicate and invalid flags cleared, '
               'no detection performed.')
-        print(f'Catalog events un-flagged: {n_events}')
-        print(f'Event pairs un-flagged: {n_pairs}')
+        print(f'Catalog events un-flagged: {n_events:n}')
+        print(f'Event pairs un-flagged: {n_pairs:n}')
 
 
 def dedup_events():
@@ -374,10 +379,13 @@ def dedup_events():
         _print_reset_report(n_events, n_pairs, dry_run)
         if dry_run:
             logger.info(
-                f'{n_events} events and {n_pairs} event pairs would be reset'
+                f'{n_events:n} events and {n_pairs:n} event pairs '
+                'would be reset'
             )
         else:
-            logger.info(f'{n_events} events and {n_pairs} event pairs reset')
+            logger.info(
+                f'{n_events:n} events and {n_pairs:n} event pairs reset'
+            )
         return
     cc_min = config.args.cc_min
     max_time_diff = config.args.max_time_diff
@@ -423,7 +431,7 @@ def dedup_events():
     n_invalid = 0
     if not dry_run and duplicate_evids:
         flag_message = (
-            f'Flagging {len(duplicate_evids)} events as duplicate...'
+            f'Flagging {len(duplicate_evids):n} events as duplicate...'
         )
         n_flagged, n_invalid = run_with_spinner(
             flag_message,
@@ -448,6 +456,6 @@ def dedup_events():
     _print_report(report)
     if not dry_run:
         logger.info(
-            f'{n_flagged} events flagged as duplicate, '
-            f'{n_invalid} event pairs flagged as invalid'
+            f'{n_flagged:n} events flagged as duplicate, '
+            f'{n_invalid:n} event pairs flagged as invalid'
         )

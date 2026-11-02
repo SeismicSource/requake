@@ -112,7 +112,7 @@ def _read_station_metadata_from_db():
         station.channels.append(channel)
     logger.info(
         'Built station metadata from database '
-        f'({len(rows)} trace metadata rows)'
+        f'({len(rows):n} trace metadata rows)'
     )
     return inv
 

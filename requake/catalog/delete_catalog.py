@@ -24,10 +24,11 @@ logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 def _report(summary, verb):
     """Report what the deletion involves."""
     logger.warning(
-        f'Catalog {summary["catalog_id"]}: {summary["events"]} events, '
-        f'{summary["scans"]} scans, {summary["pairs"]} pairs, '
-        f'{summary["builds"]} family builds, {summary["families"]} '
-        f'family rows, {summary["detections"]} template detections'
+        f'Catalog {summary["catalog_id"]}: {summary["events"]:n} events, '
+        f'{summary["scans"]:n} scans, {summary["pairs"]:n} pairs, '
+        f'{summary["builds"]:n} family builds, '
+        f'{summary["families"]:n} family rows, '
+        f'{summary["detections"]:n} template detections'
     )
     logger.warning(f'All of the above {verb}')
 

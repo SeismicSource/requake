@@ -145,8 +145,8 @@ def _build_families_from_upgma(events, cc_min):
     if n_events < 2:
         return []
     logger.info(
-        f'UPGMA: {n_events} events, '
-        f'{n_events * (n_events - 1) // 2} pairwise distances'
+        f'UPGMA: {n_events:n} events, '
+        f'{n_events * (n_events - 1) // 2:n} pairwise distances'
     )
     evids, distances = _condensed_distances(events)
     # Build the linkage matrix, then the clusters

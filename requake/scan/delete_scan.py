@@ -25,9 +25,10 @@ def _report(summary, verb):
     """Report what the deletion involves."""
     logger.warning(
         f'Scan {summary["scan_id"]} of catalog {summary["catalog_id"]}: '
-        f'{summary["pairs"]} pairs, {summary["builds"]} family builds, '
-        f'{summary["families"]} family rows, '
-        f'{summary["detections"]} template detections'
+        f'{summary["pairs"]:n} pairs, '
+        f'{summary["builds"]:n} family builds, '
+        f'{summary["families"]:n} family rows, '
+        f'{summary["detections"]:n} template detections'
     )
     logger.warning(f'All of the above {verb}')
 

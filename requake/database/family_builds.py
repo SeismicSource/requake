@@ -111,7 +111,7 @@ def describe_build_row(row):
         details.append(f'method {method}')
     nfamilies = row['nfamilies']
     if nfamilies is not None:
-        details.append(f'{int(nfamilies)} families')
+        details.append(f'{int(nfamilies):n} families')
     return f' ({", ".join(details)})' if details else ''
 
 

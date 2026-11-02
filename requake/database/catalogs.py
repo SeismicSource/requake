@@ -83,7 +83,7 @@ def _describe(row):
         details.append(f'label "{label}"')
     nevents = row['nevents']
     if nevents is not None:
-        details.append(f'{int(nevents)} events')
+        details.append(f'{int(nevents):n} events')
     return f' ({", ".join(details)})' if details else ''
 
 
