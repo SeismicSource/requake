@@ -14,6 +14,10 @@ many terminals that handle colors (e.g. ``xterm``) ignore them; the
 ``NO_HYPERLINK`` and ``FORCE_HYPERLINK`` environment variables can be
 used to force hyperlinks off or on.
 
+On Windows, ANSI processing is enabled on the console when possible, so
+that colors and other escape sequences work in Windows Terminal and
+modern consoles.
+
 :copyright:
     2021-2026 Claudio Satriano <satriano@ipgp.fr>
 :license:
@@ -87,6 +91,74 @@ _CODES = {
     'gray': '\x1b[38;5;244m',
 }
 
+# Console mode flag enabling ANSI escape processing on Windows.
+_ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+
+
+def _enable_windows_vt(stream):
+    """
+    Enable ANSI escape processing on a Windows console, if possible.
+
+    The flag is set on the output handle, as libraries like ``colorama``
+    do, so that Windows Terminal and modern consoles interpret the
+    escape sequences.
+
+    :param stream: output stream to configure
+    :type stream: io.TextIOBase
+
+    :return: True if the console now processes ANSI escape sequences
+    :rtype: bool
+    """
+    try:
+        import ctypes
+        import msvcrt
+        from ctypes import wintypes
+        kernel32 = ctypes.windll.kernel32
+        handle = wintypes.HANDLE(msvcrt.get_osfhandle(stream.fileno()))
+        mode = wintypes.DWORD()
+        if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return False
+        return bool(kernel32.SetConsoleMode(
+            handle, mode.value | _ENABLE_VIRTUAL_TERMINAL_PROCESSING))
+    except (AttributeError, ImportError, OSError, ValueError):
+        return False
+
+
+def ansi_enabled(stream=None):
+    """
+    Return whether ``stream`` is a terminal that understands ANSI codes.
+
+    Unlike :func:`color_enabled`, this is not affected by ``NO_COLOR``
+    or ``FORCE_COLOR``: cursor-control sequences must never be written
+    to a stream that is not an interactive terminal.
+
+    On Windows, ANSI processing is enabled on the console when possible;
+    terminals that are not Win32 consoles (e.g. mintty) advertise
+    themselves through the ``TERM`` environment variable instead.
+
+    :param stream: output stream to test (defaults to ``sys.stdout``)
+    :type stream: io.TextIOBase
+
+    :return: True if ANSI sequences can be used on ``stream``
+    :rtype: bool
+    """
+    stream = sys.stdout if stream is None else stream
+    if os.environ.get('TERM') == 'dumb':
+        return False
+    try:
+        if not stream.isatty():
+            return False
+    except (AttributeError, ValueError):
+        return False
+    # ANSI is native outside Windows; on Windows it must be enabled on
+    # the console, unless the terminal is not a Win32 console (e.g.
+    # mintty), which advertises itself through TERM.
+    return (
+        sys.platform != 'win32'
+        or _enable_windows_vt(stream)
+        or bool(os.environ.get('TERM'))
+    )
+
 
 def color_enabled(stream=None):
     """
@@ -106,16 +178,9 @@ def color_enabled(stream=None):
     """
     if os.environ.get('NO_COLOR'):
         return False
-    if os.environ.get('FORCE_COLOR'):
-        return True
-    if os.environ.get('TERM') == 'dumb':
-        return False
-    if stream is None:
-        stream = sys.stdout
-    try:
-        return bool(stream.isatty())
-    except (AttributeError, ValueError):
-        return False
+    return (
+        True if os.environ.get('FORCE_COLOR') else ansi_enabled(stream)
+    )
 
 
 def _known_hyperlink_terminal():

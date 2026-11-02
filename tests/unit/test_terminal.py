@@ -14,9 +14,11 @@ import unittest
 from unittest.mock import patch
 
 from requake.config.generic_printer import _style_table
+from requake import terminal
 from requake.terminal import (
     _LINK_RGB,
     _LINK_RGB_256,
+    ansi_enabled,
     color_enabled,
     display_width,
     error,
@@ -129,6 +131,40 @@ class TestTerminalColors(unittest.TestCase):
         """A dumb terminal disables colors."""
         with patch.dict('os.environ', {'TERM': 'dumb'}):
             self.assertFalse(color_enabled(_FakeStream(True)))
+
+    def test_ansi_enabled_requires_a_terminal(self):
+        """ANSI sequences are only used on interactive streams."""
+        self.assertTrue(ansi_enabled(_FakeStream(True)))
+        self.assertFalse(ansi_enabled(_FakeStream(False)))
+
+    def test_ansi_disabled_for_dumb_terminal(self):
+        """A dumb terminal does not get ANSI sequences."""
+        with patch.dict('os.environ', {'TERM': 'dumb'}):
+            self.assertFalse(ansi_enabled(_FakeStream(True)))
+
+    def test_ansi_enabled_on_windows_with_vt(self):
+        """Modern Windows consoles process ANSI sequences."""
+        with patch.object(terminal.sys, 'platform', 'win32'), \
+                patch.object(
+                    terminal, '_enable_windows_vt', lambda s: True):
+            self.assertTrue(ansi_enabled(_FakeStream(True)))
+
+    def test_ansi_disabled_on_windows_console_without_vt(self):
+        """Legacy Windows consoles get plain output."""
+        with patch.object(terminal.sys, 'platform', 'win32'), \
+                patch.object(
+                    terminal, '_enable_windows_vt', lambda s: False), \
+                patch.dict('os.environ', {'TERM': ''}):
+            self.assertFalse(ansi_enabled(_FakeStream(True)))
+            self.assertFalse(color_enabled(_FakeStream(True)))
+
+    def test_ansi_enabled_on_windows_non_console_terminal(self):
+        """Non-console terminals (e.g. mintty) are detected via TERM."""
+        with patch.object(terminal.sys, 'platform', 'win32'), \
+                patch.object(
+                    terminal, '_enable_windows_vt', lambda s: False), \
+                patch.dict('os.environ', {'TERM': 'xterm'}):
+            self.assertTrue(ansi_enabled(_FakeStream(True)))
 
     def test_style_table_highlights_header_and_separator(self):
         """Table headers are bold cyan and separators are dimmed."""
