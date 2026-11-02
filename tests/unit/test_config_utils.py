@@ -11,7 +11,9 @@ Unit tests for configuration utility helpers.
 """
 
 import io
+import os
 import time
+import tempfile
 import threading
 import unittest
 import contextlib
@@ -21,10 +23,42 @@ from unittest.mock import patch
 from requake.config import utils
 from requake.config.utils import (
     abort_requested,
+    relative_path,
     request_abort,
     run_with_spinner,
 )
 from requake.terminal import display_width
+
+
+class TestRelativePath(unittest.TestCase):
+    """Test displaying paths relative to the working directory."""
+
+    def setUp(self):
+        """Work inside a temporary directory."""
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.test_dir.cleanup)
+        old_cwd = os.getcwd()
+        self.addCleanup(os.chdir, old_cwd)
+        os.chdir(self.test_dir.name)
+
+    def test_path_inside_cwd(self):
+        """A path inside the working directory is shown relative."""
+        path = os.path.join(self.test_dir.name, 'requake_out', 'db.sqlite')
+        expected = os.path.join('requake_out', 'db.sqlite')
+        self.assertEqual(relative_path(path), expected)
+
+    def test_path_outside_cwd(self):
+        """A path outside the working directory is left unchanged."""
+        with tempfile.TemporaryDirectory() as other:
+            path = os.path.join(other, 'db.sqlite')
+            self.assertEqual(relative_path(path), path)
+
+    def test_path_on_another_drive(self):
+        """A path that cannot be made relative is left unchanged."""
+        with patch.object(
+                utils.os.path, 'relpath', side_effect=ValueError):
+            self.assertEqual(relative_path('/other/db.sqlite'),
+                             '/other/db.sqlite')
 
 
 class TestAbortFlag(unittest.TestCase):

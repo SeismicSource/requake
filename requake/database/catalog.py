@@ -15,7 +15,7 @@ from .catalogs import (
     CATALOGS_SCHEMA_STATEMENTS,
     resolve_catalog_id,
 )
-from .db import execute_with_retry, get_db_connection, get_db_path
+from .db import execute_with_retry, get_db_connection, display_db_path
 
 CATALOG_TABLE = 'catalog'
 MISSING_CATALOG_TABLE = f'no such table: {CATALOG_TABLE}'
@@ -193,12 +193,12 @@ def read_catalog(catalog_id=None, db_path=None):
         if MISSING_CATALOG_TABLE in str(err):
             raise FileNotFoundError(
                 'Catalog not found in db file '
-                f'{get_db_path(db_path=db_path)}'
+                f'{display_db_path(db_path=db_path)}'
             ) from err
         if 'no such column: catalog_id' in str(err):
             raise CatalogSchemaError(
                 'The stored catalog predates the multi-catalog schema '
-                f'in db file {get_db_path(db_path=db_path)}'
+                f'in db file {display_db_path(db_path=db_path)}'
             ) from err
         raise
     finally:

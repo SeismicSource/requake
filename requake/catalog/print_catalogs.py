@@ -25,7 +25,7 @@ from ..database.catalogs import (
     read_catalog_row,
     read_catalogs,
 )
-from ..database.db import get_db_path
+from ..database.db import display_db_path
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 
@@ -58,7 +58,7 @@ def print_catalogs():
         logger.error(msg)
         rq_exit(1)
     if not rows:
-        logger.error(f'No catalog found in db file {get_db_path()}')
+        logger.error(f'No catalog found in db file {display_db_path()}')
         rq_exit(1)
     table = [
         [

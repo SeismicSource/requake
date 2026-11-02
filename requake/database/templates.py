@@ -11,7 +11,7 @@ SQLite-backed template detection persistence.
 """
 import sqlite3
 from obspy import UTCDateTime
-from .db import execute_with_retry, get_db_connection, get_db_path
+from .db import execute_with_retry, get_db_connection, display_db_path
 from .family_builds import (
     FAMILY_BUILDS_SCHEMA_STATEMENTS,
     FamilyBuildNotFoundError,
@@ -172,7 +172,7 @@ def read_template_families(build_id=None):
             if MISSING_TEMPLATE_DETECTIONS_TABLE in str(err):
                 raise FileNotFoundError(
                     'Template detections not found in db file '
-                    f'{get_db_path()}'
+                    f'{display_db_path()}'
                 ) from err
             raise
     finally:

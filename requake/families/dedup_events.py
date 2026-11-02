@@ -23,7 +23,7 @@ from ..config import config, rq_exit
 from ..config.utils import run_with_spinner
 from ..catalog import read_stored_catalog
 from ..terminal import style
-from ..database.db import DatabaseCorruptError, get_db_path
+from ..database.db import DatabaseCorruptError, display_db_path
 from ..database.catalog import (
     count_duplicate_events,
     reset_duplicate_flags,
@@ -400,7 +400,7 @@ def dedup_events():
         rq_exit(1)
     pairs_message = (
         f'Reading event pairs of scan {scan_id} with cc >= {cc_min:.2f} '
-        f'from db file {get_db_path()}...'
+        f'from db file {display_db_path()}...'
     )
     try:
         pairs = run_with_spinner(

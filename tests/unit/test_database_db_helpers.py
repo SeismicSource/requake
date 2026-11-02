@@ -27,6 +27,7 @@ from requake.database.catalogs import create_catalog
 from requake.database.db import (
     check_db_exists,
     check_db_version,
+    display_db_path,
     execute_with_retry,
     get_db_connection,
     get_db_path,
@@ -70,6 +71,19 @@ class TestDatabaseDbHelpers(unittest.TestCase):
             db_path = get_db_path()
         self.assertTrue(db_path.startswith(self.test_dir.name))
         self.assertTrue(db_path.endswith('requake.sqlite'))
+
+    def test_display_db_path_is_relative_inside_cwd(self):
+        """A database under the working directory is shown relative."""
+        old_cwd = os.getcwd()
+        self.addCleanup(os.chdir, old_cwd)
+        os.chdir(self.test_dir.name)
+        with self._patch_runtime_config():
+            self.assertEqual(display_db_path(), 'requake.sqlite')
+
+    def test_display_db_path_outside_cwd_is_absolute(self):
+        """A database outside the working directory keeps its path."""
+        with self._patch_runtime_config():
+            self.assertEqual(display_db_path(), get_db_path())
 
     def test_check_db_exists_init_and_runtime(self):
         """Init mode creates parent dir, runtime mode requires db file."""

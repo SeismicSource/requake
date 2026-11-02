@@ -12,7 +12,7 @@ SQLite-backed family persistence.
 import sqlite3
 from obspy import UTCDateTime
 from .catalog import CATALOG_SCHEMA_STATEMENTS
-from .db import execute_with_retry, get_db_connection, get_db_path
+from .db import execute_with_retry, get_db_connection, display_db_path
 from .family_builds import (
     FAMILY_BUILDS_SCHEMA_STATEMENTS,
     FamilyBuildNotFoundError,  # noqa: F401 (re-exported for callers)
@@ -177,12 +177,12 @@ def read_families(build_id=None, family_numbers=None):
         except sqlite3.OperationalError as err:
             if MISSING_FAMILIES_TABLE in str(err):
                 raise FileNotFoundError(
-                    f'Families not found in db file {get_db_path()}'
+                    f'Families not found in db file {display_db_path()}'
                 ) from err
             if 'no such column: build_id' in str(err):
                 raise FamiliesSchemaError(
                     'The stored families predate the multi-build schema '
-                    f'in db file {get_db_path()}'
+                    f'in db file {display_db_path()}'
                 ) from err
             raise
     finally:
@@ -236,7 +236,7 @@ def update_family_valid(build_id, family_number, is_valid):
         except sqlite3.OperationalError as err:
             if MISSING_FAMILIES_TABLE in str(err):
                 raise FileNotFoundError(
-                    f'Families not found in db file {get_db_path()}'
+                    f'Families not found in db file {display_db_path()}'
                 ) from err
             raise
         conn.commit()

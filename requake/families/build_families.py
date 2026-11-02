@@ -21,7 +21,7 @@ from ..config.run_params import (
     parameters_json,
 )
 from ..config.utils import run_with_spinner
-from ..database.db import DatabaseCorruptError, get_db_path
+from ..database.db import DatabaseCorruptError, display_db_path
 from ..database.family_builds import (
     BUILD_STATUS_COMPLETE,
     BUILD_STATUS_FAILED,
@@ -308,7 +308,7 @@ def build_families():
         cc_min = config.cc_min
         read_message = (
             f'Reading events from the pairs of scan {scan_id} with '
-            f'cc >= {cc_min} in db file {get_db_path()}...'
+            f'cc >= {cc_min} in db file {display_db_path()}...'
         )
         logger.debug(read_message)
         events = run_with_spinner(
@@ -318,7 +318,7 @@ def build_families():
     except (FileNotFoundError, PairsTableNotFoundError):
         _fail_family_build(
             build_id,
-            f'Unable to find event pairs in database: {get_db_path()}'
+            f'Unable to find event pairs in database: {display_db_path()}'
         )
     except (
         PairsMetadataError, PairsSchemaError, DatabaseCorruptError
@@ -355,5 +355,5 @@ def build_families():
                 status=status,
             )
     logger.info(
-        f'Done! Family build {build_id} written to: {get_db_path()}'
+        f'Done! Family build {build_id} written to: {display_db_path()}'
     )

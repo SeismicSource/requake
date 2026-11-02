@@ -11,7 +11,7 @@ import logging
 import sqlite3
 from obspy import UTCDateTime
 from .._version import get_versions
-from .db import execute_with_retry, get_db_connection, get_db_path
+from .db import execute_with_retry, get_db_connection, display_db_path
 
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -232,7 +232,8 @@ def read_catalog_row(catalog_id):
     conn = _connect_or_none()
     if conn is None:
         raise CatalogNotFoundError(
-            f'Catalog {catalog_id} not found in db file {get_db_path()}'
+            f'Catalog {catalog_id} not found in db file '
+            f'{display_db_path()}'
         )
     try:
         cursor = conn.cursor()
@@ -245,14 +246,15 @@ def read_catalog_row(catalog_id):
             if _is_missing_catalogs_table_error(err):
                 raise CatalogNotFoundError(
                     f'Catalog {catalog_id} not found in db file '
-                    f'{get_db_path()}'
+                    f'{display_db_path()}'
                 ) from err
             raise
     finally:
         conn.close()
     if row is None:
         raise CatalogNotFoundError(
-            f'Catalog {catalog_id} not found in db file {get_db_path()}'
+            f'Catalog {catalog_id} not found in db file '
+            f'{display_db_path()}'
         )
     return row
 
@@ -331,7 +333,7 @@ def resolve_catalog_id(requested=None):
     catalog_id = latest_catalog_id()
     if catalog_id is None:
         raise CatalogNotFoundError(
-            f'No catalog found in db file {get_db_path()}. '
+            f'No catalog found in db file {display_db_path()}. '
             'Run "requake read_catalog" first.'
         )
     row = read_catalog_row(catalog_id)
@@ -392,7 +394,7 @@ def count_stored_events(catalog_id):
             if 'no such column: catalog_id' in str(err):
                 raise CatalogsSchemaError(
                     'The stored catalog predates the multi-catalog '
-                    f'schema in db file {get_db_path()}'
+                    f'schema in db file {display_db_path()}'
                 ) from err
             raise
         return int(row[0])

@@ -18,7 +18,7 @@ from ..config.generic_printer import (
     print_key_value_table,
 )
 from ..config.run_params import format_parameters
-from ..database.db import get_db_path
+from ..database.db import display_db_path
 from ..database.family_builds import (
     FamilyBuildNotFoundError,
     read_family_build,
@@ -60,7 +60,7 @@ def print_family_builds():
         logger.error(msg)
         rq_exit(1)
     if not rows:
-        logger.error(f'No family build found in db file {get_db_path()}')
+        logger.error(f'No family build found in db file {display_db_path()}')
         rq_exit(1)
     table = [
         [

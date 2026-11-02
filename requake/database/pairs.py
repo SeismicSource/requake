@@ -16,9 +16,9 @@ from typing import NamedTuple
 from obspy import UTCDateTime
 from .db import (
     DatabaseCorruptError,
+    display_db_path,
     execute_with_retry,
     get_db_connection,
-    get_db_path,
 )
 from .scans import (
     SCANS_SCHEMA_STATEMENTS,
@@ -175,7 +175,8 @@ def _incompatible_schema_message():
     """Return the error message for an outdated pairs schema."""
     return (
         'Stored event pairs schema is outdated or incompatible with this '
-        f'Requake version in db file {get_db_path()}. Databases written by '
+        f'Requake version in db file {display_db_path()}. '
+        'Databases written by '
         'Requake < 0.8.5 must be migrated: see the database schemas '
         'section of the documentation.'
     )
@@ -296,7 +297,7 @@ def count_pairs_up_to(scan_id, cc_min, cc_max, limit,
             if _is_missing_pairs_table_error(err):
                 raise PairsTableNotFoundError(
                     'Event pairs table not found in db file '
-                    f'{get_db_path()}'
+                    f'{display_db_path()}'
                 ) from err
             if _is_incompatible_pairs_schema_error(err):
                 raise PairsSchemaError(
@@ -307,7 +308,7 @@ def count_pairs_up_to(scan_id, cc_min, cc_max, limit,
             if 'database disk image is malformed' in str(err).lower():
                 raise DatabaseCorruptError(
                     'The event pairs database is corrupted: '
-                    f'{get_db_path()}'
+                    f'{display_db_path()}'
                 ) from err
             raise
     finally:
@@ -546,7 +547,7 @@ def read_event_key_rows():
             if _is_incompatible_pairs_schema_error(err):
                 raise PairsSchemaError(
                     'Stored event pairs schema is incompatible with this '
-                    f'Requake version in db file {get_db_path()}'
+                    f'Requake version in db file {display_db_path()}'
                 ) from err
             raise
     finally:
@@ -736,25 +737,25 @@ def read_pairs(scan_id=None, cc_min=None, cc_max=None, offset=None,
             if any(row['sampling_rate_hz'] is None for row in rows):
                 raise PairsMetadataError(
                     'Trace metadata is missing for one or more stored pairs '
-                    f'in db file {get_db_path()}'
+                    f'in db file {display_db_path()}'
                 )
         except sqlite3.OperationalError as err:
             if _is_missing_pairs_table_error(err):
                 raise PairsTableNotFoundError(
                     'Event pairs table not found in db file '
-                    f'{get_db_path()}'
+                    f'{display_db_path()}'
                 ) from err
             if _is_incompatible_pairs_schema_error(err):
                 raise PairsSchemaError(
                     'Stored event pairs schema is incompatible with this '
-                    f'Requake version in db file {get_db_path()}'
+                    f'Requake version in db file {display_db_path()}'
                 ) from err
             raise
         except sqlite3.DatabaseError as err:
             if 'database disk image is malformed' in str(err).lower():
                 raise DatabaseCorruptError(
                     'The event pairs database is corrupted or malformed: '
-                    f'{get_db_path()}\n'
+                    f'{display_db_path()}\n'
                     'You can try recovering it with:\n'
                     "sqlite3 requake.sqlite '.recover' | "
                     'sqlite3 requake_new.sqlite'

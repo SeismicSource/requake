@@ -115,6 +115,32 @@ def write_ok(filepath, force=False):
     return True
 
 
+def relative_path(path):
+    """
+    Return *path* relative to the current directory, when it is inside it.
+
+    Paths outside the current directory, or on another drive (on
+    Windows), are returned unchanged, so that messages are not
+    cluttered with ``..`` components.
+
+    :param path: path to convert
+    :type path: str or os.PathLike
+
+    :return: path relative to the current directory, or *path*
+    :rtype: str
+    """
+    path = os.fspath(path)
+    try:
+        cwd = os.path.realpath(os.getcwd())
+        absolute = os.path.realpath(os.path.abspath(path))
+        relative = os.path.relpath(absolute, cwd)
+    except ValueError:
+        return path
+    if relative == os.pardir or relative.startswith(os.pardir + os.sep):
+        return path
+    return relative
+
+
 def write_sample_config(configspec, progname):
     """
     Write a sample configuration file.

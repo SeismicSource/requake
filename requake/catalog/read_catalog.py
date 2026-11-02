@@ -26,7 +26,7 @@ from ..database.catalogs import (
     find_catalog_by_hash,
     resolve_catalog_id,
 )
-from ..database.db import get_db_path
+from ..database.db import display_db_path
 from .catalog import RequakeEvent, RequakeCatalog, read_stored_catalog
 from .read_catalog_from_fdsnws import read_catalog_from_fdsnws
 from .read_catalog_from_quakeml import read_catalog_from_quakeml
@@ -165,7 +165,7 @@ def read_catalog():
             nevs_read = len(catalog)
             logger.info(
                 f'{nevs_read:n} events read from catalog {append_to} '
-                f'in db file {get_db_path()}'
+                f'in db file {display_db_path()}'
             )
     logger.debug('Reading catalog...')
     input_cat_file = getattr(config.args, 'catalog_file', None)
@@ -209,5 +209,5 @@ def read_catalog():
     nevs_written = len(catalog) - nevs_read
     logger.info(
         f'{nevs_written:n} events written to catalog {catalog_id} '
-        f'in db file {get_db_path()}'
+        f'in db file {display_db_path()}'
     )

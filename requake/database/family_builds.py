@@ -12,7 +12,7 @@ import logging
 import sqlite3
 from obspy import UTCDateTime
 from .._version import get_versions
-from .db import execute_with_retry, get_db_connection, get_db_path
+from .db import execute_with_retry, get_db_connection, display_db_path
 from .scans import SCANS_SCHEMA_STATEMENTS
 
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
@@ -276,7 +276,7 @@ def read_family_build(build_id):
     if conn is None:
         raise FamilyBuildNotFoundError(
             f'Family build {build_id} not found in db file '
-            f'{get_db_path()}'
+            f'{display_db_path()}'
         )
     try:
         cursor = conn.cursor()
@@ -289,7 +289,7 @@ def read_family_build(build_id):
             if _is_missing_family_builds_table_error(err):
                 raise FamilyBuildNotFoundError(
                     f'Family build {build_id} not found in db file '
-                    f'{get_db_path()}'
+                    f'{display_db_path()}'
                 ) from err
             raise
     finally:
@@ -297,7 +297,7 @@ def read_family_build(build_id):
     if row is None:
         raise FamilyBuildNotFoundError(
             f'Family build {build_id} not found in db file '
-            f'{get_db_path()}'
+            f'{display_db_path()}'
         )
     return row
 
@@ -391,7 +391,7 @@ def resolve_build_id(requested=None, scan_id=None):
     build_id = latest_build_id(scan_id=scan_id)
     if build_id is None:
         raise FamilyBuildNotFoundError(
-            f'No family build found in db file {get_db_path()}. '
+            f'No family build found in db file {display_db_path()}. '
             'Run "requake build_families" first.'
         )
     row = read_family_build(build_id)

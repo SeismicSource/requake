@@ -15,7 +15,7 @@ import random
 import sqlite3
 import time
 from ..config.config import config
-from ..config.utils import abort_requested
+from ..config.utils import abort_requested, relative_path
 
 DB_VERSION = 1
 DB_FILENAME = 'requake.sqlite'
@@ -70,6 +70,19 @@ def get_db_path(db_path=None):
     return os.path.join(outdir, DB_FILENAME)
 
 
+def display_db_path(db_path=None):
+    """
+    Return the SQLite path for display, relative to the current directory.
+
+    :param db_path: database path (defaults to the configured one)
+    :type db_path: str or None
+
+    :return: path for display
+    :rtype: str
+    """
+    return relative_path(get_db_path(db_path=db_path))
+
+
 def check_db_exists(initdb=False, db_path=None):
     """Validate the configured database path for read or init mode."""
     db_path = get_db_path(db_path=db_path)
@@ -77,7 +90,9 @@ def check_db_exists(initdb=False, db_path=None):
         _ensure_parent_dir(db_path)
         return db_path
     if not os.path.exists(db_path):
-        raise FileNotFoundError(f'Database file {db_path} not found')
+        raise FileNotFoundError(
+            f'Database file {relative_path(db_path)} not found'
+        )
     return db_path
 
 

@@ -24,7 +24,7 @@ from ..config.run_params import (
     scan_parameters,
 )
 from ..database.catalogs import CatalogNotFoundError, resolve_catalog_id
-from ..database.db import get_db_path
+from ..database.db import display_db_path
 from ..database.scans import (
     SCAN_STATUS_COMPLETE,
     SCAN_STATUS_FAILED,
@@ -253,7 +253,7 @@ def scan_catalog():
         rq_exit(1)
     logger.info(
         f'[rq:scan] {nevents:n} events read from catalog {catalog_id} '
-        f'in db file {get_db_path()}'
+        f'in db file {display_db_path()}'
     )
     params = scan_parameters()
     params_hash = parameters_digest(params)
@@ -311,5 +311,5 @@ def scan_catalog():
             )
     logger.info(f'[rq:scan] Processed {npairs:n} event pairs')
     logger.info(
-        f'[rq:scan] Done! Scan {scan_id} written to {get_db_path()}'
+        f'[rq:scan] Done! Scan {scan_id} written to: {display_db_path()}'
     )

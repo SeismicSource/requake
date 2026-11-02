@@ -19,6 +19,7 @@ from obspy.geodetics import gps2dist_azimuth
 from tqdm import tqdm
 
 from ..config import config, rq_exit
+from ..config.utils import relative_path
 from ..cli.values import timespec_to_sec
 from ..terminal import style
 from .storage import (
@@ -862,7 +863,11 @@ def wfcache_inspect():
     if bool(getattr(config.args, 'json', False)):
         print(json.dumps(summary, indent=2, sort_keys=True))
         rq_exit(0)
-    _print_cached_key('waveform cache path', summary['path'])
+    path = summary['path']
+    _print_cached_key(
+        'waveform cache path',
+        relative_path(path) if path is not None else path,
+    )
     _print_cached_key('cache exists', summary['exists'])
     if summary['exists']:
         _print_wfcache_details(summary)

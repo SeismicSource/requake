@@ -17,7 +17,7 @@ from .catalogs import (
     describe_catalog_row,
     read_catalog_row,
 )
-from .db import execute_with_retry, get_db_connection, get_db_path
+from .db import execute_with_retry, get_db_connection, display_db_path
 
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
@@ -272,7 +272,7 @@ def read_scan(scan_id):
     conn = _connect_or_none()
     if conn is None:
         raise ScanNotFoundError(
-            f'Scan {scan_id} not found in db file {get_db_path()}'
+            f'Scan {scan_id} not found in db file {display_db_path()}'
         )
     try:
         cursor = conn.cursor()
@@ -284,14 +284,15 @@ def read_scan(scan_id):
         except sqlite3.OperationalError as err:
             if _is_missing_scans_table_error(err):
                 raise ScanNotFoundError(
-                    f'Scan {scan_id} not found in db file {get_db_path()}'
+                    f'Scan {scan_id} not found in db file '
+                    f'{display_db_path()}'
                 ) from err
             raise
     finally:
         conn.close()
     if row is None:
         raise ScanNotFoundError(
-            f'Scan {scan_id} not found in db file {get_db_path()}'
+            f'Scan {scan_id} not found in db file {display_db_path()}'
         )
     return row
 
@@ -424,7 +425,7 @@ def resolve_scan_id(requested=None, catalog_id=None):
     scan_id = latest_scan_id(catalog_id=catalog_id)
     if scan_id is None:
         raise ScanNotFoundError(
-            f'No catalog scan found in db file {get_db_path()}. '
+            f'No catalog scan found in db file {display_db_path()}. '
             'Run "requake scan_catalog" first.'
         )
     row = read_scan(scan_id)
