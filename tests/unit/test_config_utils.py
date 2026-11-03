@@ -89,6 +89,50 @@ class TestRunWithSpinner(unittest.TestCase):
         request_abort(False)
         self.addCleanup(request_abort, False)
 
+    def _terminal_output(self, message='reading...', func=None,
+                         columns=40, ansi=None, env=None):
+        """
+        Run the spinner on a fake terminal and return its output.
+
+        *func* defaults to a short sleep, *columns* may be either the
+        terminal width or a callable returning it, and *ansi* optionally
+        forces the outcome of the ANSI support detection.
+        """
+        env = {'NO_COLOR': '1', 'TERM': 'xterm'} if env is None else env
+
+        def _sleep():
+            time.sleep(0.15)
+
+        def _fixed_columns():
+            return columns
+
+        columns_fn = columns if callable(columns) else _fixed_columns
+        if ansi is None:
+            ansi_patch = contextlib.nullcontext()
+        else:
+            ansi_patch = patch.object(
+                utils, 'ansi_enabled', lambda s=None: ansi)
+        stream = io.StringIO()
+        with contextlib.redirect_stderr(stream), \
+                patch.object(utils, '_terminal_columns', columns_fn), \
+                patch.object(stream, 'isatty', lambda: True), \
+                patch.dict('os.environ', env), \
+                ansi_patch:
+            run_with_spinner(message, func or _sleep)
+        return stream.getvalue()
+
+    def _assert_terminal_output(self, *expected, **kwargs):
+        """
+        Run the spinner and check that each of *expected* is printed.
+
+        Keyword arguments are passed to :meth:`_terminal_output`.  The
+        spinner output is returned, for further checks.
+        """
+        out = self._terminal_output(**kwargs)
+        for text in expected:
+            self.assertIn(text, out)
+        return out
+
     def test_spinner_returns_result(self):
         """The wrapped function result should be returned."""
         with contextlib.redirect_stderr(io.StringIO()):
@@ -127,14 +171,7 @@ class TestRunWithSpinner(unittest.TestCase):
 
     def test_spinner_keeps_a_short_message(self):
         """A message that fits the terminal is printed in full."""
-        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
-                patch.object(utils, '_terminal_columns', lambda: 40), \
-                patch.object(stderr, 'isatty', lambda: True), \
-                patch.dict('os.environ', {'NO_COLOR': '1'}):
-            run_with_spinner('reading...', lambda: time.sleep(0.15))
-        out = stderr.getvalue()
-        self.assertIn('reading...\n', out)
-        self.assertIn('⠋', out)
+        self._assert_terminal_output('reading...\n', '⠋')
 
     def test_spinner_is_not_animated_when_redirected(self):
         """A redirected stderr gets the message, but no spinner frames."""
@@ -147,15 +184,7 @@ class TestRunWithSpinner(unittest.TestCase):
 
     def test_spinner_clears_both_lines_on_a_terminal(self):
         """Message and spinner lines are erased when nothing resized."""
-        env = {'NO_COLOR': '1', 'TERM': 'xterm'}
-        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
-                patch.object(utils, '_terminal_columns', lambda: 40), \
-                patch.object(stderr, 'isatty', lambda: True), \
-                patch.dict('os.environ', env):
-            run_with_spinner('reading...', lambda: time.sleep(0.15))
-        out = stderr.getvalue()
-        self.assertIn('\r\x1b[2K', out)
-        self.assertIn('\x1b[1A\x1b[2K', out)
+        out = self._assert_terminal_output('\r\x1b[2K', '\x1b[1A\x1b[2K')
         self.assertEqual(out.count('\x1b[?25l'), 1)
         self.assertTrue(out.endswith('\x1b[?25h'))
 
@@ -168,14 +197,8 @@ class TestRunWithSpinner(unittest.TestCase):
             columns[0] = 20
             time.sleep(0.25)
 
-        env = {'NO_COLOR': '1', 'TERM': 'xterm'}
-        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
-                patch.object(
-                    utils, '_terminal_columns', lambda: columns[0]), \
-                patch.object(stderr, 'isatty', lambda: True), \
-                patch.dict('os.environ', env):
-            run_with_spinner('x' * 120, _worker)
-        out = stderr.getvalue()
+        out = self._terminal_output(
+            'x' * 120, _worker, columns=lambda: columns[0])
         self.assertIn('…', out)
         self.assertNotIn('\x1b[1A', out)
         self.assertTrue(out.endswith('\x1b[?25h'))
@@ -190,27 +213,12 @@ class TestRunWithSpinner(unittest.TestCase):
 
     def test_spinner_falls_back_without_ansi_support(self):
         """A terminal without ANSI support gets plain output."""
-        env = {'NO_COLOR': '1'}
-        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
-                patch.object(utils, '_terminal_columns', lambda: 40), \
-                patch.object(stderr, 'isatty', lambda: True), \
-                patch.object(utils, 'ansi_enabled', lambda s=None: False), \
-                patch.dict('os.environ', env):
-            run_with_spinner('reading...', lambda: time.sleep(0.15))
-        self.assertNotIn('\x1b', stderr.getvalue())
-        self.assertIn('⠋', stderr.getvalue())
+        out = self._assert_terminal_output('⠋', ansi=False)
+        self.assertNotIn('\x1b', out)
 
     def test_spinner_uses_ansi_when_supported(self):
         """ANSI terminals get erase sequences and cursor hiding."""
-        env = {'NO_COLOR': '1'}
-        with contextlib.redirect_stderr(io.StringIO()) as stderr, \
-                patch.object(utils, '_terminal_columns', lambda: 40), \
-                patch.object(stderr, 'isatty', lambda: True), \
-                patch.object(utils, 'ansi_enabled', lambda s=None: True), \
-                patch.dict('os.environ', env):
-            run_with_spinner('reading...', lambda: time.sleep(0.15))
-        out = stderr.getvalue()
-        self.assertIn('\x1b[?25l', out)
+        out = self._assert_terminal_output('\x1b[?25l', ansi=True)
         self.assertTrue(out.endswith('\x1b[?25h'))
 
     def test_spinner_runs_in_place_outside_main_process(self):
