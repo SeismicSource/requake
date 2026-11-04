@@ -32,13 +32,13 @@ file.  Both methods start from the event pairs with
 :math:`\mathrm{CC}_\mathrm{max} \ge \mathrm{cc}_\mathrm{min}`: the
 weaker pairs are never read from the database.
 
-The example used in this section is a chain of four events,
+The first example is a chain of four events,
 :math:`a`–:math:`b`–:math:`c`–:math:`d`, linked by three pairs above
 :math:`\mathrm{cc}_\mathrm{min} = 0.95`.  The three remaining pairs,
 :math:`a`–:math:`c`, :math:`a`–:math:`d` and :math:`b`–:math:`d`, are
 either not measured or below ``cc_min``, so they are not edges.
 
-The six pairs of the example are:
+The six pairs of that example are:
 
 .. list-table::
    :header-rows: 1
@@ -111,7 +111,7 @@ families that ``shared`` (a) and ``UPGMA`` (b) build from them.
    event :math:`j` of :math:`B`: the distance between two clusters is
    the mean of their :math:`|A| \cdot |B|` event-to-event distances.
 
-   In the example (``cc_min = 0.95``), :math:`a`–:math:`b` and
+   In the first example (``cc_min = 0.95``), :math:`a`–:math:`b` and
    :math:`c`–:math:`d` merge at 0.01 and 0.02, while the two clusters
    meet only at :math:`(1 + 1 + 0.03 + 1)/4 = 0.76`, above the cut at
    0.05: the strong :math:`b`–:math:`c` pair averages with three
@@ -123,6 +123,101 @@ pair above ``cc_min``: with :math:`n` such events, the matrix holds
 :math:`n(n-1)/2` distances.  For reference, ``UPGMA`` completed on a
 catalog of 93,000 events in which about 15,000 were linked by at least
 one pair above ``cc_min``, a matrix of about 109 million distances.
+
+
+Dendrogram aggregation
+----------------------
+
+The first example ends with one merge between two clusters of two
+events.  With more events, the same mean decides the shape of the whole
+dendrogram: it can join two pairs into a larger family, or keep a third
+pair apart.
+
+The second example has six events, in three pairs, with
+:math:`\mathrm{cc}_\mathrm{min} = 0.95`.  Two of the pairs are joined
+by four cross pairs, the third by one:
+
+.. list-table::
+   :header-rows: 1
+   :align: center
+
+   * - Pair
+     - :math:`\mathrm{CC}_\mathrm{max}`
+     - :math:`d`
+   * - :math:`a`–:math:`b`
+     - 0.99
+     - 0.01
+   * - :math:`c`–:math:`d`
+     - 0.99
+     - 0.01
+   * - :math:`e`–:math:`f`
+     - 0.99
+     - 0.01
+   * - :math:`a`–:math:`c`
+     - 0.96
+     - 0.04
+   * - :math:`a`–:math:`d`
+     - 0.96
+     - 0.04
+   * - :math:`b`–:math:`c`
+     - 0.97
+     - 0.03
+   * - :math:`b`–:math:`d`
+     - 0.97
+     - 0.03
+   * - :math:`a`–:math:`e`
+     - 0.96
+     - 0.04
+
+The other seven pairs are not measured or below ``cc_min``, so they
+have :math:`d = 1`.  ``shared`` links the six events into one family,
+while ``UPGMA`` merges them in five steps:
+
+.. list-table::
+   :header-rows: 1
+   :align: center
+
+   * - Step
+     - Clusters merged
+     - Height
+   * - 1
+     - :math:`a`, :math:`b`
+     - 0.01
+   * - 2
+     - :math:`c`, :math:`d`
+     - 0.01
+   * - 3
+     - :math:`e`, :math:`f`
+     - 0.01
+   * - 4
+     - :math:`\{a, b\}`, :math:`\{c, d\}`
+     - 0.035
+   * - 5
+     - :math:`\{a, b, c, d\}`, :math:`\{e, f\}`
+     - 0.88
+
+.. figure:: imgs/upgma_dendrogram.svg
+   :alt: UPGMA dendrogram of six events in three pairs, cut at 0.05
+   :width: 600
+   :align: center
+
+   **Figure 2** The dendrogram of the six events.  The heights on the
+   left are distances, not to scale; the dashed line is the cut at
+   :math:`t = 0.05`.
+
+Steps 1 to 3 merge the three pairs at their own distances.  Step 4
+averages the four cross distances between :math:`\{a, b\}` and
+:math:`\{c, d\}`, all real, and gives
+:math:`(0.04 + 0.04 + 0.03 + 0.03)/4 = 0.035`: below the cut, so the
+two pairs become one family of four events.  Step 5 averages eight
+distances between that family and :math:`\{e, f\}`, of which only
+:math:`a`–:math:`e` (0.04) is real, and gives
+:math:`(0.04 + 7)/8 = 0.88`: above the cut, so :math:`\{e, f\}` stays a
+family of its own.
+
+A single strong pair cannot join two groups of events: a family grows
+only where several strong pairs support the merge, as the same 0.04
+distance shows in steps 4 and 5.
 
 
 Replacing a build

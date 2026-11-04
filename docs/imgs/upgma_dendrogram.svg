@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 380"
+     width="660" height="380">
+  <style>
+    .node { fill: #ffffff; stroke: #333333; stroke-width: 1.5; }
+    .tree { stroke: #b35c00; stroke-width: 1.5; }
+    .group { fill: none; stroke: #2e7d32; stroke-width: 1.2;
+             stroke-dasharray: 6 4; }
+    .cut { stroke: #c0392b; stroke-width: 1.2; stroke-dasharray: 6 4; }
+    .axis { stroke: #999999; stroke-width: 1; }
+    text { font-family: sans-serif; font-size: 13px; fill: #222222; }
+    .id { font-style: italic; text-anchor: middle; }
+    .h { font-size: 11px; fill: #b35c00; text-anchor: end; }
+    .cutlbl { font-size: 11px; fill: #c0392b; }
+    .title { font-size: 14px; font-weight: bold; text-anchor: middle; }
+    .note { font-size: 12px; fill: #444444; text-anchor: middle; }
+    .result { font-size: 12px; text-anchor: middle; }
+  </style>
+
+  <text class="title" x="330" y="24">UPGMA dendrogram of six events in three pairs</text>
+  <text class="note" x="330" y="44">heights are distances, not to scale</text>
+
+  <!-- height axis -->
+  <line class="axis" x1="46" y1="126" x2="46" y2="300"/>
+  <line class="axis" x1="38" y1="130" x2="46" y2="130"/>
+  <line class="axis" x1="38" y1="250" x2="46" y2="250"/>
+  <line class="axis" x1="38" y1="285" x2="46" y2="285"/>
+  <text class="h" x="33" y="134">0.88</text>
+  <text class="h" x="33" y="254">0.035</text>
+  <text class="h" x="33" y="289">0.01</text>
+
+  <!-- a, b -->
+  <line class="tree" x1="110" y1="297" x2="110" y2="285"/>
+  <line class="tree" x1="180" y1="297" x2="180" y2="285"/>
+  <line class="tree" x1="110" y1="285" x2="180" y2="285"/>
+  <line class="tree" x1="145" y1="285" x2="145" y2="250"/>
+
+  <!-- c, d -->
+  <line class="tree" x1="250" y1="297" x2="250" y2="285"/>
+  <line class="tree" x1="320" y1="297" x2="320" y2="285"/>
+  <line class="tree" x1="250" y1="285" x2="320" y2="285"/>
+  <line class="tree" x1="285" y1="285" x2="285" y2="250"/>
+
+  <!-- e, f -->
+  <line class="tree" x1="420" y1="297" x2="420" y2="285"/>
+  <line class="tree" x1="490" y1="297" x2="490" y2="285"/>
+  <line class="tree" x1="420" y1="285" x2="490" y2="285"/>
+  <line class="tree" x1="455" y1="285" x2="455" y2="130"/>
+
+  <!-- {a, b} with {c, d}, then with {e, f} -->
+  <line class="tree" x1="145" y1="250" x2="285" y2="250"/>
+  <line class="tree" x1="215" y1="250" x2="215" y2="130"/>
+  <line class="tree" x1="215" y1="130" x2="455" y2="130"/>
+
+  <!-- cut at 0.05 -->
+  <line class="cut" x1="60" y1="228" x2="560" y2="228"/>
+  <text class="cutlbl" x="566" y="224">cut: d = 0.05</text>
+
+  <!-- families -->
+  <rect class="group" x="90" y="291" width="250" height="32" rx="8"/>
+  <rect class="group" x="400" y="291" width="110" height="32" rx="8"/>
+
+  <circle class="node" cx="110" cy="309" r="12"/>
+  <circle class="node" cx="180" cy="309" r="12"/>
+  <circle class="node" cx="250" cy="309" r="12"/>
+  <circle class="node" cx="320" cy="309" r="12"/>
+  <circle class="node" cx="420" cy="309" r="12"/>
+  <circle class="node" cx="490" cy="309" r="12"/>
+  <text class="id" x="110" y="314">a</text>
+  <text class="id" x="180" y="314">b</text>
+  <text class="id" x="250" y="314">c</text>
+  <text class="id" x="320" y="314">d</text>
+  <text class="id" x="420" y="314">e</text>
+  <text class="id" x="490" y="314">f</text>
+
+  <text class="result" x="300" y="352">two families: {a, b, c, d} and {e, f}</text>
+</svg>
