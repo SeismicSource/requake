@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 580"
+     width="560" height="580">
+  <style>
+    .step { fill: #eef3f8; stroke: #1f4e79; stroke-width: 1.5; }
+    .opt { fill: #fbfbfb; stroke: #1f4e79; stroke-width: 1.5;
+           stroke-dasharray: 6 4; }
+    .arrow { stroke: #555555; stroke-width: 1.5; }
+    text { font-family: sans-serif; }
+    .name { font-size: 14px; font-weight: bold; text-anchor: middle;
+            fill: #222222; }
+    .sub { font-size: 10.5px; text-anchor: middle; fill: #555555; }
+    .cmd { font-family: monospace; font-size: 11px; fill: #1f4e79; }
+  </style>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#555555"/>
+    </marker>
+  </defs>
+
+  <text class="cmd" x="180" y="16" text-anchor="middle">requake read file</text>
+  <text class="cmd" x="180" y="32" text-anchor="middle">requake read fdsn</text>
+
+  <rect class="step" x="60" y="48" width="240" height="64" rx="8"/>
+  <text class="name" x="180" y="76">catalog</text>
+  <text class="sub" x="180" y="94">events with origin times</text>
+
+  <line class="arrow" x1="180" y1="112" x2="180" y2="156"
+        marker-end="url(#arrow)"/>
+  <text class="cmd" x="316" y="138">requake scan catalog</text>
+
+  <rect class="step" x="60" y="160" width="240" height="64" rx="8"/>
+  <text class="name" x="180" y="188">event pairs</text>
+  <text class="sub" x="180" y="206">events with similar waveforms</text>
+
+  <line class="arrow" x1="180" y1="224" x2="180" y2="268"
+        marker-end="url(#arrow)"/>
+  <text class="cmd" x="316" y="250">requake build families</text>
+
+  <rect class="step" x="60" y="272" width="240" height="64" rx="8"/>
+  <text class="name" x="180" y="300">families</text>
+  <text class="sub" x="180" y="318">clusters of repeating events</text>
+
+  <line class="arrow" x1="180" y1="336" x2="180" y2="380"
+        marker-end="url(#arrow)"/>
+  <text class="cmd" x="316" y="362">requake build templates</text>
+
+  <rect class="opt" x="60" y="384" width="240" height="64" rx="8"/>
+  <text class="name" x="180" y="412">templates</text>
+  <text class="sub" x="180" y="430">one waveform per family</text>
+
+  <line class="arrow" x1="180" y1="448" x2="180" y2="492"
+        marker-end="url(#arrow)"/>
+  <text class="cmd" x="316" y="474">requake scan templates</text>
+
+  <rect class="opt" x="60" y="496" width="240" height="64" rx="8"/>
+  <text class="name" x="180" y="524">template detections</text>
+  <text class="sub" x="180" y="542">new events in continuous data</text>
+</svg>

@@ -45,6 +45,7 @@ Commands are a verb followed by the object the verb acts on, as in
    :maxdepth: 2
    :caption: Analysis
 
+   analysis
    read_catalog
    scan_catalog
    pairs

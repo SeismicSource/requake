@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 360"
+     width="560" height="360">
+  <style>
+    .node { fill: #ffffff; stroke: #333333; stroke-width: 1.5; }
+    .tree { stroke: #b35c00; stroke-width: 1.5; }
+    .group { fill: none; stroke: #2e7d32; stroke-width: 1.2;
+             stroke-dasharray: 6 4; }
+    .cut { stroke: #c0392b; stroke-width: 1.2; stroke-dasharray: 6 4; }
+    .axis { stroke: #999999; stroke-width: 1; }
+    text { font-family: sans-serif; }
+    .id { font-size: 13px; font-style: italic; text-anchor: middle; }
+    .h { font-size: 11px; fill: #b35c00; text-anchor: end; }
+    .cutlbl { font-size: 11px; fill: #c0392b; }
+    .orphan { font-size: 11px; fill: #555555; text-anchor: middle; }
+    .title { font-size: 14px; font-weight: bold; text-anchor: middle; }
+    .note { font-size: 12px; fill: #444444; text-anchor: middle; }
+    .result { font-size: 12px; text-anchor: middle; }
+  </style>
+
+  <text class="title" x="280" y="22">UPGMA dendrogram of five events</text>
+  <text class="note" x="280" y="40">heights are distances, not to scale</text>
+
+  <!-- height axis -->
+  <line class="axis" x1="55" y1="60" x2="55" y2="300"/>
+  <line class="axis" x1="47" y1="160" x2="55" y2="160"/>
+  <line class="axis" x1="47" y1="230" x2="55" y2="230"/>
+  <text class="h" x="42" y="164">0.03</text>
+  <text class="h" x="42" y="234">0.01</text>
+
+  <!-- cut at 0.05 -->
+  <line class="cut" x1="70" y1="100" x2="460" y2="100"/>
+  <line class="cut" x1="47" y1="100" x2="55" y2="100"/>
+  <text class="cutlbl" x="466" y="104">cut: d = 0.05</text>
+
+  <!-- a and b merge first -->
+  <line class="tree" x1="110" y1="272" x2="110" y2="230"/>
+  <line class="tree" x1="170" y1="272" x2="170" y2="230"/>
+  <line class="tree" x1="110" y1="230" x2="170" y2="230"/>
+  <line class="tree" x1="140" y1="230" x2="140" y2="160"/>
+
+  <!-- e joins them -->
+  <line class="tree" x1="230" y1="272" x2="230" y2="160"/>
+  <line class="tree" x1="140" y1="160" x2="230" y2="160"/>
+
+  <!-- families -->
+  <rect class="group" x="90" y="269" width="160" height="40" rx="8"/>
+  <rect class="group" x="320" y="269" width="40" height="40" rx="8"/>
+  <rect class="group" x="410" y="269" width="40" height="40" rx="8"/>
+
+  <circle class="node" cx="110" cy="285" r="13"/>
+  <circle class="node" cx="170" cy="285" r="13"/>
+  <circle class="node" cx="230" cy="285" r="13"/>
+  <circle class="node" cx="340" cy="285" r="13"/>
+  <circle class="node" cx="430" cy="285" r="13"/>
+  <text class="id" x="110" y="289.5">a</text>
+  <text class="id" x="170" y="289.5">b</text>
+  <text class="id" x="230" y="289.5">e</text>
+  <text class="id" x="340" y="289.5">c</text>
+  <text class="id" x="430" y="289.5">d</text>
+
+  <text class="orphan" x="340" y="330">no similar event</text>
+  <text class="orphan" x="430" y="330">no similar event</text>
+
+  <text class="result" x="280" y="352">three families: {a, b, e}, {c}, {d}</text>
+</svg>
