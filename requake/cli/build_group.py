@@ -47,7 +47,7 @@ def _add_templates_leaf(leaves, name, help_text):
 def add_to(subparsers):
     """Add the "build" group to the command line."""
     group, leaves = add_group(
-        subparsers, 'build', 'build derived data from the output database'
+        subparsers, 'build', 'build event families or waveform templates'
     )
     _add_families_leaf(
         leaves, 'families',

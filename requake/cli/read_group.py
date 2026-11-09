@@ -71,7 +71,7 @@ def _add_file_leaf(leaves, name, help_text):
 def add_to(subparsers):
     """Add the "read" group to the command line."""
     group, leaves = add_group(
-        subparsers, 'read', 'read a data set into the output database'
+        subparsers, 'read', 'read an event catalog into the output database'
     )
     _add_fdsn_leaf(
         leaves, 'fdsn', 'read an event catalog from FDSN web services'

@@ -76,7 +76,8 @@ def _add_builds_leaf(leaves, name, help_text):
 def add_to(subparsers):
     """Add the "list" group to the command line."""
     group, leaves = add_group(
-        subparsers, 'list', 'list the entries stored in the output database'
+        subparsers, 'list',
+        'list the stored catalogs, scans and family builds'
     )
     _add_catalogs_leaf(
         leaves, 'catalogs', 'list the catalogs stored in the database'

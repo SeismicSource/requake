@@ -224,7 +224,7 @@ def _add_map_leaf(leaves, name, help_text):
 def add_to(subparsers):
     """Add the "plot" group to the command line."""
     group, leaves = add_group(
-        subparsers, 'plot', 'plot data to screen or file'
+        subparsers, 'plot', 'plot event pairs, families and maps'
     )
     _add_pair_leaf(leaves, 'pair', 'plot traces for a given event pair')
     _add_families_leaf(

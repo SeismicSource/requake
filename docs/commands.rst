@@ -17,14 +17,13 @@ for:
 .. code-block:: text
 
    config              write or update the configuration file
-   read                read a data set into the output database
-   scan                search data already in the output database or new
-                       waveforms
-   build               build derived data from the output database
-   print               print data to screen
-   list                list the entries stored in the output database
-   plot                plot data to screen or file
-   edit                edit entries stored in the output database
+   read                read an event catalog into the output database
+   scan                search for similar events in catalogs and waveforms
+   build               build event families or waveform templates
+   print               print the catalog, event pairs or families to screen
+   list                list the stored catalogs, scans and family builds
+   plot                plot event pairs, families and maps
+   edit                change the label of a stored entry or flag a family
    delete              delete a catalog, a catalog scan or a family build
    wfcache             manage the persistent waveform cache
 

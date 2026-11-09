@@ -98,7 +98,8 @@ def _add_families_leaf(leaves, name, help_text):
 def add_to(subparsers):
     """Add the "print" group to the command line."""
     group, leaves = add_group(
-        subparsers, 'print', 'print data to screen'
+        subparsers, 'print',
+        'print the catalog, event pairs or families to screen'
     )
     _add_catalog_leaf(leaves, 'catalog', 'print the event catalog to screen')
     _add_pairs_leaf(leaves, 'pairs', 'print the event pairs to screen')

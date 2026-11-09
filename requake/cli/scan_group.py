@@ -106,7 +106,7 @@ def add_to(subparsers):
     """Add the "scan" group to the command line."""
     group, leaves = add_group(
         subparsers, 'scan',
-        'search data already in the output database or new waveforms'
+        'search for similar events in catalogs and waveforms'
     )
     _add_catalog_leaf(
         leaves, 'catalog', 'scan an existing catalog for earthquake pairs'

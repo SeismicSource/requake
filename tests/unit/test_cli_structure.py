@@ -191,7 +191,7 @@ class TestGroupHelp(unittest.TestCase):
         """A group without an object must print its own help and exit 0."""
         output = self._check_help('plot')
         self.assertIn('requake plot', output)
-        self.assertIn('Plot data to screen or file.', output)
+        self.assertIn('Plot event pairs, families and maps.', output)
         self.assertIn('timespans', output)
         self.assertNotIn('requake read', output)
 

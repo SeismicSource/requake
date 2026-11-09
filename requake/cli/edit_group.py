@@ -67,7 +67,8 @@ def _add_family_leaf(leaves, name, help_text):
 def add_to(subparsers):
     """Add the "edit" group to the command line."""
     group, leaves = add_group(
-        subparsers, 'edit', 'edit entries stored in the output database'
+        subparsers, 'edit',
+        'change the label of a stored entry or flag a family'
     )
     _add_catalog_leaf(
         leaves, 'catalog', 'change the label of a catalog'
