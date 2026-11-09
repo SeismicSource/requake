@@ -7,6 +7,8 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 - Commands are now a verb followed by an object, as in ``requake print
   pairs`` or ``requake plot map``; the old one-word names are gone, so
   scripts using them need updating.
+- ``sample_config`` and ``update_config`` are now ``config sample`` and
+  ``config update``.
 - New ``list`` command, with ``catalogs``, ``scans`` and ``builds``
   subcommands, replacing ``print_catalogs``, ``print_scans`` and
   ``print_family_builds``.
