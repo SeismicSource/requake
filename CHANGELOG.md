@@ -2,6 +2,8 @@
 
 Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
+## [unreleased]
+
 ## [0.8.5] - 2026-11-09
 
 - Commands are now a verb followed by an object, as in ``requake print
@@ -318,6 +320,7 @@ Mostly a bugfix release with a slightly improved trace plotting.
 
 - Initial release, not yet feature complete
 
+[unreleased]: https://github.com/SeismicSource/requake/compare/v0.8.5...HEAD
 [0.8.5]: https://github.com/SeismicSource/requake/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/SeismicSource/requake/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/SeismicSource/requake/compare/v0.8.2...v0.8.3
