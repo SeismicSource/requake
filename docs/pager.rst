@@ -62,17 +62,17 @@ clipboard.  For the pairs table both event IDs are copied
 Pairs large-dataset warning
 ---------------------------
 
-When more than 10,000 pairs match the current filter, ``print_pairs``
-shows a confirmation prompt before opening the pager.  Use
-``--cc-min`` / ``--cc-max`` to narrow the selection, or ``--force``
-to skip the warning.
+``requake print pairs`` shows a confirmation prompt when more than
+10,000 pairs match the current filter.  Use ``--cc-min`` /
+``--cc-max`` to narrow the selection, or ``--force`` to skip the
+warning.
 
 
 Invalid pairs
 -------------
 
-``print_pairs`` shows only valid pairs.  Pairs flagged as invalid (see
-:doc:`pairs`), i.e. pairs involving an event marked as duplicate, are
-hidden.  Use ``--include-invalid`` to list them as well; an ``invalid``
-column is then added to the table, and the table can be sorted on it to
-show the invalid pairs first.
+``requake print pairs`` shows only valid pairs.  Pairs flagged as
+invalid (see :doc:`pairs`), i.e. pairs involving an event marked as
+duplicate, are hidden.  Use ``--include-invalid`` to list them as
+well; an ``invalid`` column is then added to the table, and the table
+can be sorted on it to show the invalid pairs first.

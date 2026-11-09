@@ -3,7 +3,7 @@
 """
 SQLite-backed registry of the family builds stored in the database.
 
-A family build is one execution of ``requake build_families`` on a scan
+A family build is one execution of ``requake build families`` on a scan
 with a given clustering method and parameters.  It owns its rows in the
 ``families`` table, so that several builds from the same pair set can
 coexist.
@@ -392,7 +392,7 @@ def resolve_build_id(requested=None, scan_id=None):
     if build_id is None:
         raise FamilyBuildNotFoundError(
             f'No family build found in db file {display_db_path()}. '
-            'Run "requake build_families" first.'
+            'Run "requake build families" first.'
         )
     row = read_family_build(build_id)
     logger.info(

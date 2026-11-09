@@ -3,9 +3,9 @@
 """
 SQLite-backed registry of the catalogs stored in the database.
 
-Every catalog read by ``requake read_catalog`` gets its own
-``catalog_id`` and its own ``catalog`` rows, so that reading a new
-catalog never replaces an existing one.
+Every catalog read by ``requake read fdsn`` or ``requake read file``
+gets its own ``catalog_id`` and its own ``catalog`` rows, so that
+reading a new catalog never replaces an existing one.
 """
 import logging
 import sqlite3
@@ -334,7 +334,7 @@ def resolve_catalog_id(requested=None):
     if catalog_id is None:
         raise CatalogNotFoundError(
             f'No catalog found in db file {display_db_path()}. '
-            'Run "requake read_catalog" first.'
+            'Run "requake read fdsn" or "requake read file" first.'
         )
     row = read_catalog_row(catalog_id)
     logger.info(f'Using catalog {catalog_id}{_describe(row)}')

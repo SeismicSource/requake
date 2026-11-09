@@ -1111,7 +1111,7 @@ def plot_families():
             f'Too many families selected: {len(families):n}. '
             'Plotting only the first 20.')
         logger.info(
-            'See "requake plot_families -h" for information on '
+            'See "requake plot families -h" for information on '
             'how to select specific families.')
         families = families[:20]
     for family in families:

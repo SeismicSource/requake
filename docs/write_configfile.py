@@ -25,7 +25,7 @@ Configuration file (default name: ``requake.conf``) is a plain text file
 with keys and values in the form ``key = value``.
 Comment lines start with ``#``.
 
-Here is the default config file, generated through ``requake sample_config``::
+Here is the default config file, generated through ``requake config sample``::
 
 ''')
         configspec = os.path.join(

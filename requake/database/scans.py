@@ -3,7 +3,7 @@
 """
 SQLite-backed registry of the catalog scans stored in the database.
 
-A scan is one execution of ``requake scan_catalog`` on a given catalog.
+A scan is one execution of ``requake scan catalog`` on a given catalog.
 It owns its event pairs and its trace metadata, so that several scans
 performed with different parameters can coexist in the same database.
 """
@@ -426,7 +426,7 @@ def resolve_scan_id(requested=None, catalog_id=None):
     if scan_id is None:
         raise ScanNotFoundError(
             f'No catalog scan found in db file {display_db_path()}. '
-            'Run "requake scan_catalog" first.'
+            'Run "requake scan catalog" first.'
         )
     row = read_scan(scan_id)
     catalog_row = read_catalog_row(int(row['catalog_id']))

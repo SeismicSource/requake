@@ -131,7 +131,7 @@ it acts on:
     print               print data to screen
     list                list the entries stored in the output database
     plot                plot data to screen or file
-    flag                flag entries of the output database
+    edit                edit entries stored in the output database
     delete              delete a catalog, a catalog scan or a family build
     wfcache             manage the persistent waveform cache
 
