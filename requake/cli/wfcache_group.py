@@ -74,6 +74,17 @@ def _add_prefetch_leaf(leaves, name, help_text):
         help='max grouped download span (e.g., 30m, 1h; default: '
              '%(default)s)'
     )
+    parser.add_argument(
+        '--claim-ttl', type=str, default='15m', metavar='DURATION',
+        help='how long a download group stays reserved for this '
+             'process, so that concurrent prefetch instances skip it '
+             '(default: %(default)s)'
+    )
+    parser.add_argument(
+        '--clear-claims', action='store_true',
+        help='remove all prefetch claims before starting '
+             '(use after a crashed instance)'
+    )
     set_action(parser, 'wfcache_prefetch')
     return parser
 

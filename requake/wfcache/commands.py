@@ -23,13 +23,22 @@ from ..config.utils import relative_path
 from ..cli.values import timespec_to_sec
 from ..terminal import style
 from .storage import (
+    DEFAULT_CLAIM_TTL_S,
+    abort_cache_write_batch,
     begin_cache_write_batch,
+    claim_prefetch_group,
+    clear_prefetch_claims,
     clear_waveform_failure,
     commit_cache_write_batch,
+    is_waveform_cached,
     list_waveform_cache_rows,
+    purge_expired_prefetch_claims,
     read_waveform_cache_summary,
     read_waveform_from_cache,
     register_waveform_failure,
+    release_all_prefetch_claims,
+    release_prefetch_claim,
+    renew_prefetch_claim,
     reset_waveform_failures,
     run_wal_checkpoint,
     should_skip_waveform_download,
@@ -57,9 +66,16 @@ def wfcache_prefetch():
 
     batch_size = max(int(getattr(config.args, 'batch_size', 500)), 1)
     group_window_s = _resolve_group_window_seconds()
+    claim_ttl_s = _resolve_claim_ttl_seconds()
+    if bool(getattr(config.args, 'clear_claims', False)):
+        removed = clear_prefetch_claims()
+        logger.info(f'Cleared {removed:n} prefetch claim(s).')
+    purge_expired_prefetch_claims()
     total_attempts = nevents * len(trace_ids)
     counters = {
         'fetched': 0,
+        'cached': 0,
+        'deferred': 0,
         'unavailable': 0,
         'unexpected_errors': 0,
         'attempted': 0,
@@ -70,35 +86,42 @@ def wfcache_prefetch():
         f'({nevents:n} events x {len(trace_ids):n} trace IDs).'
     )
     progress_ctx = _init_prefetch_progress(total_attempts)
-    pending_by_trace = _prepare_prefetch_pending_requests(
-        filtered_catalog,
-        trace_ids,
-        dependencies,
-        progress_ctx,
-        total_attempts,
-        batch_size,
-        counters,
-    )
-    for trace_id in trace_ids:
-        groups = _group_prefetch_requests(
-            pending_by_trace[trace_id],
-            group_window_s,
+    try:
+        requests_by_trace = _prepare_prefetch_requests(
+            filtered_catalog,
+            trace_ids,
+            dependencies,
+            progress_ctx,
+            total_attempts,
+            batch_size,
+            counters,
         )
-        for group in groups:
-            statuses = _download_prefetch_group(
-                trace_id,
-                group,
-                dependencies['get_waveform_from_client'],
-                dependencies['NoWaveformError'],
+        for trace_id in trace_ids:
+            groups = _group_prefetch_requests(
+                requests_by_trace[trace_id],
+                group_window_s,
             )
-            for status in statuses:
-                _record_prefetch_status(
+            for group in groups:
+                _process_prefetch_group(
+                    trace_id,
+                    group,
+                    dependencies,
                     progress_ctx,
                     total_attempts,
                     batch_size,
                     counters,
-                    status,
+                    claim_ttl_s,
                 )
+    finally:
+        # Leave no claim behind, even on Ctrl-C: a later run must be
+        # able to take over immediately.
+        try:
+            release_all_prefetch_claims()
+        except Exception as err:  # pylint: disable=broad-except
+            logger.warning(
+                'Unable to release prefetch claims: '
+                f'{_safe_error(err)}'
+            )
 
     pbar = progress_ctx['pbar']
     if pbar is not None:
@@ -106,9 +129,15 @@ def wfcache_prefetch():
 
     summary = (
         f'Prefetch complete: attempted={counters["attempted"]:n}, '
+        f'cached={counters["cached"]:n}, '
         f'fetched={counters["fetched"]:n}, '
         f'unavailable={counters["unavailable"]:n}'
     )
+    if counters['deferred'] > 0:
+        summary += (
+            f', deferred={counters["deferred"]:n} '
+            '(owned by other instances)'
+        )
     if counters['unexpected_errors'] > 0:
         summary += (
             ' '
@@ -175,7 +204,7 @@ def _prepare_prefetch_scope(catalog, event_ids):
     return trace_ids, filtered_catalog
 
 
-def _prepare_prefetch_pending_requests(
+def _prepare_prefetch_requests(
     filtered_catalog,
     trace_ids,
     dependencies,
@@ -184,14 +213,20 @@ def _prepare_prefetch_pending_requests(
     batch_size,
     counters,
 ):
-    """Prepare pending grouped requests while accounting cache hits/misses.
+    """Prepare every request, tagging it with its cache/failure status.
+
+    The returned list contains *all* requests, not only the ones that
+    still need a download: grouping must not depend on how much of the
+    cache happens to be populated, otherwise two instances (or two runs)
+    would build different groups and could download the same window
+    twice.  Statuses are ``pending``, ``cached`` and ``unavailable``.
 
     Events are processed in catalog order (chronological by orig_time),
     which matches the order scan_catalog consumes pairs.  This ensures
     that when the two processes run in parallel, the earliest events
     are cached before scan_catalog reaches them.
     """
-    pending_by_trace = {
+    requests_by_trace = {
         trace_id: [] for trace_id in trace_ids
     }
     prepared = 0
@@ -232,8 +267,10 @@ def _prepare_prefetch_pending_requests(
                     trace_id,
                     standard_offsets,
                 )
+            if request is not None:
+                request['status'] = status
+                requests_by_trace[trace_id].append(request)
             if status == 'pending':
-                pending_by_trace[trace_id].append(request)
                 queued += 1
             else:
                 _record_prefetch_status(
@@ -251,7 +288,7 @@ def _prepare_prefetch_pending_requests(
                 batch_size,
                 queued,
             )
-    return pending_by_trace
+    return requests_by_trace
 
 
 def _resolve_prefetch_trace_coords_map(
@@ -409,12 +446,29 @@ def _resolve_group_window_seconds():
         rq_exit(2)
 
 
+def _resolve_claim_ttl_seconds():
+    """Parse the prefetch claim lease from CLI arguments."""
+    claim_ttl_spec = getattr(config.args, 'claim_ttl', None)
+    if claim_ttl_spec is None:
+        return DEFAULT_CLAIM_TTL_S
+    try:
+        return max(float(timespec_to_sec(claim_ttl_spec)), 1.0)
+    except ValueError as err:
+        logger.error(err)
+        rq_exit(2)
+
+
 def _prepare_prefetch_request(
     event,
     trace_id,
     standard_offsets,
 ):
-    """Prepare one event/trace request, honoring cache and failure state."""
+    """Prepare one event/trace request, honoring cache and failure state.
+
+    The request is always returned when the window can be computed, so
+    that grouping does not depend on the cache state; only the status
+    tells whether a download is still needed.
+    """
     request = _build_prefetch_request(
         event,
         trace_id,
@@ -424,9 +478,9 @@ def _prepare_prefetch_request(
         return 'unavailable', None
     cached_trace = _read_prefetch_cache(request)
     if cached_trace is not None:
-        return 'fetched', None
+        return 'cached', request
     if _should_skip_prefetch_download(request):
-        return 'unavailable', None
+        return 'unavailable', request
     return 'pending', request
 
 
@@ -494,7 +548,14 @@ def _should_skip_prefetch_download(request):
 
 
 def _group_prefetch_requests(requests, max_span_s):
-    """Group pending requests into larger windows for one trace ID."""
+    """
+    Group requests into larger windows for one trace ID.
+
+    The partition depends only on the requests and on ``max_span_s``,
+    never on which windows are already cached: that is what lets
+    concurrent prefetch instances compute the same groups, and therefore
+    claim and skip the same units of work.
+    """
     if not requests:
         return []
     sorted_requests = sorted(
@@ -528,6 +589,119 @@ def _new_prefetch_group(request):
     }
 
 
+def _process_prefetch_group(
+    trace_id,
+    group,
+    dependencies,
+    progress_ctx,
+    total_attempts,
+    batch_size,
+    counters,
+    claim_ttl_s,
+):
+    """Claim, download and release one group of requests."""
+    pending = [
+        request for request in group['requests']
+        if request['status'] == 'pending'
+    ]
+    if not pending:
+        return
+    start_time = group['start_time']
+    end_time = group['end_time']
+    if not claim_prefetch_group(
+        trace_id, start_time, end_time, claim_ttl_s
+    ):
+        # Another live instance owns this group: it will write these
+        # rows, so there is nothing to download here.
+        _record_prefetch_statuses(
+            progress_ctx,
+            total_attempts,
+            batch_size,
+            counters,
+            ['deferred'] * len(pending),
+        )
+        return
+    try:
+        statuses = _process_claimed_prefetch_group(
+            trace_id,
+            group,
+            pending,
+            dependencies,
+            claim_ttl_s,
+        )
+        _record_prefetch_statuses(
+            progress_ctx,
+            total_attempts,
+            batch_size,
+            counters,
+            statuses,
+        )
+    finally:
+        _release_prefetch_claim_quietly(trace_id, start_time, end_time)
+
+
+def _release_prefetch_claim_quietly(trace_id, start_time, end_time):
+    """Release one claim without ever failing the run: leases expire."""
+    try:
+        release_prefetch_claim(trace_id, start_time, end_time)
+    except Exception as err:  # pylint: disable=broad-except
+        logger.warning(
+            f'Unable to release prefetch claim for {trace_id}: '
+            f'{_safe_error(err)}'
+        )
+
+
+def _process_claimed_prefetch_group(
+    trace_id,
+    group,
+    pending,
+    dependencies,
+    claim_ttl_s,
+):
+    """Download the members of a claimed group that are still missing."""
+    start_time = group['start_time']
+    end_time = group['end_time']
+    # The cache may have been filled between our scan and the claim.
+    missing = _drop_cached_prefetch_requests(pending)
+    cached_count = len(pending) - len(missing)
+    statuses = ['cached'] * cached_count
+    if not missing:
+        return statuses
+    if not renew_prefetch_claim(trace_id, start_time, end_time, claim_ttl_s):
+        statuses.extend(['deferred'] * len(missing))
+        return statuses
+    download_group = {
+        'start_time': start_time,
+        'end_time': end_time,
+        'requests': missing,
+    }
+    statuses.extend(
+        _download_prefetch_group(
+            trace_id,
+            download_group,
+            dependencies['get_waveform_from_client'],
+            dependencies['NoWaveformError'],
+        )
+    )
+    return statuses
+
+
+def _drop_cached_prefetch_requests(requests):
+    """Return the requests whose window is still missing from the cache."""
+    missing = []
+    for request in requests:
+        event = request['event']
+        if is_waveform_cached(
+            event.evid,
+            request['trace_id'],
+            request['start_time'],
+            request['end_time'],
+        ):
+            continue
+        missing.append(request)
+    return missing
+
+
 def _download_prefetch_group(
     trace_id,
     group,
@@ -555,10 +729,14 @@ def _download_prefetch_group(
         _register_prefetch_group_failure(requests, err)
         return ['failed'] * len(requests)
     begin_cache_write_batch()
-    statuses = [
-        _cut_and_cache_prefetch_request(group_trace, request)
-        for request in requests
-    ]
+    try:
+        statuses = [
+            _cut_and_cache_prefetch_request(group_trace, request)
+            for request in requests
+        ]
+    except BaseException:
+        abort_cache_write_batch()
+        raise
     commit_cache_write_batch()
     return statuses
 
@@ -631,6 +809,24 @@ def _safe_error(err):
         )
 
 
+def _record_prefetch_statuses(
+    progress_ctx,
+    total_attempts,
+    batch_size,
+    counters,
+    statuses,
+):
+    """Record several request statuses, one at a time."""
+    for status in statuses:
+        _record_prefetch_status(
+            progress_ctx,
+            total_attempts,
+            batch_size,
+            counters,
+            status,
+        )
+
+
 def _record_prefetch_status(
     progress_ctx,
     total_attempts,
@@ -642,6 +838,10 @@ def _record_prefetch_status(
     counters['attempted'] += 1
     if status == 'fetched':
         counters['fetched'] += 1
+    elif status == 'cached':
+        counters['cached'] += 1
+    elif status == 'deferred':
+        counters['deferred'] += 1
     elif status == 'unavailable':
         counters['unavailable'] += 1
     else:
@@ -653,15 +853,17 @@ def _record_prefetch_status(
         total_attempts,
         batch_size,
         counters['fetched'],
+        counters['cached'],
         counters['unavailable'],
         counters['unexpected_errors'],
     )
 
 
 def _resolve_prefetch_trace_ids():
-    """Resolve trace IDs to use for prefetch."""
+    """Resolve trace IDs to use for prefetch, without duplicates."""
     trace_ids = list(getattr(config.args, 'trace_id', []) or [])
-    return trace_ids or list(getattr(config, 'catalog_trace_id', []))
+    trace_ids = trace_ids or list(getattr(config, 'catalog_trace_id', []))
+    return list(dict.fromkeys(trace_ids))
 
 
 def _init_prefetch_progress(total_attempts):
@@ -687,6 +889,7 @@ def _update_prefetch_progress(
     total_attempts,
     batch_size,
     fetched,
+    cached,
     unavailable,
     unexpected_errors,
 ):
@@ -696,6 +899,7 @@ def _update_prefetch_progress(
         pbar.update(1)
         pbar.set_postfix_str(
             f'fetched={fetched:n} '
+            f'cached={cached:n} '
             f'unavailable={unavailable:n}'
         )
         return
@@ -704,6 +908,7 @@ def _update_prefetch_progress(
         total_attempts,
         batch_size,
         fetched,
+        cached,
         unavailable,
         unexpected_errors,
     )
@@ -726,6 +931,7 @@ def _log_prefetch_progress(
     total_attempts,
     batch_size,
     fetched,
+    cached,
     unavailable,
     unexpected_errors,
 ):
@@ -734,7 +940,8 @@ def _log_prefetch_progress(
         return
     logger.info(
         f'Prefetch progress: {attempted:n}/{total_attempts:n} '
-        f'(fetched={fetched:n}, unavailable={unavailable:n})'
+        f'(fetched={fetched:n}, cached={cached:n}, '
+        f'unavailable={unavailable:n})'
     )
     if unexpected_errors > 0:
         logger.info(
@@ -897,6 +1104,22 @@ def _print_wfcache_details(summary):
             print(f'  {row["trace_id"]}: {row["rows"]:n}')
     if summary['integrity_check'] is not None:
         _print_cached_key('integrity check', summary['integrity_check'])
+    _print_prefetch_claims(summary)
+
+
+def _print_prefetch_claims(summary):
+    """Print the prefetch claim state (parallel-instance coordination)."""
+    print(
+        f'{style("prefetch claims:", "cyan")} '
+        f'total={summary["claim_rows"]:n}, '
+        f'active={summary["claim_active_rows"]:n}, '
+        f'expired={summary["claim_expired_rows"]:n}'
+    )
+    for owner in summary['claim_owners']:
+        print(
+            f'  {owner["owner"]}: {owner["claims"]:n} '
+            f'(active={owner["active"]:n})'
+        )
 
 
 def _read_event_ids_file(path):

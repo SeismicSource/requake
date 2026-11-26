@@ -48,6 +48,23 @@ class TestWaveformCacheCli(unittest.TestCase):
         self.assertEqual(args.action, 'wfcache_reset_failures')
         self.assertEqual(args.event_id, ['ev1'])
 
+    def test_wfcache_prefetch_claim_options(self):
+        """Prefetch should expose the claim lease and reset options."""
+        argv = ['requake', 'wfcache', 'prefetch']
+        with patch.object(sys, 'argv', argv):
+            args = parse_arguments()
+        self.assertEqual(args.action, 'wfcache_prefetch')
+        self.assertEqual(args.claim_ttl, '15m')
+        self.assertFalse(args.clear_claims)
+        argv = [
+            'requake', 'wfcache', 'prefetch',
+            '--claim-ttl', '5m', '--clear-claims',
+        ]
+        with patch.object(sys, 'argv', argv):
+            args = parse_arguments()
+        self.assertEqual(args.claim_ttl, '5m')
+        self.assertTrue(args.clear_claims)
+
 
 if __name__ == '__main__':
     unittest.main()

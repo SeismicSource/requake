@@ -10,6 +10,8 @@ Unit tests for waveform-cache prefetch command.
     (https://www.gnu.org/licenses/gpl-3.0-standalone.html)
 """
 
+import contextlib
+import io
 import tempfile
 import unittest
 from argparse import Namespace
@@ -20,6 +22,7 @@ from obspy import UTCDateTime
 
 from requake.config import config
 from requake.wfcache import commands as commands_module
+from requake.wfcache import storage as storage_mod
 
 MISSING = object()
 
@@ -69,6 +72,57 @@ def _build_group_trace():
     )
 
 
+@contextlib.contextmanager
+def _prefetch_mocks(catalog, cached_by_evid=None):
+    """
+    Patch the prefetch collaborators and yield the download mock.
+
+    ``cached_by_evid`` maps event IDs to a truthy value meaning "this
+    window is already in the cache".
+    """
+    cached = cached_by_evid or {}
+
+    def _read_cache(evid, *_args, **_kwargs):
+        return cached.get(evid)
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch(
+            'requake.catalog.read_stored_catalog',
+            return_value=catalog,
+        ))
+        stack.enter_context(patch(
+            'requake.catalog.fix_non_locatable_events',
+        ))
+        stack.enter_context(patch(
+            'requake.waveforms.station_metadata.get_traceid_coords',
+            side_effect=_build_traceid_coords,
+        ))
+        stack.enter_context(patch(
+            'requake.waveforms.arrivals.get_arrivals',
+            side_effect=_build_arrivals,
+        ))
+        mock_get_waveform = stack.enter_context(patch(
+            'requake.waveforms.get_waveform_from_client',
+            return_value=_build_group_trace(),
+        ))
+        stack.enter_context(patch(
+            'requake.wfcache.commands.read_waveform_from_cache',
+            side_effect=_read_cache,
+        ))
+        stack.enter_context(patch(
+            'requake.wfcache.commands.should_skip_waveform_download',
+            return_value=(False, ''),
+        ))
+        stack.enter_context(patch(
+            'requake.wfcache.commands.write_waveform_to_cache',
+            return_value=True,
+        ))
+        stack.enter_context(patch(
+            'requake.wfcache.commands.clear_waveform_failure',
+        ))
+        yield mock_get_waveform
+
+
 class TestWaveformCachePrefetch(unittest.TestCase):
     """Validate waveform-cache prefetch command behavior."""
 
@@ -91,6 +145,27 @@ class TestWaveformCachePrefetch(unittest.TestCase):
                 config.pop(key, None)
             else:
                 config[key] = value
+
+    def _set_prefetch_args(self, tmpdir, trace_ids):
+        """Configure the prefetch command arguments for one test."""
+        config['args'] = Namespace(
+            outdir=tmpdir,
+            event_id=[],
+            event_id_file=None,
+            trace_id=list(trace_ids),
+            max_events=None,
+            batch_size=10,
+            group_window='1h',
+        )
+
+    def _run_prefetch(self):
+        """Run the prefetch command, returning its standard output."""
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            with self.assertRaises(SystemExit) as exit_err:
+                commands_module.wfcache_prefetch()
+        self.assertEqual(exit_err.exception.code, 0)
+        return stdout.getvalue()
 
     def test_prefetch_honors_filters_and_max_events(self):
         """Prefetch should apply event filters and max-events bound."""
@@ -234,6 +309,82 @@ class TestWaveformCachePrefetch(unittest.TestCase):
                 with self.assertRaises(SystemExit) as exit_err:
                     commands_module.wfcache_prefetch()
             self.assertEqual(exit_err.exception.code, 0)
+            self.assertEqual(mock_get_waveform.call_count, 1)
+
+    def test_prefetch_releases_claims_on_exit(self):
+        """A completed run leaves no claim behind."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config['cc_pre_P'] = 1.0
+            config['cc_trace_length'] = 4.0
+            self._set_prefetch_args(tmpdir, ['IV.ATFO..HHZ'])
+            with _prefetch_mocks([_build_event('ev1')]):
+                self._run_prefetch()
+            self.assertEqual(storage_mod.list_prefetch_claims(), [])
+
+    def test_prefetch_defers_group_owned_by_another_instance(self):
+        """A group claimed by a live peer is skipped, not downloaded."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config['cc_pre_P'] = 1.0
+            config['cc_trace_length'] = 4.0
+            self._set_prefetch_args(tmpdir, ['IV.ATFO..HHZ'])
+            catalog = [_build_event('ev1')]
+            with _prefetch_mocks(catalog), patch(
+                'requake.wfcache.commands.release_prefetch_claim'
+            ), patch(
+                'requake.wfcache.commands.release_all_prefetch_claims'
+            ):
+                first = self._run_prefetch()
+            self.assertIn('fetched=1', first)
+            self.assertEqual(len(storage_mod.list_prefetch_claims()), 1)
+            with patch.object(
+                storage_mod, '_OWNER_TOKEN', 'other-host:1:deadbeef'
+            ), _prefetch_mocks(catalog) as mock_get_waveform:
+                second = self._run_prefetch()
+            self.assertIn('deferred=1', second)
+            self.assertEqual(mock_get_waveform.call_count, 0)
+            storage_mod.clear_prefetch_claims()
+            with _prefetch_mocks(catalog) as mock_get_waveform:
+                third = self._run_prefetch()
+            self.assertIn('fetched=1', third)
+            self.assertEqual(mock_get_waveform.call_count, 1)
+
+    def test_group_span_does_not_depend_on_cache_state(self):
+        """Grouped windows are identical whether or not data is cached."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config['cc_pre_P'] = 1.0
+            config['cc_trace_length'] = 4.0
+            self._set_prefetch_args(tmpdir, ['IV.ATFO..HHZ'])
+            ev1 = _build_event('ev1')
+            ev2 = _build_event('ev2')
+            ev2.orig_time = ev1.orig_time + 60
+            catalog = [ev1, ev2]
+            with _prefetch_mocks(catalog) as mock_get_waveform:
+                self._run_prefetch()
+            reference_call = mock_get_waveform.call_args
+            self.assertIsNotNone(reference_call)
+            cached = {'ev1': object()}
+            with _prefetch_mocks(
+                catalog, cached_by_evid=cached
+            ) as mock_get_waveform:
+                output = self._run_prefetch()
+            self.assertIn('cached=1', output)
+            self.assertEqual(mock_get_waveform.call_count, 1)
+            self.assertEqual(
+                mock_get_waveform.call_args, reference_call
+            )
+
+    def test_prefetch_ignores_duplicate_trace_ids(self):
+        """A repeated trace ID must not duplicate the work."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config['cc_pre_P'] = 1.0
+            config['cc_trace_length'] = 4.0
+            self._set_prefetch_args(
+                tmpdir, ['IV.ATFO..HHZ', 'IV.ATFO..HHZ']
+            )
+            with _prefetch_mocks(
+                [_build_event('ev1')]
+            ) as mock_get_waveform:
+                self._run_prefetch()
             self.assertEqual(mock_get_waveform.call_count, 1)
 
     def test_prefetch_resolves_coords_once_per_event(self):

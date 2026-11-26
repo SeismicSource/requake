@@ -4,6 +4,12 @@ Copyright (c) 2021-2026 Claudio Satriano <satriano@ipgp.fr>
 
 ## [unreleased]
 
+- ``wfcache prefetch`` can now run as several instances on the same
+  output directory: each instance claims the windows it downloads, so
+  no window is downloaded twice.
+- New ``wfcache prefetch --claim-ttl`` and ``--clear-claims`` options;
+  ``wfcache inspect`` reports the active claims.
+
 ## [0.8.5] - 2026-11-09
 
 - Commands are now a verb followed by an object, as in ``requake print

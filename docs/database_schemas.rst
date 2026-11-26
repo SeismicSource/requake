@@ -364,7 +364,9 @@ Waveform Cache Database
 
 The waveform cache is stored in a separate SQLite file,
 ``waveform_cache.sqlite``, located in the output directory.  It contains
-prefetched waveform windows and a persistent record of download failures.
+prefetched waveform windows, a persistent record of download failures,
+and the short-lived claims that let concurrent ``wfcache prefetch``
+processes split the work.
 
 The file uses its own ``PRAGMA user_version`` (currently ``1``) and the
 same WAL / ``busy_timeout`` settings as the main database.
@@ -439,3 +441,36 @@ inserted (or updated via ``ON CONFLICT`` upsert) with an incremented
 backoff.  Once ``retry_count >= max_retries`` the download is considered
 exhausted and skipped by all subsequent runs until the failure is manually
 reset via ``wfcache reset-failures``.
+
+prefetch_claims Table
+~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: sql
+
+   CREATE TABLE IF NOT EXISTS prefetch_claims (
+       trace_id TEXT NOT NULL,
+       start_time_ns INTEGER NOT NULL,
+       end_time_ns INTEGER NOT NULL,
+       owner TEXT NOT NULL,
+       host TEXT,
+       pid INTEGER,
+       claimed_at_ns INTEGER NOT NULL,
+       expires_at_ns INTEGER NOT NULL,
+       PRIMARY KEY (trace_id, start_time_ns, end_time_ns)
+   )
+
+One row per grouped download that a ``wfcache prefetch`` process is
+fetching, so that concurrent instances skip work already in progress.
+``owner`` identifies the process (``host:pid:token``) and
+``expires_at_ns`` is a lease renewed before each download; expired rows
+are removed and reclaimed automatically.  The table is only used while
+prefetch runs: rows are deleted when a group completes.
+
+Indexes:
+
+- ``idx_prefetch_claims_expires`` on ``prefetch_claims(expires_at_ns)``
+
+Adding this table does not change ``PRAGMA user_version``, which stays
+``1``: the table is optional to readers, so older caches gain it in
+place the first time they are opened, with no migration step and no
+loss of cached data.

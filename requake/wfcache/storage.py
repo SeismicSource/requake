@@ -12,9 +12,11 @@ SQLite-backed waveform cache storage.
 import io
 import logging
 import os
+import socket
 import time
 import atexit
 import sqlite3
+import uuid
 from contextlib import suppress
 from pathlib import Path
 
@@ -22,12 +24,15 @@ import numpy as np
 from obspy import Stream, UTCDateTime, read
 
 from ..config import config
+from ..database.db import execute_with_retry
 
 logger = logging.getLogger(__name__.rsplit('.', maxsplit=1)[-1])
 
 SCHEMA_VERSION = 1
 DEFAULT_FAILURE_MAX_RETRIES = 3
 DEFAULT_FAILURE_BACKOFF_S = 600.0
+# Lease duration of a claimed prefetch group, in seconds.
+DEFAULT_CLAIM_TTL_S = 900.0
 
 WAVEFORM_CACHE_SCHEMA = [
     '''
@@ -69,6 +74,23 @@ WAVEFORM_CACHE_SCHEMA = [
         PRIMARY KEY (evid, trace_id, start_time_ns, end_time_ns)
     )
     ''',
+    '''
+    CREATE TABLE IF NOT EXISTS prefetch_claims (
+        trace_id TEXT NOT NULL,
+        start_time_ns INTEGER NOT NULL,
+        end_time_ns INTEGER NOT NULL,
+        owner TEXT NOT NULL,
+        host TEXT,
+        pid INTEGER,
+        claimed_at_ns INTEGER NOT NULL,
+        expires_at_ns INTEGER NOT NULL,
+        PRIMARY KEY (trace_id, start_time_ns, end_time_ns)
+    )
+    ''',
+    (
+        'CREATE INDEX IF NOT EXISTS idx_prefetch_claims_expires '
+        'ON prefetch_claims (expires_at_ns)'
+    ),
 ]
 
 # One SQLite connection is cached per (path, pid) so that every process
@@ -82,6 +104,58 @@ _CACHE_SCHEMA_VERIFIED = set()
 _CACHE_BATCH_ACTIVE = False
 # Cached return value of _failure_limits() for this process.
 _FAILURE_LIMITS = None
+# Identity of this process in the prefetch_claims table.
+_OWNER_TOKEN = None
+
+
+def _claim_owner_token():
+    """Return the stable owner token for this process."""
+    global _OWNER_TOKEN  # pylint: disable=global-statement
+    if _OWNER_TOKEN is None:
+        _OWNER_TOKEN = (
+            f'{socket.gethostname()}:{os.getpid()}:'
+            f'{uuid.uuid4().hex[:8]}'
+        )
+    return _OWNER_TOKEN
+
+
+def _immediate_transaction(conn, work, name):
+    """
+    Run *work* inside a ``BEGIN IMMEDIATE`` transaction, retrying on locks.
+
+    ``work`` must be safe to run more than once, since a transient
+    ``database is locked`` error restarts the whole transaction.
+
+    :param conn: SQLite connection
+    :param work: callable performing the transaction statements
+    :param name: operation name used in error messages
+    :return: whatever *work* returns
+    """
+
+    def _run():
+        conn.execute('BEGIN IMMEDIATE')
+        try:
+            result = work()
+        except BaseException:
+            with suppress(sqlite3.Error):
+                conn.rollback()
+            raise
+        conn.commit()
+        return result
+
+    return execute_with_retry(_run, name)
+
+
+def _write_transaction(conn, work, name):
+    """
+    Run *work* atomically, respecting an already open write batch.
+
+    Inside a batch the caller already holds the write lock, so no new
+    transaction is started and the commit is deferred to the batch.
+    """
+    if _CACHE_BATCH_ACTIVE:
+        return work()
+    return _immediate_transaction(conn, work, name)
 
 
 def _utc_to_ns(value):
@@ -111,9 +185,14 @@ def _connect_cache_db(cache_path):
     """Open a SQLite connection with conservative tuning."""
     conn = sqlite3.connect(str(cache_path), timeout=30.0)
     conn.row_factory = sqlite3.Row
-    conn.execute('PRAGMA journal_mode=WAL')
-    conn.execute('PRAGMA synchronous=NORMAL')
     conn.execute('PRAGMA busy_timeout=30000')
+    # Switching to WAL needs a short exclusive lock; a peer creating the
+    # file at the same time may hold it, hence the retry.
+    execute_with_retry(
+        lambda: conn.execute('PRAGMA journal_mode=WAL'),
+        'enable WAL journal mode',
+    )
+    conn.execute('PRAGMA synchronous=NORMAL')
     _ensure_schema(conn, str(cache_path))
     return conn
 
@@ -158,6 +237,15 @@ def _ensure_schema(conn, cache_path_str):
     """Create tables and validate schema version."""
     if cache_path_str in _CACHE_SCHEMA_VERIFIED:
         return
+    execute_with_retry(
+        lambda: _apply_schema(conn, cache_path_str),
+        'initialize waveform-cache schema',
+    )
+    _CACHE_SCHEMA_VERIFIED.add(cache_path_str)
+
+
+def _apply_schema(conn, cache_path_str):
+    """Create missing tables and set the schema version when unset."""
     for statement in WAVEFORM_CACHE_SCHEMA:
         conn.execute(statement)
     version = int(conn.execute('PRAGMA user_version').fetchone()[0])
@@ -176,7 +264,6 @@ def _ensure_schema(conn, cache_path_str):
             (str(SCHEMA_VERSION),),
         )
         conn.commit()
-    _CACHE_SCHEMA_VERIFIED.add(cache_path_str)
 
 
 def _cache_key(evid, trace_id, starttime, endtime):
@@ -276,6 +363,42 @@ def read_waveform_from_cache(evid, trace_id, starttime, endtime):
     return tr
 
 
+def is_waveform_cached(evid, trace_id, starttime, endtime):
+    """
+    Return True if the window is present in the positive cache.
+
+    Cheaper than :func:`read_waveform_from_cache`, which deserializes
+    the MiniSEED blob: this only checks for the row, using the same
+    exact-match-then-covering-window lookup.
+    """
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return False
+    key = _cache_key(evid, trace_id, starttime, endtime)
+    conn = _get_cache_connection(cache_path)
+    row = conn.execute(
+        '''
+        SELECT 1 FROM waveform_cache
+        WHERE evid = ? AND trace_id = ?
+            AND start_time_ns = ? AND end_time_ns = ?
+        ''',
+        key,
+    ).fetchone()
+    if row is not None:
+        return True
+    row = conn.execute(
+        '''
+        SELECT 1 FROM waveform_cache
+        WHERE evid = ? AND trace_id = ?
+            AND start_time_ns <= ? + 10000000000
+            AND end_time_ns + 10000000000 >= ?
+        LIMIT 1
+        ''',
+        key,
+    ).fetchone()
+    return row is not None
+
+
 def write_waveform_to_cache(evid, trace_id, starttime, endtime, tr):
     """Write one waveform window to SQLite cache."""
     cache_path = get_waveform_cache_db_path()
@@ -324,14 +447,17 @@ def write_cache_meta(key, value):
     if cache_path is None:
         return
     conn = _get_cache_connection(cache_path)
-    conn.execute(
-        '''
-        INSERT OR REPLACE INTO cache_meta (key, value)
-        VALUES (?, ?)
-        ''',
-        (str(key), str(value)),
+    _write_transaction(
+        conn,
+        lambda: conn.execute(
+            '''
+            INSERT OR REPLACE INTO cache_meta (key, value)
+            VALUES (?, ?)
+            ''',
+            (str(key), str(value)),
+        ),
+        'write cache metadata',
     )
-    conn.commit()
 
 
 def read_cache_meta(key):
@@ -356,7 +482,12 @@ def begin_cache_write_batch():
     if cache_path is None:
         return
     conn = _get_cache_connection(cache_path)
-    conn.execute('BEGIN IMMEDIATE')
+    # A peer may hold the write lock: retry instead of aborting the run.
+    # A failed BEGIN leaves no transaction open, so retrying is safe.
+    execute_with_retry(
+        lambda: conn.execute('BEGIN IMMEDIATE'),
+        'begin cache write batch',
+    )
     _CACHE_BATCH_ACTIVE = True
 
 
@@ -372,6 +503,235 @@ def commit_cache_write_batch():
     conn = _get_cache_connection(cache_path)
     conn.commit()
     _CACHE_BATCH_ACTIVE = False
+
+
+def abort_cache_write_batch():
+    """Roll back an open batched-write transaction, if any."""
+    global _CACHE_BATCH_ACTIVE  # pylint: disable=global-statement
+    if not _CACHE_BATCH_ACTIVE:
+        return
+    cache_path = get_waveform_cache_db_path()
+    _CACHE_BATCH_ACTIVE = False
+    if cache_path is None:
+        return
+    conn = _get_cache_connection(cache_path)
+    with suppress(sqlite3.Error):
+        conn.rollback()
+
+
+def _claim_key(trace_id, starttime, endtime):
+    """Build the SQL key tuple for the prefetch_claims table."""
+    return (
+        str(trace_id),
+        _utc_to_ns(starttime),
+        _utc_to_ns(endtime),
+    )
+
+
+def _claim_ttl_ns(ttl_s):
+    """Return the claim lease duration in nanoseconds (at least 1 s)."""
+    ttl = DEFAULT_CLAIM_TTL_S if ttl_s is None else float(ttl_s)
+    return int(max(ttl, 1.0) * 1e9)
+
+
+def claim_prefetch_group(trace_id, starttime, endtime, ttl_s=None):
+    """
+    Try to reserve one prefetch group for this process.
+
+    Expired claims are removed first, so a crashed process never blocks
+    a group forever.
+
+    :param trace_id: trace ID of the group
+    :param starttime: start of the grouped download window
+    :param endtime: end of the grouped download window
+    :param ttl_s: lease duration in seconds (defaults to
+        ``DEFAULT_CLAIM_TTL_S``)
+    :return: True if this process now owns the group, False if another
+        live process holds it
+    :rtype: bool
+    """
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None:
+        # Disk cache disabled: nothing to coordinate.
+        return True
+    conn = _get_cache_connection(cache_path)
+    key = _claim_key(trace_id, starttime, endtime)
+    owner = _claim_owner_token()
+    now_ns = _utc_to_ns(UTCDateTime())
+    expires_ns = now_ns + _claim_ttl_ns(ttl_s)
+
+    def work():
+        conn.execute(
+            'DELETE FROM prefetch_claims WHERE expires_at_ns < ?',
+            (now_ns,),
+        )
+        cursor = conn.execute(
+            '''
+            INSERT OR IGNORE INTO prefetch_claims (
+                trace_id, start_time_ns, end_time_ns,
+                owner, host, pid, claimed_at_ns, expires_at_ns
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (
+                *key,
+                owner,
+                socket.gethostname(),
+                os.getpid(),
+                now_ns,
+                expires_ns,
+            ),
+        )
+        if cursor.rowcount == 1:
+            return True
+        row = conn.execute(
+            '''
+            SELECT owner FROM prefetch_claims
+            WHERE trace_id = ? AND start_time_ns = ? AND end_time_ns = ?
+            ''',
+            key,
+        ).fetchone()
+        if row is None or row['owner'] != owner:
+            return False
+        # We already own this group (e.g. a previous release was lost):
+        # just renew the lease.
+        conn.execute(
+            '''
+            UPDATE prefetch_claims SET expires_at_ns = ?
+            WHERE trace_id = ? AND start_time_ns = ? AND end_time_ns = ?
+            ''',
+            (expires_ns, *key),
+        )
+        return True
+
+    return _immediate_transaction(conn, work, 'claim prefetch group')
+
+
+def renew_prefetch_claim(trace_id, starttime, endtime, ttl_s=None):
+    """
+    Extend the lease of a group owned by this process.
+
+    :return: False when this process no longer owns the group
+    :rtype: bool
+    """
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None:
+        # Disk cache disabled: nothing to coordinate.
+        return True
+    conn = _get_cache_connection(cache_path)
+    key = _claim_key(trace_id, starttime, endtime)
+    expires_ns = _utc_to_ns(UTCDateTime()) + _claim_ttl_ns(ttl_s)
+
+    def work():
+        cursor = conn.execute(
+            '''
+            UPDATE prefetch_claims SET expires_at_ns = ?
+            WHERE trace_id = ? AND start_time_ns = ? AND end_time_ns = ?
+                AND owner = ?
+            ''',
+            (expires_ns, *key, _claim_owner_token()),
+        )
+        return cursor.rowcount == 1
+
+    return _immediate_transaction(conn, work, 'renew prefetch claim')
+
+
+def purge_expired_prefetch_claims():
+    """Delete expired claims, returning the number of removed rows."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return 0
+    conn = _get_cache_connection(cache_path)
+    now_ns = _utc_to_ns(UTCDateTime())
+
+    def work():
+        return conn.execute(
+            'DELETE FROM prefetch_claims WHERE expires_at_ns < ?',
+            (now_ns,),
+        ).rowcount
+
+    return _immediate_transaction(conn, work, 'purge prefetch claims')
+
+
+def release_prefetch_claim(trace_id, starttime, endtime):
+    """Delete this process' claim on one group, if any."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None:
+        return
+    conn = _get_cache_connection(cache_path)
+    key = _claim_key(trace_id, starttime, endtime)
+    _write_transaction(
+        conn,
+        lambda: conn.execute(
+            '''
+            DELETE FROM prefetch_claims
+            WHERE trace_id = ? AND start_time_ns = ? AND end_time_ns = ?
+                AND owner = ?
+            ''',
+            (*key, _claim_owner_token()),
+        ),
+        'release prefetch claim',
+    )
+
+
+def release_all_prefetch_claims():
+    """Delete every claim owned by this process, whatever its group."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None:
+        return
+    conn = _get_cache_connection(cache_path)
+    _write_transaction(
+        conn,
+        lambda: conn.execute(
+            'DELETE FROM prefetch_claims WHERE owner = ?',
+            (_claim_owner_token(),),
+        ),
+        'release prefetch claims',
+    )
+
+
+def clear_prefetch_claims():
+    """Delete all claims, returning the number of removed rows."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return 0
+    conn = _get_cache_connection(cache_path)
+
+    def work():
+        return conn.execute('DELETE FROM prefetch_claims').rowcount
+
+    return _immediate_transaction(conn, work, 'clear prefetch claims')
+
+
+def list_prefetch_claims():
+    """Return all claim rows, oldest group first."""
+    cache_path = get_waveform_cache_db_path()
+    if cache_path is None or not cache_path.exists():
+        return []
+    conn = _get_cache_connection(cache_path)
+    now_ns = _utc_to_ns(UTCDateTime())
+    rows = conn.execute(
+        '''
+        SELECT trace_id, start_time_ns, end_time_ns, owner, host, pid,
+            claimed_at_ns, expires_at_ns
+        FROM prefetch_claims
+        ORDER BY start_time_ns, trace_id
+        '''
+    ).fetchall()
+    return [
+        {
+            'trace_id': row['trace_id'],
+            'start_time': str(_ns_to_utc(row['start_time_ns'])),
+            'end_time': str(_ns_to_utc(row['end_time_ns'])),
+            'owner': row['owner'],
+            'host': row['host'],
+            'pid': row['pid'],
+            'claimed_at': str(_ns_to_utc(row['claimed_at_ns'])),
+            'expires_at': str(_ns_to_utc(row['expires_at_ns'])),
+            'expired': int(row['expires_at_ns']) < now_ns,
+        }
+        for row in rows
+    ]
 
 
 def run_wal_checkpoint(mode='passive'):
@@ -509,59 +869,65 @@ def register_waveform_failure(evid, trace_id, starttime, endtime, error):
         return
     key = _cache_key(evid, trace_id, starttime, endtime)
     max_retries, backoff_base_s = _failure_limits()
-    now_ns = _utc_to_ns(UTCDateTime())
     conn = _get_cache_connection(cache_path)
-    row = conn.execute(
-        '''
-        SELECT retry_count, first_failure_ns
-        FROM waveform_failures
-        WHERE evid = ? AND trace_id = ?
-            AND start_time_ns = ? AND end_time_ns = ?
-        ''',
-        key,
-    ).fetchone()
-    # Increment retry count (or start at 1 for a brand-new failure).
-    retry_count = 1 if row is None else int(row['retry_count']) + 1
-    first_failure_ns = (
-        now_ns if row is None else int(row['first_failure_ns'])
-    )
-    # Exponential backoff: delay = base * 2^(retry_count - 1).
-    delay_s = backoff_base_s * (2 ** max(retry_count - 1, 0))
-    next_retry_after_ns = now_ns + int(delay_s * 1e9)
-    conn.execute(
-        '''
-        INSERT INTO waveform_failures (
-            evid,
-            trace_id,
-            start_time_ns,
-            end_time_ns,
-            retry_count,
-            max_retries,
-            last_error,
-            first_failure_ns,
-            last_failure_ns,
-            next_retry_after_ns
+    now_ns = _utc_to_ns(UTCDateTime())
+
+    def work():
+        # The read and the write happen in the same write transaction,
+        # so a concurrent failure on the same key cannot lose an
+        # increment.
+        row = conn.execute(
+            '''
+            SELECT retry_count, first_failure_ns
+            FROM waveform_failures
+            WHERE evid = ? AND trace_id = ?
+                AND start_time_ns = ? AND end_time_ns = ?
+            ''',
+            key,
+        ).fetchone()
+        # Increment retry count (or start at 1 for a brand-new failure).
+        retry_count = 1 if row is None else int(row['retry_count']) + 1
+        first_failure_ns = (
+            now_ns if row is None else int(row['first_failure_ns'])
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(evid, trace_id, start_time_ns, end_time_ns)
-        DO UPDATE SET
-            retry_count = excluded.retry_count,
-            max_retries = excluded.max_retries,
-            last_error = excluded.last_error,
-            last_failure_ns = excluded.last_failure_ns,
-            next_retry_after_ns = excluded.next_retry_after_ns
-        ''',
-        (
-            *key,
-            retry_count,
-            max_retries,
-            str(error),
-            first_failure_ns,
-            now_ns,
-            next_retry_after_ns,
-        ),
-    )
-    conn.commit()
+        # Exponential backoff: delay = base * 2^(retry_count - 1).
+        delay_s = backoff_base_s * (2 ** max(retry_count - 1, 0))
+        next_retry_after_ns = now_ns + int(delay_s * 1e9)
+        conn.execute(
+            '''
+            INSERT INTO waveform_failures (
+                evid,
+                trace_id,
+                start_time_ns,
+                end_time_ns,
+                retry_count,
+                max_retries,
+                last_error,
+                first_failure_ns,
+                last_failure_ns,
+                next_retry_after_ns
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(evid, trace_id, start_time_ns, end_time_ns)
+            DO UPDATE SET
+                retry_count = excluded.retry_count,
+                max_retries = excluded.max_retries,
+                last_error = excluded.last_error,
+                last_failure_ns = excluded.last_failure_ns,
+                next_retry_after_ns = excluded.next_retry_after_ns
+            ''',
+            (
+                *key,
+                retry_count,
+                max_retries,
+                str(error),
+                first_failure_ns,
+                now_ns,
+                next_retry_after_ns,
+            ),
+        )
+
+    _write_transaction(conn, work, 'register waveform failure')
 
 
 def clear_waveform_failure(evid, trace_id, starttime, endtime):
@@ -571,15 +937,18 @@ def clear_waveform_failure(evid, trace_id, starttime, endtime):
         return
     key = _cache_key(evid, trace_id, starttime, endtime)
     conn = _get_cache_connection(cache_path)
-    conn.execute(
-        '''
-        DELETE FROM waveform_failures
-        WHERE evid = ? AND trace_id = ?
-            AND start_time_ns = ? AND end_time_ns = ?
-        ''',
-        key,
+    _write_transaction(
+        conn,
+        lambda: conn.execute(
+            '''
+            DELETE FROM waveform_failures
+            WHERE evid = ? AND trace_id = ?
+                AND start_time_ns = ? AND end_time_ns = ?
+            ''',
+            key,
+        ),
+        'clear waveform failure',
     )
-    conn.commit()
 
 
 def read_waveform_cache_summary(integrity=False):
@@ -598,6 +967,10 @@ def read_waveform_cache_summary(integrity=False):
         'failure_rows': 0,
         'failure_exhausted_rows': 0,
         'failure_retry_pending_rows': 0,
+        'claim_rows': 0,
+        'claim_active_rows': 0,
+        'claim_expired_rows': 0,
+        'claim_owners': [],
     }
     if cache_path is None or not cache_path.exists():
         return summary
@@ -657,6 +1030,44 @@ def read_waveform_cache_summary(integrity=False):
     summary['failure_retry_pending_rows'] = int(
         fail_row['pending'] or 0
     )
+    claim_row = conn.execute(
+        '''
+        SELECT
+            COUNT(*) AS nrows,
+            SUM(CASE WHEN expires_at_ns > ? THEN 1 ELSE 0 END) AS active
+        FROM prefetch_claims
+        ''',
+        (now_ns,),
+    ).fetchone()
+    summary['claim_rows'] = int(claim_row['nrows'])
+    summary['claim_active_rows'] = int(claim_row['active'] or 0)
+    summary['claim_expired_rows'] = (
+        summary['claim_rows'] - summary['claim_active_rows']
+    )
+    owner_rows = conn.execute(
+        '''
+        SELECT
+            owner,
+            host,
+            pid,
+            COUNT(*) AS nrows,
+            SUM(CASE WHEN expires_at_ns > ? THEN 1 ELSE 0 END) AS active
+        FROM prefetch_claims
+        GROUP BY owner, host, pid
+        ORDER BY nrows DESC
+        ''',
+        (now_ns,),
+    ).fetchall()
+    summary['claim_owners'] = [
+        {
+            'owner': row['owner'],
+            'host': row['host'],
+            'pid': row['pid'],
+            'claims': int(row['nrows']),
+            'active': int(row['active'] or 0),
+        }
+        for row in owner_rows
+    ]
     if integrity:
         with suppress(sqlite3.DatabaseError):
             integrity_row = conn.execute(
@@ -754,12 +1165,11 @@ def reset_waveform_failures(
         where_clause = f" WHERE {' AND '.join(clauses)}"
     query = f'SELECT COUNT(*) FROM waveform_failures{where_clause}'
     conn = _get_cache_connection(cache_path)
-    affected = int(conn.execute(query, tuple(params)).fetchone()[0])
     if dry_run:
-        return affected
-    conn.execute(
-        f'DELETE FROM waveform_failures{where_clause}',
-        params,
+        return int(conn.execute(query, tuple(params)).fetchone()[0])
+    delete_query = f'DELETE FROM waveform_failures{where_clause}'
+    return _immediate_transaction(
+        conn,
+        lambda: conn.execute(delete_query, params).rowcount,
+        'reset waveform failures',
     )
-    conn.commit()
-    return affected

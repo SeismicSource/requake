@@ -63,6 +63,44 @@ repeated attempts to fetch permanently unavailable data are suppressed.
   default: ``1h``).  Larger windows reduce the number of HTTP requests
   but increase individual download size.
 
+``--claim-ttl DURATION``
+  How long a download group stays reserved for the process that is
+  fetching it (default: ``15m``).  The lease is renewed before every
+  download, so only a crashed instance leaves a stale claim behind.
+
+``--clear-claims``
+  Remove all prefetch claims before starting, for example after an
+  instance was killed and its claims did not expire yet.
+
+
+Running several prefetches in parallel
+--------------------------------------
+
+Several ``requake wfcache prefetch`` processes can work on the same
+output directory at the same time.  Each download group is *claimed* in
+the cache database before it is fetched, so two instances never
+download the same window.
+
+The instances build their plan from the whole event catalog, not from
+the part of the cache that is still missing, so they always split the
+work in the same groups.  A group already claimed by another running
+instance is skipped and reported as ``deferred`` in the final summary:
+the owning instance writes those rows.
+
+Claims are leases.  They expire after ``--claim-ttl`` and are renewed
+before each download, so only a crashed instance leaves stale claims
+behind, and those are reclaimed automatically once expired.
+``requake wfcache inspect`` lists the active claims with their owners,
+and ``--clear-claims`` removes all of them before a run.
+
+For the coordination to work, every instance must use the same
+``--group-window``, ``cc_pre_P`` and ``cc_trace_length``, and read the
+same catalog: those values define the group boundaries, and different
+boundaries mean different claims.  Splitting the work explicitly with
+``--trace-id`` or ``--event-id-file`` is still the most efficient way
+to use several processes, because it also removes the small overlap of
+group windows at the boundary between two disjoint event sets.
+
 
 inspect
 -------
